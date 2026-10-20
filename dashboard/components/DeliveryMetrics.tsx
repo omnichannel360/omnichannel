@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface TeamMetric {
   team: string
@@ -10,11 +10,31 @@ interface TeamMetric {
 }
 
 export function DeliveryMetrics() {
-  const teams: TeamMetric[] = [
-    { team: 'Engineering', velocity: 42, targetVelocity: 40, onTimeDelivery: 94 },
-    { team: 'Design', velocity: 28, targetVelocity: 30, onTimeDelivery: 88 },
-    { team: 'QA', velocity: 35, targetVelocity: 35, onTimeDelivery: 96 }
-  ]
+  const [teams, setTeams] = useState<TeamMetric[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/metrics')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data?.delivery) {
+          const delivery = data.data.delivery
+          setTeams([
+            { team: 'Engineering', velocity: delivery.completed_tasks, targetVelocity: 50, onTimeDelivery: 94 },
+            { team: 'Design', velocity: 28, targetVelocity: 30, onTimeDelivery: 88 },
+            { team: 'QA', velocity: 35, targetVelocity: 35, onTimeDelivery: 96 }
+          ])
+        } else {
+          setError(data.error)
+        }
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div style={{ padding: '20px' }}>Loading metrics...</div>
+  if (error) return <div style={{ padding: '20px', color: 'red' }}>Error: {error}</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>

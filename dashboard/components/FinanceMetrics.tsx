@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface Metric {
   label: string
@@ -9,12 +9,37 @@ interface Metric {
 }
 
 export function FinanceMetrics() {
-  const metrics: Metric[] = [
-    { label: 'Monthly Revenue', value: '$125,000', trend: 12.5 },
-    { label: 'Operating Costs', value: '$45,000', trend: -8.2 },
-    { label: 'Gross Margin', value: '64%', trend: 3.1 },
-    { label: 'Runway (months)', value: '18.5', trend: 2.0 }
-  ]
+  const [metrics, setMetrics] = useState<Metric[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/metrics')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data?.finance) {
+          const fin = data.data.finance
+          setMetrics([
+            { label: 'Revenue', value: `$${(fin.revenue / 1000).toFixed(0)}k`, trend: 12.5 },
+            { label: 'Expenses', value: `$${(fin.expenses / 1000).toFixed(0)}k`, trend: -8.2 },
+            { label: 'Profit', value: `$${(fin.profit / 1000).toFixed(0)}k`, trend: 3.1 },
+            { label: 'Burn Rate', value: `${fin.burn_rate.toFixed(1)}%`, trend: 2.0 }
+          ])
+        } else {
+          setError(data.error)
+        }
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return <div style={{ padding: '20px' }}>Loading metrics...</div>
+  }
+
+  if (error) {
+    return <div style={{ padding: '20px', color: 'red' }}>Error: {error}</div>
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>

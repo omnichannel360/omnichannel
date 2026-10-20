@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface FunnelStage {
   name: string
@@ -8,12 +8,32 @@ interface FunnelStage {
 }
 
 export function SalesFunnel() {
-  const stages: FunnelStage[] = [
-    { name: 'Leads', count: 1000 },
-    { name: 'Qualified', count: 500 },
-    { name: 'Proposal', count: 200 },
-    { name: 'Closed', count: 50 }
-  ]
+  const [stages, setStages] = useState<FunnelStage[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/metrics')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data?.sales) {
+          const sales = data.data.sales
+          setStages([
+            { name: 'Leads', count: 1000 },
+            { name: 'Qualified', count: 500 },
+            { name: 'Proposal', count: 200 },
+            { name: 'Closed', count: Math.round(sales.pipeline_value / sales.average_deal_size * 0.05) }
+          ])
+        } else {
+          setError(data.error)
+        }
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div style={{ padding: '20px' }}>Loading...</div>
+  if (error) return <div style={{ padding: '20px', color: 'red' }}>Error: {error}</div>
 
   const maxCount = Math.max(...stages.map(s => s.count))
 

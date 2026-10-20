@@ -1,12 +1,43 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface DeptDossierProps {
   deptId: string
 }
 
 export function DeptDossier({ deptId }: DeptDossierProps) {
+  const [metrics, setMetrics] = useState({
+    teamSize: 12,
+    budget: 480000,
+    okrProgress: 85,
+    velocity: 42,
+    headcount: 10,
+    attrition: 0
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/metrics')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data?.team) {
+          const team = data.data.team
+          setMetrics({
+            teamSize: team.total_agents,
+            budget: 480000,
+            okrProgress: 85,
+            velocity: 42,
+            headcount: team.active_agents,
+            attrition: 0
+          })
+        }
+      })
+      .finally(() => setLoading(false))
+  }, [deptId])
+
+  if (loading) return <div>Loading...</div>
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -18,8 +49,8 @@ export function DeptDossier({ deptId }: DeptDossierProps) {
             borderRadius: '6px'
           }}>
             <p><strong>Department:</strong> {deptId.charAt(0).toUpperCase() + deptId.slice(1)}</p>
-            <p><strong>Team Size:</strong> 12 people</p>
-            <p><strong>Budget:</strong> $480K/year</p>
+            <p><strong>Team Size:</strong> {metrics.teamSize} people</p>
+            <p><strong>Budget:</strong> ${(metrics.budget / 1000).toFixed(0)}K/year</p>
             <p><strong>Lead:</strong> Department Manager</p>
           </div>
         </div>
@@ -31,10 +62,10 @@ export function DeptDossier({ deptId }: DeptDossierProps) {
             padding: '15px',
             borderRadius: '6px'
           }}>
-            <p><strong>OKR Progress:</strong> 85%</p>
-            <p><strong>Velocity:</strong> 42 points/sprint</p>
-            <p><strong>Headcount:</strong> 10/12 filled</p>
-            <p><strong>Attrition Rate:</strong> 0%</p>
+            <p><strong>OKR Progress:</strong> {metrics.okrProgress}%</p>
+            <p><strong>Velocity:</strong> {metrics.velocity} points/sprint</p>
+            <p><strong>Headcount:</strong> {metrics.headcount}/{metrics.teamSize} filled</p>
+            <p><strong>Attrition Rate:</strong> {metrics.attrition}%</p>
           </div>
         </div>
       </div>

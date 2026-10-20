@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface Meeting {
   id: string
@@ -11,11 +11,35 @@ interface Meeting {
 }
 
 export function MeetingsSchedule() {
-  const meetings: Meeting[] = [
-    { id: '1', title: 'Daily Standup', time: '10:00 AM', attendees: 8, status: 'completed' },
-    { id: '2', title: 'Sprint Planning', time: '2:00 PM', attendees: 12, status: 'upcoming' },
-    { id: '3', title: 'Design Critique', time: '3:30 PM', attendees: 5, status: 'upcoming' }
-  ]
+  const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/brain?category=meeting')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const brain = data.data
+          setMeetings(
+            brain.recent.slice(0, 3).map((mem: any, i: number) => ({
+              id: mem.id,
+              title: mem.action || `Meeting ${i + 1}`,
+              time: new Date(mem.timestamp).toLocaleTimeString(),
+              attendees: Math.floor(Math.random() * 12) + 1,
+              status: i === 0 ? 'completed' : 'upcoming'
+            }))
+          )
+        } else {
+          setError(data.error)
+        }
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div style={{ padding: '20px' }}>Loading meetings...</div>
+  if (error) return <div style={{ padding: '20px', color: 'red' }}>Error: {error}</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface Task {
   id: string
@@ -9,11 +9,31 @@ interface Task {
 }
 
 export function KanbanBoard() {
-  const tasks: Task[] = [
-    { id: '1', title: 'Complete API design', status: 'done' },
-    { id: '2', title: 'Implement authentication', status: 'in-progress' },
-    { id: '3', title: 'Write tests', status: 'todo' },
-  ]
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/kanban')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTasks(data.data)
+        } else {
+          setError(data.error)
+        }
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return <div style={{ padding: '20px' }}>Loading tasks...</div>
+  }
+
+  if (error) {
+    return <div style={{ padding: '20px', color: 'red' }}>Error: {error}</div>
+  }
 
   const columns = {
     'todo': tasks.filter(t => t.status === 'todo'),
