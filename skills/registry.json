@@ -1,0 +1,152 @@
+{
+    "meeting_skills":  [
+                           {
+                               "id":  "sprint-planning",
+                               "owner":  "product_team",
+                               "name":  "Sprint Planning",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "plan sprint",
+                                                "sprint planning",
+                                                "sprint goals"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "sprint_planning.py",
+                               "cadence":  "weekly"
+                           },
+                           {
+                               "id":  "sprint-review",
+                               "owner":  "product_team",
+                               "name":  "Sprint Review",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "sprint review",
+                                                "demo",
+                                                "sprint demo"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "sprint_review.py",
+                               "cadence":  "weekly"
+                           },
+                           {
+                               "id":  "standup-report",
+                               "owner":  "team",
+                               "name":  "Standup Report",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "standup",
+                                                "daily standup",
+                                                "blockers"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "standup_report.py",
+                               "cadence":  "daily"
+                           },
+                           {
+                               "id":  "retrospective-kaizen",
+                               "owner":  "team",
+                               "name":  "Retrospective",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "retrospective",
+                                                "kaizen",
+                                                "retro"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "retrospective_kaizen.py",
+                               "cadence":  "weekly"
+                           },
+                           {
+                               "id":  "postmortem",
+                               "owner":  "incident_team",
+                               "name":  "Postmortem",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "postmortem",
+                                                "incident review",
+                                                "root cause"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "postmortem.py",
+                               "cadence":  "adhoc"
+                           },
+                           {
+                               "id":  "go-no-go",
+                               "owner":  "release_team",
+                               "name":  "Go/No-Go Decision",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "go no go",
+                                                "release decision"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "go_no_go.py",
+                               "cadence":  "adhoc"
+                           },
+                           {
+                               "id":  "meeting-facilitate",
+                               "owner":  "facilitator",
+                               "name":  "Meeting Facilitator",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "facilitate",
+                                                "run meeting",
+                                                "lead meeting"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "meeting_facilitate.py",
+                               "cadence":  "variable"
+                           },
+                           {
+                               "id":  "meeting-attend",
+                               "owner":  "attendee",
+                               "name":  "Meeting Attendee",
+                               "type":  "meeting_participant",
+                               "triggers":  [
+                                                "attend",
+                                                "prepare meeting"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "meeting_attend.py",
+                               "cadence":  "variable"
+                           },
+                           {
+                               "id":  "meeting-minutes",
+                               "owner":  "scribe",
+                               "name":  "Meeting Minutes",
+                               "type":  "meeting_facilitator",
+                               "triggers":  [
+                                                "take notes",
+                                                "meeting minutes"
+                                            ],
+                               "status":  "active",
+                               "python_module":  "meeting_minutes.py",
+                               "cadence":  "variable"
+                           }
+                       ],
+    "keyword_index":  {
+                          "postmortem":  "postmortem",
+                          "demo":  "sprint-review",
+                          "retrospective":  "retrospective-kaizen",
+                          "run meeting":  "meeting-facilitate",
+                          "facilitate":  "meeting-facilitate",
+                          "attend":  "meeting-attend",
+                          "sprint planning":  "sprint-planning",
+                          "kaizen":  "retrospective-kaizen",
+                          "meeting minutes":  "meeting-minutes",
+                          "plan sprint":  "sprint-planning",
+                          "take notes":  "meeting-minutes",
+                          "standup":  "standup-report",
+                          "daily standup":  "standup-report",
+                          "blockers":  "standup-report",
+                          "sprint review":  "sprint-review",
+                          "incident review":  "postmortem",
+                          "release decision":  "go-no-go",
+                          "go no go":  "go-no-go"
+                      },
+    "metadata":  {
+                     "updated_at":  "2026-10-21T03:30:00Z",
+                     "total_skills":  9,
+                     "version":  "1.0"
+                 }
+}

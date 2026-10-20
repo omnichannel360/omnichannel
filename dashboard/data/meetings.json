@@ -1,0 +1,173 @@
+{
+  "daily-standup": {
+    "id": "daily-standup",
+    "name": "Daily Standup",
+    "duration_minutes": 15,
+    "frequency": "daily",
+    "purpose": "Synchronize work, blockers, and dependencies",
+    "required_fields": ["what_done", "what_next", "blockers"],
+    "attendees": "team"
+  },
+  "sprint-planning": {
+    "id": "sprint-planning",
+    "name": "Sprint Planning",
+    "duration_minutes": 120,
+    "frequency": "weekly",
+    "purpose": "Plan sprint work and define acceptance criteria",
+    "required_fields": ["goals", "stories", "estimates", "acceptance_criteria"],
+    "attendees": "product_team"
+  },
+  "sprint-review": {
+    "id": "sprint-review",
+    "name": "Sprint Review",
+    "duration_minutes": 60,
+    "frequency": "weekly",
+    "purpose": "Demonstrate completed work and gather feedback",
+    "required_fields": ["demo_items", "feedback", "metrics"],
+    "attendees": "stakeholders"
+  },
+  "retrospective": {
+    "id": "retrospective",
+    "name": "Retrospective (Kaizen)",
+    "duration_minutes": 60,
+    "frequency": "weekly",
+    "purpose": "Improve team processes through continuous learning",
+    "required_fields": ["what_went_well", "what_to_improve", "actions"],
+    "attendees": "team"
+  },
+  "postmortem": {
+    "id": "postmortem",
+    "name": "Postmortem (Incident Review)",
+    "duration_minutes": 90,
+    "frequency": "adhoc",
+    "purpose": "Root cause analysis and prevention after incident",
+    "required_fields": ["timeline", "root_cause", "action_items", "prevention"],
+    "attendees": "incident_team"
+  },
+  "go-no-go": {
+    "id": "go-no-go",
+    "name": "Go/No-Go Decision Meeting",
+    "duration_minutes": 30,
+    "frequency": "adhoc",
+    "purpose": "Make release or launch decision",
+    "required_fields": ["decision", "rationale", "risks", "go_nogo"],
+    "attendees": "release_team"
+  },
+  "board-meeting": {
+    "id": "board-meeting",
+    "name": "Board Meeting",
+    "duration_minutes": 180,
+    "frequency": "monthly",
+    "purpose": "Report financials, strategy, risk to board",
+    "required_fields": ["metrics", "financials", "strategy_updates", "risks"],
+    "attendees": "executives"
+  },
+  "design-critique": {
+    "id": "design-critique",
+    "name": "Design Critique",
+    "duration_minutes": 45,
+    "frequency": "adhoc",
+    "purpose": "Review design work for quality and usability",
+    "required_fields": ["design_artifact", "feedback", "improvements"],
+    "attendees": "design_team"
+  },
+  "architecture-review": {
+    "id": "architecture-review",
+    "name": "Architecture Review",
+    "duration_minutes": 90,
+    "frequency": "quarterly",
+    "purpose": "Technical design review and scalability assessment",
+    "required_fields": ["proposal", "tradeoffs", "risks", "approval"],
+    "attendees": "tech_leads"
+  },
+  "client-kickoff": {
+    "id": "client-kickoff",
+    "name": "Client Kickoff",
+    "duration_minutes": 90,
+    "frequency": "project_start",
+    "purpose": "Align on project scope, timeline, expectations",
+    "required_fields": ["scope", "timeline", "success_criteria", "deliverables"],
+    "attendees": "client_project_team"
+  },
+  "app-intake": {
+    "id": "app-intake",
+    "name": "App Intake/Discovery",
+    "duration_minutes": 60,
+    "frequency": "project_start",
+    "purpose": "Gather requirements and build project brief",
+    "required_fields": ["requirements", "constraints", "success_metrics", "timeline"],
+    "attendees": "discovery_team"
+  },
+  "security-review": {
+    "id": "security-review",
+    "name": "Security Review",
+    "duration_minutes": 60,
+    "frequency": "quarterly",
+    "purpose": "Assess security posture and compliance",
+    "required_fields": ["findings", "severity", "remediation", "timeline"],
+    "attendees": "security_team"
+  },
+  "growth-review": {
+    "id": "growth-review",
+    "name": "Growth Review",
+    "duration_minutes": 75,
+    "frequency": "monthly",
+    "purpose": "Review metrics, cohorts, and growth initiatives",
+    "required_fields": ["metrics", "cohort_analysis", "initiatives", "next_steps"],
+    "attendees": "growth_team"
+  },
+  "kb-review": {
+    "id": "kb-review",
+    "name": "Knowledge Base Review",
+    "duration_minutes": 45,
+    "frequency": "monthly",
+    "purpose": "Update and maintain internal knowledge base",
+    "required_fields": ["new_docs", "updates", "deprecations"],
+    "attendees": "all"
+  },
+  "agent-perf-review": {
+    "id": "agent-perf-review",
+    "name": "Agent Performance Review",
+    "duration_minutes": 45,
+    "frequency": "weekly",
+    "purpose": "Review agent accuracy, latency, and improvements",
+    "required_fields": ["metrics", "errors", "optimizations"],
+    "attendees": "ai_team"
+  },
+  "monthly-retainer-status": {
+    "id": "monthly-retainer-status",
+    "name": "Monthly Retainer Status",
+    "duration_minutes": 30,
+    "frequency": "monthly",
+    "purpose": "Report on retainer work and upcoming priorities",
+    "required_fields": ["summary", "completed", "upcoming", "health"],
+    "attendees": "client_account_team"
+  },
+  "one-on-one": {
+    "id": "one-on-one",
+    "name": "One-on-One",
+    "duration_minutes": 30,
+    "frequency": "weekly",
+    "purpose": "Individual coaching and career development",
+    "required_fields": ["goals", "feedback", "blockers", "growth"],
+    "attendees": "manager_direct_report"
+  },
+  "all-hands": {
+    "id": "all-hands",
+    "name": "All Hands",
+    "duration_minutes": 60,
+    "frequency": "monthly",
+    "purpose": "Company-wide updates, vision, and culture",
+    "required_fields": ["company_updates", "metrics", "vision"],
+    "attendees": "all_company"
+  },
+  "hiring-debrief": {
+    "id": "hiring-debrief",
+    "name": "Hiring Debrief",
+    "duration_minutes": 30,
+    "frequency": "adhoc",
+    "purpose": "Evaluate candidate interviews and make hiring decision",
+    "required_fields": ["candidate_assessment", "decision", "rationale"],
+    "attendees": "hiring_panel"
+  }
+}
