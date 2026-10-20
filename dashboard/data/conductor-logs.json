@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": "2026-10-20T18:58:40.509Z",
+    "userMessage": "fix the authentication bug",
+    "conductorResponse": "Dispatching \"fix the\" to: bug-fixer-1, bug-fixer-2. Task logged and agents notified.",
+    "dispatchedAgents": [
+      "bug-fixer-1",
+      "bug-fixer-2"
+    ]
+  }
+]

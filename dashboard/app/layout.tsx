@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ConductorDock } from '@/components/ConductorDock'
 
 export const metadata: Metadata = {
   title: 'OmniForge Dashboard',
@@ -30,13 +31,8 @@ export default function RootLayout({
           <main className="flex-1 bg-gray-50 overflow-auto">
             {children}
           </main>
-          <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-auto">
-            <h2 className="text-lg font-bold mb-4">Conductor Dock</h2>
-            <div className="space-y-4">
-              <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                <p className="text-sm text-gray-600">Chat interface coming soon</p>
-              </div>
-            </div>
+          <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-auto flex flex-col">
+            <ConductorDock />
           </div>
         </div>
       </body>
