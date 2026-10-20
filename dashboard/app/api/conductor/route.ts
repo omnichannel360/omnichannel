@@ -15,7 +15,7 @@ interface SkillRegistry {
 }
 
 const LOG_FILE = path.join(process.cwd(), 'data', 'conductor-logs.json')
-const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', '..', 'skills', 'registry.json')
+const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
 
 function ensureDataDir() {
   const dir = path.dirname(LOG_FILE)

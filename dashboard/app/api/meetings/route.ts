@@ -27,7 +27,7 @@ interface SkillRegistry {
 
 const MEETINGS_DATA_PATH = path.join(process.cwd(), 'data', 'meetings.json')
 const MEETINGS_LOG = path.join(process.cwd(), 'data', 'meetings-log.json')
-const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', '..', 'skills', 'registry.json')
+const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
 
 function ensureDataDir() {
   const dir = path.dirname(MEETINGS_LOG)
