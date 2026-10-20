@@ -21,8 +21,13 @@ interface MeetingLog {
   outcomes?: Record<string, unknown>
 }
 
+interface SkillRegistry {
+  keyword_index: Record<string, string>
+}
+
 const MEETINGS_DATA_PATH = path.join(process.cwd(), 'data', 'meetings.json')
 const MEETINGS_LOG = path.join(process.cwd(), 'data', 'meetings-log.json')
+const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', '..', 'skills', 'registry.json')
 
 function ensureDataDir() {
   const dir = path.dirname(MEETINGS_LOG)
@@ -56,27 +61,15 @@ function saveMeetingLogs(logs: MeetingLog[]) {
   fs.writeFileSync(MEETINGS_LOG, JSON.stringify(logs, null, 2))
 }
 
-const SKILL_MAPPING: Record<string, string> = {
-  'daily-standup': 'standup_report',
-  'sprint-planning': 'sprint_planning',
-  'sprint-review': 'sprint_review',
-  'retrospective': 'retrospective_kaizen',
-  'postmortem': 'postmortem',
-  'go-no-go': 'go_no_go',
-  'board-meeting': 'board_meeting',
-  'architecture-review': 'architecture_review',
-  'client-kickoff': 'client_kickoff',
-  'app-intake': 'app_intake',
-  'security-review': 'security_review',
-  'growth-review': 'growth_review',
-  'kb-review': 'kb_review',
-  'agent-perf-review': 'agent_perf_review',
-  'monthly-retainer-status': 'monthly_retainer_status',
-  'one-on-one': 'one_on_one',
-  'all-hands': 'all_hands',
-  'hiring-debrief': 'hiring_debrief',
-  'design-critique': 'design_critique',
+function loadSkillRegistry(): SkillRegistry | null {
+  try {
+    const content = fs.readFileSync(SKILL_REGISTRY_PATH, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
 }
+
 
 function logToBrain(log: MeetingLog) {
   const brainDir = path.join(process.cwd(), '..', '..', 'company-brain', 'meetings')
@@ -101,22 +94,25 @@ function logToBrain(log: MeetingLog) {
   fs.writeFileSync(filePath, JSON.stringify(brainRecord, null, 2))
 }
 
-function parseMeetingFromMessage(message: string): {
+function parseMeetingFromMessage(message: string, registry: SkillRegistry | null): {
   meeting_type: string | null
   skill: string | null
   description: string
 } {
-  const lowerMessage = message.toLowerCase()
+  if (!registry) {
+    return {
+      meeting_type: null,
+      skill: null,
+      description: message,
+    }
+  }
 
-  for (const [key, skill] of Object.entries(SKILL_MAPPING)) {
-    if (
-      lowerMessage.includes(key.replace(/-/g, ' ')) ||
-      lowerMessage.includes(key) ||
-      lowerMessage.includes(skill.replace(/_/g, ' '))
-    ) {
+  const lowerMessage = message.toLowerCase()
+  for (const [keyword, skillId] of Object.entries(registry.keyword_index)) {
+    if (lowerMessage.includes(keyword)) {
       return {
-        meeting_type: key,
-        skill,
+        meeting_type: skillId,
+        skill: skillId,
         description: message,
       }
     }
@@ -170,6 +166,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const registry = loadSkillRegistry()
+
     let parsed = {
       meeting_type: meeting_type || null,
       skill: null,
@@ -177,11 +175,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (message) {
-      parsed = parseMeetingFromMessage(message)
-    }
-
-    if (parsed.meeting_type && SKILL_MAPPING[parsed.meeting_type]) {
-      parsed.skill = SKILL_MAPPING[parsed.meeting_type]
+      parsed = parseMeetingFromMessage(message, registry)
     }
 
     const logs = loadMeetingLogs()
