@@ -78,6 +78,29 @@ const SKILL_MAPPING: Record<string, string> = {
   'design-critique': 'design_critique',
 }
 
+function logToBrain(log: MeetingLog) {
+  const brainDir = path.join(process.cwd(), '..', '..', 'company-brain', 'meetings')
+  if (!fs.existsSync(brainDir)) {
+    fs.mkdirSync(brainDir, { recursive: true })
+  }
+
+  const fileName = `${log.meeting_type}_${new Date().getTime()}.json`
+  const filePath = path.join(brainDir, fileName)
+
+  const brainRecord = {
+    id: `meeting_${Date.now()}`,
+    timestamp: log.timestamp,
+    category: 'meetings',
+    meeting_type: log.meeting_type,
+    skill_triggered: log.skill_triggered,
+    participants: log.participants || [],
+    outcomes: log.outcomes || {},
+    status: log.status,
+  }
+
+  fs.writeFileSync(filePath, JSON.stringify(brainRecord, null, 2))
+}
+
 function parseMeetingFromMessage(message: string): {
   meeting_type: string | null
   skill: string | null
@@ -171,7 +194,7 @@ export async function POST(request: NextRequest) {
       outcomes: {},
     }
 
-    logs.push(log)
+    logs.push(log); logToBrain(log);
     saveMeetingLogs(logs)
 
     const response = parsed.skill
@@ -191,3 +214,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

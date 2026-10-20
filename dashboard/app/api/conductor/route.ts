@@ -7,9 +7,15 @@ interface ConversationLog {
   userMessage: string
   conductorResponse: string
   dispatchedAgents?: string[]
+  dispatchedSkills?: string[]
+}
+
+interface SkillRegistry {
+  keyword_index: Record<string, string>
 }
 
 const LOG_FILE = path.join(process.cwd(), 'data', 'conductor-logs.json')
+const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', '..', 'skills', 'registry.json')
 
 function ensureDataDir() {
   const dir = path.dirname(LOG_FILE)
@@ -18,16 +24,40 @@ function ensureDataDir() {
   }
 }
 
+function loadSkillRegistry(): SkillRegistry | null {
+  try {
+    const data = fs.readFileSync(SKILL_REGISTRY_PATH, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return null
+  }
+}
+
 function loadLogs(): ConversationLog[] {
   ensureDataDir()
   if (!fs.existsSync(LOG_FILE)) return []
-  const data = fs.readFileSync(LOG_FILE, 'utf-8')
-  return JSON.parse(data)
+  try {
+    const data = fs.readFileSync(LOG_FILE, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return []
+  }
 }
 
 function saveLogs(logs: ConversationLog[]) {
   ensureDataDir()
   fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2))
+}
+
+function findMatchingSkill(message: string, registry: SkillRegistry | null): string | null {
+  if (!registry) return null
+  const lowerMessage = message.toLowerCase()
+  for (const [keyword, skillId] of Object.entries(registry.keyword_index)) {
+    if (lowerMessage.includes(keyword)) {
+      return skillId
+    }
+  }
+  return null
 }
 
 function parseTaskFromMessage(message: string): {
@@ -65,26 +95,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const registry = loadSkillRegistry()
+    const skillId = findMatchingSkill(message, registry)
     const task = parseTaskFromMessage(message)
 
-    const response =
-      task.agents.length === 1 && task.agents[0] === 'conductor'
-        ? `Processing: ${task.action}. No specific agents assigned. Awaiting clarification.`
-        : `Dispatching "${task.action}" to: ${task.agents.join(', ')}. Task logged and agents notified.`
+    let response: string
+    let dispatchedSkills: string[] = []
+    let dispatchedAgents: string[] = []
+
+    if (skillId) {
+      response = `Dispatching meeting skill: "${skillId}". Task logged and skill triggered.`
+      dispatchedSkills = [skillId]
+    } else if (task.agents.length > 0 && task.agents[0] !== 'conductor') {
+      response = `Dispatching "${task.action}" to: ${task.agents.join(', ')}. Task logged and agents notified.`
+      dispatchedAgents = task.agents
+    } else {
+      response = `Processing: ${task.action}. No specific agents assigned. Awaiting clarification.`
+    }
 
     const logs = loadLogs()
     logs.push({
       timestamp: new Date().toISOString(),
       userMessage: message,
       conductorResponse: response,
-      dispatchedAgents: task.agents,
+      dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
+      dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
     })
     saveLogs(logs)
 
     return NextResponse.json({
       success: true,
       response,
-      dispatchedAgents: task.agents,
+      dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
+      dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
     })
   } catch (error) {
     return NextResponse.json(
