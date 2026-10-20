@@ -72,7 +72,7 @@ function loadSkillRegistry(): SkillRegistry | null {
 
 
 function logToBrain(log: MeetingLog) {
-  const brainDir = path.join(process.cwd(), '..', '..', 'company-brain', 'meetings')
+  const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
   if (!fs.existsSync(brainDir)) {
     fs.mkdirSync(brainDir, { recursive: true })
   }
