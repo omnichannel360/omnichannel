@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodSchema, ZodError, z } from 'zod'
 import { createLogger } from '@/lib/logger'
+// Re-export complete sanitizeString from input-validation (includes HTML entity escaping for XSS protection)
+import { sanitizeString as completeSanitizeString } from '@/lib/input-validation'
 
 const logger = createLogger('validation-system')
 
@@ -304,22 +306,22 @@ export function createSuccessResponse<T>(
  */
 
 /**
- * Removes common injection attack patterns from strings
- * - Null bytes
- * - Control characters
- * - Common XSS patterns (handled by Zod schemas primarily)
+ * Removes injection attack patterns from strings - COMPLETE VERSION with XSS protection
+ *
+ * Performs TWO security operations:
+ * 1. Removes null bytes and control characters
+ * 2. Escapes HTML entities to prevent XSS attacks
+ *
+ * This delegates to the authoritative implementation in input-validation.ts.
+ * Always use this function, never the incomplete version.
  *
  * @param input - String to sanitize
- * @returns Sanitized string
+ * @returns Sanitized string safe for HTML context
  */
 export function sanitizeString(input: string): string {
-  // Remove null bytes
-  let sanitized = input.replace(/\0/g, '')
-
-  // Remove control characters (except whitespace)
-  sanitized = sanitized.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]/g, '')
-
-  return sanitized.trim()
+  // Delegate to the complete, properly-implemented version
+  // This ensures consistent XSS protection across all validation code
+  return completeSanitizeString(input)
 }
 
 /**

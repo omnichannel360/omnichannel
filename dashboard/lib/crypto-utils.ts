@@ -4,8 +4,10 @@
  * NOTE: Fallback to Math.random is NOT cryptographically secure
  */
 
+import type { Logger } from './logger'
+
 // Use dynamic require to avoid circular dependency with logger
-let logger: any = null
+let logger: Logger | null = null
 function getLogger() {
   if (!logger) {
     try {
@@ -14,9 +16,9 @@ function getLogger() {
     } catch {
       // Fallback if logger cannot be loaded - create minimal structured logger
       logger = {
-        warn: (message: string, context?: any) => {
+        warn: (message: string, context?: Record<string, unknown>) => {
           const timestamp = new Date().toISOString()
-          const logEntry = { timestamp, level: 'WARN', module: 'crypto-utils', message, ...context }
+          const logEntry = { timestamp, level: 'WARN', module: 'crypto-utils', message, ...(context || {}) }
           // Write to stderr to avoid mixing with stdout
           if (typeof process !== 'undefined' && process.stderr) {
             process.stderr.write(JSON.stringify(logEntry) + '\n')
@@ -25,7 +27,7 @@ function getLogger() {
             console.warn('[WARN]', logEntry)
           }
         }
-      }
+      } as Logger
     }
   }
   return logger

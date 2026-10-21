@@ -3,8 +3,10 @@
  * Uses crypto.getRandomValues() when available, falls back to Math.random()
  */
 
+import type { Logger } from './logger'
+
 // Use dynamic require to avoid circular dependency with logger
-let logger: any = null
+let logger: Logger | null = null
 function getLogger() {
   if (!logger) {
     try {
@@ -24,7 +26,7 @@ function getLogger() {
             console.warn('[WARN]', logEntry)
           }
         }
-      }
+      } as Logger
     }
   }
   return logger
