@@ -1,12 +1,29 @@
 import { z } from 'zod'
-import crypto from 'crypto'
+import { generateId as generatePlainId, generatePrefixedId, generateUUIDv4 } from './uuid'
+
+/**
+ * Re-exports and wrappers for UUID generation
+ * Uses the uuid.ts implementation for consistency
+ */
 
 /**
  * Generates a UUID v4 without a prefix
- * @returns A cryptographically secure random UUID
+ * @returns A cryptographically secure random UUID (RFC 4122 compliant)
  */
 export function generateUUID(): string {
-  return crypto.randomUUID()
+  return generateUUIDv4()
+}
+
+/**
+ * Generates a unique ID, optionally with a prefix
+ * @param prefix - Optional prefix for the ID (e.g., 'meeting', 'alert')
+ * @returns A prefixed UUID (e.g., 'meeting_550e8400-e29b-41d4-a716-446655440000') or unprefixed UUID
+ */
+export function generateId(prefix?: string): string {
+  if (!prefix) {
+    return generatePlainId()
+  }
+  return generatePrefixedId(prefix)
 }
 
 export const MeetingTypeSchema = z
@@ -41,10 +58,6 @@ export const AlertUpdateSchema = z.object({
   alert_id: z.string(),
   status: AlertStatusSchema,
 })
-
-export function generateId(prefix: string): string {
-  return `${prefix}_${crypto.randomUUID()}`
-}
 
 import path from 'path'
 

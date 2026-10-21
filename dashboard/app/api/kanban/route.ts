@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
-import crypto from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
-import { TaskCreateSchema, TaskUpdateSchema } from '@/lib/validation'
+import { TaskCreateSchema, TaskUpdateSchema, generateId } from '@/lib/validation'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
@@ -18,9 +17,9 @@ interface Task {
 const DATA_FILE = path.join(process.cwd(), 'data', 'kanban.json')
 
 const DEFAULT_TASKS: Task[] = [
-  { id: crypto.randomUUID(), title: 'Complete API design', status: 'done' as const },
-  { id: crypto.randomUUID(), title: 'Implement authentication', status: 'in-progress' },
-  { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
+  { id: generateId('task'), title: 'Complete API design', status: 'done' as const },
+  { id: generateId('task'), title: 'Implement authentication', status: 'in-progress' },
+  { id: generateId('task'), title: 'Write tests', status: 'todo' },
 ]
 
 export async function GET(request: NextRequest) {

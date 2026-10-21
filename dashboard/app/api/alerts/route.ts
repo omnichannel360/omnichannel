@@ -3,6 +3,7 @@ import { atomicUpdate, atomicRead } from '@/lib/atomic-file-ops'
 import { AlertCreateSchema, AlertUpdateSchema, AlertLevelSchema, AlertStatusSchema, generateId } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import path from 'path'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface Alert {
   id: string
@@ -16,6 +17,10 @@ interface Alert {
 const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json')
 
 export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'alerts')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Unauthorized')
@@ -30,6 +35,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'alerts')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Unauthorized')
@@ -65,6 +74,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'alerts')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Unauthorized')

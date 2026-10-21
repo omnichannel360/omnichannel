@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import crypto from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { atomicRead } from '@/lib/atomic-file-ops'
 import { atomicReaddir } from '@/lib/atomic-dir-ops'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { generateId } from '@/lib/validation'
 
 interface Memory {
   id: string
@@ -71,7 +71,7 @@ async function getHandler(request: NextRequest) {
         const data = await atomicRead<MemoryData[] | Record<string, unknown>>(path.join(BRAIN_DIR, file))
         if (Array.isArray(data)) {
           data.forEach((mem: MemoryData) => {
-            const id = mem.id || crypto.randomUUID()
+            const id = mem.id || generateId('memory')
             const cat = mem.category || 'general'
 
             // Prevent duplicate IDs from being counted twice
