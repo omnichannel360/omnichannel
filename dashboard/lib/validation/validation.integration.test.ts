@@ -9,7 +9,7 @@
  * - XSS/injection attempts are prevented
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from '@jest/globals'
 import {
   LoginRequestSchema,
   BrainQuerySchema,
@@ -439,3 +439,4 @@ describe('Input Validation - Security', () => {
     expect(result.success).toBe(false)
   })
 })
+

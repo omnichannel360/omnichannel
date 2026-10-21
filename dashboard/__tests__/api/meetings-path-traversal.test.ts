@@ -1,9 +1,9 @@
-﻿/**
+/**
  * Path Traversal Vulnerability Tests for Meetings API
  * Tests comprehensive attack vectors and defense-in-depth strategy
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from '@jest/globals'
 import { MeetingTypeSchema, SkillTypeSchema, safeJoin } from '@/lib/validation'
 import path from 'path'
 
@@ -254,3 +254,4 @@ describe('Error Handling and Auditability', () => {
     }
   })
 })
+

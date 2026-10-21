@@ -48,5 +48,8 @@ expect.extend({
   },
 })
 
+// NOTE: Rate limit store reset is handled in individual test files via beforeEach hook
+// to ensure proper import and isolation. See rate-limiting.test.ts for example.
+
 // Global test timeout
 jest.setTimeout(10000)

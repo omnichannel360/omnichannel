@@ -2,20 +2,20 @@ import { POST, GET } from '../route'
 import { NextRequest } from 'next/server'
 import * as fs from 'fs/promises'
 import path from 'path'
-import { beforeEach, describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from '@jest/globals'
 
 // Mock dependencies
-vi.mock('@/lib/auth', () => ({
-  verifyAuth: vi.fn().mockResolvedValue({ authenticated: true }),
-  createUnauthorizedResponse: vi.fn(),
+jest.mock('@/lib/auth', () => ({
+  verifyAuth: jest.fn().mockResolvedValue({ authenticated: true }),
+  createUnauthorizedResponse: jest.fn(),
 }))
 
-vi.mock('@/lib/file-lock', () => ({
-  withFileLock: vi.fn((filePath, fn) => fn()),
+jest.mock('@/lib/file-lock', () => ({
+  withFileLock: jest.fn((filePath, fn) => fn()),
 }))
 
-vi.mock('@/lib/ensure-dir', () => ({
-  ensureDataDir: vi.fn().mockResolvedValue(undefined),
+jest.mock('@/lib/ensure-dir', () => ({
+  ensureDataDir: jest.fn().mockResolvedValue(undefined),
 }))
 
 describe('POST /api/meetings - Path Traversal Security', () => {
@@ -294,3 +294,4 @@ describe('POST /api/meetings - Path Traversal Security', () => {
     })
   })
 })
+

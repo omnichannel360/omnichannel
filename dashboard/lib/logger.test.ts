@@ -1,21 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { logger, createLogContext, getErrorMessage, LogContext } from '@/lib/logger'
 
 // Mock console methods
 const consoleSpy = {
-  log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-  warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
-  error: vi.spyOn(console, 'error').mockImplementation(() => {})
+  log: jest.spyOn(console, 'log').mockImplementation(() => {}),
+  warn: jest.spyOn(console, 'warn').mockImplementation(() => {}),
+  error: jest.spyOn(console, 'error').mockImplementation(() => {})
 }
 
 describe('Logger', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
     logger.setMinLevel('debug')
   })
 
   afterEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('debug()', () => {
@@ -242,3 +242,4 @@ describe('Logger', () => {
     })
   })
 })
+

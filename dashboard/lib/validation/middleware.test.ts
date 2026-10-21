@@ -3,7 +3,7 @@
  * Tests header validation, request size limits, and error handling
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import { validateBody, validateQuery, formatZodErrors } from './middleware'
 import { z, ZodError } from 'zod'
@@ -288,3 +288,4 @@ describe('Validation Middleware', () => {
     })
   })
 })
+

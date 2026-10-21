@@ -4,7 +4,7 @@
  * Covers: required fields, data types, constraints, XSS prevention, path traversal
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import { validateBody, validateQuery, formatZodErrors } from '@/lib/validation/middleware'
 import {

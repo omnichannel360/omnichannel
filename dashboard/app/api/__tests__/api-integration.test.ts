@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from '@jest/globals'
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
@@ -220,3 +220,4 @@ describe('Performance Characteristics', () => {
     expect(duration).toBeLessThan(500)
   })
 })
+

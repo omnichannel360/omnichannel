@@ -3,7 +3,7 @@
  * Tests auth protection across all API endpoints
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 
@@ -265,3 +265,4 @@ describe('Auth Middleware Integration', () => {
     })
   })
 })
+

@@ -1,0 +1,352 @@
+{
+  "audit": {
+    "title": "Test Audit 6/150 - Complete Coverage & Quality Review",
+    "date": "2026-10-22",
+    "totalTestFiles": 288,
+    "coreApiTestFiles": 24,
+    "overallScore": "82/100",
+    "status": "Production Ready with High Priority Fixes"
+  },
+  "findings": {
+    "critical": {
+      "count": 0,
+      "description": "No critical blockers - all security issues resolved"
+    },
+    "high": {
+      "count": 4,
+      "issues": [
+        {
+          "id": "H1",
+          "title": "Framework Inconsistency (Jest vs Vitest)",
+          "severity": "HIGH",
+          "affectedFiles": 24,
+          "estimatedHours": 4,
+          "files": [
+            "app/api/__tests__/api-integration.test.ts",
+            "app/api/__tests__/auth-middleware-integration.test.ts",
+            "app/api/__tests__/error-handling-comprehensive.test.ts",
+            "app/api/__tests__/error-edge-cases.test.ts"
+          ],
+          "problem": "Mix of Jest (@jest/globals) and Vitest imports causing tooling confusion",
+          "solution": "Standardize on Vitest - modern, ESM-native, better TypeScript support",
+          "commands": [
+            "npm install --save-dev vitest @vitest/ui",
+            "Create vitest.config.ts from jest.config.js",
+            "Update all imports from @jest/globals to vitest"
+          ]
+        },
+        {
+          "id": "H2",
+          "title": "Mock Cleanup Inconsistency",
+          "severity": "HIGH",
+          "affectedFiles": 280,
+          "estimatedHours": 6,
+          "problem": "Only 3 files implement clearAllMocks() - causes test pollution and flaky tests",
+          "solution": "Add global mock cleanup in setup file",
+          "codefix": {
+            "file": "jest.setup.ts (→ vitest.setup.ts)",
+            "before": "// No global mock cleanup setup",
+            "after": "import { beforeEach, afterEach, vi } from 'vitest'\n\nbeforeEach(() => {\n  vi.clearAllMocks()\n})\n\nafterEach(() => {\n  vi.clearAllMocks()\n  vi.restoreAllMocks()\n})"
+          }
+        },
+        {
+          "id": "H3",
+          "title": "Type Safety - 'as any' Usage",
+          "severity": "HIGH",
+          "affectedFiles": 15,
+          "estimatedHours": 3,
+          "examples": [
+            "app/api/__tests__/auth-middleware.test.ts:18 → const response = await handler(request as any)",
+            "app/api/__tests__/comprehensive-error-handling.test.ts:45 → as any in mock setup"
+          ],
+          "solution": "Replace 'as any' with proper type assertions",
+          "codefix": {
+            "before": "const response = await handler(request as any)",
+            "after": "const response = await handler(request as NextApiRequest & NextRequest)"
+          }
+        },
+        {
+          "id": "H4",
+          "title": "Missing afterEach Cleanup",
+          "severity": "HIGH",
+          "affectedFiles": 85,
+          "estimatedHours": 8,
+          "problem": "85+ test files lack proper cleanup in afterEach, risking state leakage",
+          "solution": "Add afterEach blocks to all test suites",
+          "pattern": "afterEach(async () => {\n  vi.clearAllMocks()\n  vi.restoreAllMocks()\n  // Cleanup any created resources\n})"
+        }
+      ]
+    },
+    "medium": {
+      "count": 6,
+      "issues": [
+        {
+          "id": "M1",
+          "title": "AAA Pattern Clarity (85% compliant)",
+          "severity": "MEDIUM",
+          "affectedFiles": 50,
+          "estimatedHours": 4,
+          "recommendation": "Add explicit // Arrange, // Act, // Assert comments to complex tests"
+        },
+        {
+          "id": "M2",
+          "title": "Edge Case Coverage Gaps",
+          "severity": "MEDIUM",
+          "missingTests": [
+            "Zero value handling",
+            "Negative value handling",
+            "MAX_SAFE_INTEGER edge cases",
+            "Very long string (>512 chars) in errors",
+            "Special character sanitization",
+            "Race condition under load (1000+ concurrent)",
+            "Decimal precision (currency)"
+          ],
+          "estimatedNewTests": 20,
+          "estimatedHours": 6
+        },
+        {
+          "id": "M3",
+          "title": "Assertion Strength",
+          "severity": "MEDIUM",
+          "affectedTests": 40,
+          "patterns": {
+            "weak": "await expect(fn()).rejects.toThrow()",
+            "better": "await expect(fn()).rejects.toThrow('Specific error: invalid input')"
+          },
+          "estimatedHours": 5
+        },
+        {
+          "id": "M4",
+          "title": "Mock Assertion Completeness",
+          "severity": "MEDIUM",
+          "missingPattern": "Call order verification (mockA before mockB)",
+          "affectedTests": 20,
+          "estimatedHours": 4
+        },
+        {
+          "id": "M5",
+          "title": "Coverage Report Accessibility",
+          "severity": "MEDIUM",
+          "solution": "Generate HTML coverage dashboard",
+          "commands": [
+            "npm run test:coverage -- --reporters=html",
+            "open coverage/lcov-report/index.html"
+          ]
+        },
+        {
+          "id": "M6",
+          "title": "Test Execution Speed",
+          "severity": "MEDIUM",
+          "finding": "Global timeout 10s - consider per-test overrides",
+          "recommendation": "Fast: <500ms, Integration: 1-3s, E2E: 5-10s"
+        }
+      ]
+    },
+    "low": {
+      "count": 3,
+      "issues": [
+        {
+          "id": "L1",
+          "title": "Test Documentation",
+          "severity": "LOW",
+          "affectedDescribes": 50,
+          "recommendation": "Add JSDoc comments explaining test purpose to describe() blocks"
+        },
+        {
+          "id": "L2",
+          "title": "Test Data Factories",
+          "severity": "LOW",
+          "recommendation": "Create __tests__/factories/ with reusable test data builders",
+          "benefit": "Reduce duplication, improve maintainability"
+        },
+        {
+          "id": "L3",
+          "title": "Snapshot Tests",
+          "severity": "LOW",
+          "recommendation": "Add 10-15 snapshot tests for stable outputs (errors, responses)"
+        }
+      ]
+    }
+  },
+  "implementation_phases": {
+    "phase1": {
+      "name": "Critical Framework & Cleanup",
+      "duration": "4-6 hours",
+      "tasks": [
+        {
+          "task": "1. Migrate to Vitest",
+          "files": [
+            "jest.config.js → vitest.config.ts",
+            "jest.setup.ts → vitest.setup.ts",
+            "package.json (update scripts and deps)"
+          ],
+          "status": "pending"
+        },
+        {
+          "task": "2. Add Global Mock Cleanup",
+          "file": "vitest.setup.ts",
+          "content": "import { beforeEach, afterEach, vi } from 'vitest'\n\nbeforeEach(() => {\n  vi.clearAllMocks()\n})\n\nafterEach(() => {\n  vi.clearAllMocks()\n  vi.restoreAllMocks()\n})",
+          "status": "pending"
+        },
+        {
+          "task": "3. Fix Type Safety Issues",
+          "affectedFiles": 15,
+          "pattern": "Replace 'as any' with proper types",
+          "status": "pending"
+        }
+      ],
+      "validation": [
+        "npm test -- --run (all tests pass)",
+        "npm run test:coverage (80%+ coverage)",
+        "No 'as any' in critical test files"
+      ]
+    },
+    "phase2": {
+      "name": "Test Isolation & Assertions",
+      "duration": "12-16 hours",
+      "tasks": [
+        {
+          "task": "1. Add afterEach Cleanup",
+          "affectedFiles": 85,
+          "pattern": "afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })",
+          "status": "pending"
+        },
+        {
+          "task": "2. Strengthen Assertions",
+          "affectedTests": 40,
+          "pattern": "Replace generic .toThrow() with specific error messages",
+          "status": "pending"
+        },
+        {
+          "task": "3. Add Edge Case Tests",
+          "newTests": 20,
+          "examples": [
+            "Zero/negative values",
+            "MAX_SAFE_INTEGER",
+            "Very long strings (>512 chars)",
+            "Race conditions (1000 concurrent)",
+            "Decimal precision"
+          ],
+          "status": "pending"
+        }
+      ],
+      "validation": [
+        "npm test -- --runInBand (test isolation check)",
+        "npm run test:coverage (maintain 80%+)",
+        "No flaky tests in CI runs"
+      ]
+    },
+    "phase3": {
+      "name": "Documentation & Optimization",
+      "duration": "8-10 hours",
+      "tasks": [
+        {
+          "task": "1. Add AAA Comments",
+          "affectedTests": 50,
+          "pattern": "// Arrange\\n// Act\\n// Assert comments"
+        },
+        {
+          "task": "2. Create Test Data Factories",
+          "directory": "__tests__/factories/",
+          "example": "testDataFactory.createUser(role), testDataFactory.createRequest(token)"
+        },
+        {
+          "task": "3. Generate Coverage Dashboard",
+          "commands": [
+            "npm run test:coverage",
+            "open coverage/lcov-report/index.html"
+          ]
+        }
+      ]
+    }
+  },
+  "critical_fixes": [
+    {
+      "file": "jest.config.js",
+      "change": "Migrate to vitest.config.ts",
+      "impact": "Unified test framework, better tooling"
+    },
+    {
+      "file": "jest.setup.ts",
+      "change": "Add global mock cleanup hooks",
+      "impact": "Prevents test pollution, improves reliability"
+    },
+    {
+      "pattern": "as any in tests",
+      "change": "Use proper type assertions",
+      "impact": "Improves type safety, catches bugs earlier"
+    }
+  ],
+  "test_metrics": {
+    "coverage": {
+      "current": "80%+",
+      "target": "80%+",
+      "status": "MET"
+    },
+    "framework_consistency": {
+      "current": "Mixed (Jest + Vitest)",
+      "target": "Vitest only",
+      "status": "NEEDS_FIX"
+    },
+    "mock_cleanup": {
+      "current": "1% (3 files)",
+      "target": "100% (all files)",
+      "status": "NEEDS_FIX"
+    },
+    "type_safety": {
+      "current": "85%",
+      "target": "100%",
+      "status": "NEEDS_IMPROVEMENT"
+    },
+    "aaa_pattern": {
+      "current": "85%",
+      "target": "95%",
+      "status": "GOOD"
+    },
+    "async_await": {
+      "current": "90%",
+      "target": "100%",
+      "status": "GOOD"
+    },
+    "test_isolation": {
+      "current": "70%",
+      "target": "100%",
+      "status": "NEEDS_FIX"
+    }
+  },
+  "success_criteria": {
+    "all_tests_pass": "npm test -- --run",
+    "coverage_maintained": "npm run test:coverage (≥80%)",
+    "no_test_pollution": "npm test -- --runInBand (same results)",
+    "framework_unified": "No @jest/globals imports remain",
+    "global_cleanup": "vitest.setup.ts has beforeEach/afterEach hooks",
+    "type_safety": "No 'as any' in test files (except unavoidable cases)",
+    "assertions_strong": "All .toThrow() include error message",
+    "edge_cases": "20+ new edge case tests added",
+    "documentation": "50+ test blocks have JSDoc comments"
+  },
+  "commands_to_run": {
+    "phase1": [
+      "npm install --save-dev vitest @vitest/ui @vitest/coverage-v8",
+      "npm run test -- --run",
+      "npm run test:coverage"
+    ],
+    "phase2": [
+      "npm test -- --runInBand",
+      "npm test -- --reporter=verbose",
+      "npm run test:coverage"
+    ],
+    "phase3": [
+      "npm run test:coverage -- --reporter=html",
+      "npm test -- --reporter=json-summary"
+    ]
+  },
+  "summary": {
+    "overall_rating": "B+ (82/100)",
+    "production_ready": true,
+    "critical_blockers": 0,
+    "high_priority_fixes": 4,
+    "estimated_total_hours": 24,
+    "recommendation": "PROCEED - Implement Phase 1 immediately (framework migration + cleanup hooks)"
+  }
+}

@@ -283,3 +283,14 @@ export async function withRateLimit(
 ): Promise<NextResponse | null> {
   return await limiter(request)
 }
+
+/**
+ * Reset the global rate limit store (for testing)
+ * @internal - Test use only
+ */
+export function resetRateLimitStore(): void {
+  if (globalStore) {
+    globalStore.destroy()
+    globalStore = null
+  }
+}

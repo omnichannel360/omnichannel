@@ -5,7 +5,7 @@
  * OWASP A03:2021 - Injection (includes XSS)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import { validateBody, validateQuery } from '@/lib/validation/middleware'
 import {
@@ -841,3 +841,4 @@ describe('XSS Prevention - Comprehensive Security Tests', () => {
     })
   })
 })
+

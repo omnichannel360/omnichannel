@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import { asyncRoute, asyncGet, asyncPost } from '@/lib/async-route'
 import { logger } from '@/lib/logger'
 
 // Mock logger
-vi.mock('@/lib/logger', () => ({
+jest.mock('@/lib/logger', () => ({
   logger: {
-    debug: vi.fn(),
-    error: vi.fn(),
-    logOperation: vi.fn()
+    debug: jest.fn(),
+    error: jest.fn(),
+    logOperation: jest.fn()
   },
   getErrorMessage: (err: unknown) => {
     if (err instanceof Error) return err.message
@@ -19,12 +19,12 @@ vi.mock('@/lib/logger', () => ({
 
 describe('asyncRoute', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('successful request handling', () => {
     it('wraps successful handler execution', async () => {
-      const handler = vi.fn(async () => NextResponse.json({ success: true }))
+      const handler = jest.fn(async () => NextResponse.json({ success: true }))
       const wrapped = asyncRoute(handler, {
         operationName: 'test-operation',
         method: 'POST'
@@ -48,7 +48,7 @@ describe('asyncRoute', () => {
     })
 
     it('adds correlation ID to response headers', async () => {
-      const handler = vi.fn(async () => NextResponse.json({ success: true }))
+      const handler = jest.fn(async () => NextResponse.json({ success: true }))
       const wrapped = asyncRoute(handler, {
         operationName: 'test-op',
         method: 'GET'
@@ -65,7 +65,7 @@ describe('asyncRoute', () => {
   describe('error handling', () => {
     it('catches and logs errors from handler', async () => {
       const testError = new Error('Handler error')
-      const handler = vi.fn(async () => {
+      const handler = jest.fn(async () => {
         throw testError
       })
 
@@ -94,7 +94,7 @@ describe('asyncRoute', () => {
     })
 
     it('handles JSON parsing errors', async () => {
-      const handler = vi.fn(async () => {
+      const handler = jest.fn(async () => {
         throw new SyntaxError('Unexpected token')
       })
 
@@ -115,7 +115,7 @@ describe('asyncRoute', () => {
     })
 
     it('handles type errors', async () => {
-      const handler = vi.fn(async () => {
+      const handler = jest.fn(async () => {
         throw new TypeError('Cannot read property')
       })
 
@@ -134,11 +134,11 @@ describe('asyncRoute', () => {
     })
 
     it('uses custom error formatter when provided', async () => {
-      const handler = vi.fn(async () => {
+      const handler = jest.fn(async () => {
         throw new Error('Custom error')
       })
 
-      const customFormatter = vi.fn(() => ({
+      const customFormatter = jest.fn(() => ({
         message: 'Formatted error message',
         statusCode: 418,
         details: { custom: true }
@@ -165,7 +165,7 @@ describe('asyncRoute', () => {
 
   describe('context attachment', () => {
     it('includes custom context in logs', async () => {
-      const handler = vi.fn(async () => NextResponse.json({ success: true }))
+      const handler = jest.fn(async () => NextResponse.json({ success: true }))
       const wrapped = asyncRoute(handler, {
         operationName: 'with-context',
         method: 'GET',
@@ -188,7 +188,7 @@ describe('asyncRoute', () => {
     })
 
     it('extracts correlation ID from request headers', async () => {
-      const handler = vi.fn(async () => NextResponse.json({ success: true }))
+      const handler = jest.fn(async () => NextResponse.json({ success: true }))
       const wrapped = asyncRoute(handler, {
         operationName: 'correlation-test',
         method: 'GET'
@@ -207,7 +207,7 @@ describe('asyncRoute', () => {
 
   describe('factory functions', () => {
     it('creates GET handler with asyncGet', async () => {
-      const handler = vi.fn(async () => NextResponse.json({ method: 'GET' }))
+      const handler = jest.fn(async () => NextResponse.json({ method: 'GET' }))
       const wrapped = asyncGet(handler, { operationName: 'get-test' })
 
       const request = new NextRequest('http://localhost:3000/api/test', {
@@ -219,7 +219,7 @@ describe('asyncRoute', () => {
     })
 
     it('creates POST handler with asyncPost', async () => {
-      const handler = vi.fn(async () => NextResponse.json({ method: 'POST' }))
+      const handler = jest.fn(async () => NextResponse.json({ method: 'POST' }))
       const wrapped = asyncPost(handler, { operationName: 'post-test' })
 
       const request = new NextRequest('http://localhost:3000/api/test', {
@@ -233,7 +233,7 @@ describe('asyncRoute', () => {
 
   describe('timing and duration tracking', () => {
     it('records operation duration', async () => {
-      const handler = vi.fn(async () => {
+      const handler = jest.fn(async () => {
         // Simulate some delay
         await new Promise(resolve => setTimeout(resolve, 10))
         return NextResponse.json({ success: true })
@@ -262,7 +262,7 @@ describe('asyncRoute', () => {
 
   describe('response structure', () => {
     it('includes required fields in error response', async () => {
-      const handler = vi.fn(async () => {
+      const handler = jest.fn(async () => {
         throw new Error('Test error')
       })
 
@@ -290,7 +290,7 @@ describe('asyncRoute', () => {
         data: { id: '123', name: 'Test' }
       }
 
-      const handler = vi.fn(async () =>
+      const handler = jest.fn(async () =>
         NextResponse.json(expectedBody)
       )
 
@@ -307,3 +307,4 @@ describe('asyncRoute', () => {
     })
   })
 })
+

@@ -4,7 +4,7 @@
  * Covers: error codes, status codes, logging, correlation IDs, and error messages
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   generateCorrelationId,
@@ -435,3 +435,4 @@ describe('Error Handling Integration Scenarios', () => {
     expect(timestamp2).toBeGreaterThanOrEqual(timestamp1)
   })
 })
+

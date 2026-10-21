@@ -3,7 +3,7 @@
  * Comprehensive test coverage for auth protection, role-based access, and error handling
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getAuthContext,
@@ -15,19 +15,19 @@ import {
 import * as auth from '@/lib/auth'
 
 // Mock dependencies
-vi.mock('@/lib/auth')
-vi.mock('@/lib/logger', () => ({
+jest.mock('@/lib/auth')
+jest.mock('@/lib/logger', () => ({
   logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
   },
-  createLogContext: vi.fn((ctx) => ctx),
+  createLogContext: jest.fn((ctx) => ctx),
 }))
 
 describe('Auth Middleware', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('getAuthContext', () => {
@@ -40,7 +40,7 @@ describe('Auth Middleware', () => {
         exp: Date.now() + 24 * 60 * 60 * 1000,
       }
 
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
 
       const request = new NextRequest(new URL('http://localhost/api/test'), {
         method: 'GET',
@@ -55,7 +55,7 @@ describe('Auth Middleware', () => {
     })
 
     it('should return unauthenticated context with missing token', async () => {
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(null)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(null)
 
       const request = new NextRequest(new URL('http://localhost/api/test'), {
         method: 'GET',
@@ -69,7 +69,7 @@ describe('Auth Middleware', () => {
 
     it('should handle token verification errors', async () => {
       const error = new Error('Invalid token')
-      vi.mocked(auth.verifyToken).mockRejectedValueOnce(error)
+      jest.mocked(auth.verifyToken).mockRejectedValueOnce(error)
 
       const request = new NextRequest(new URL('http://localhost/api/test'), {
         method: 'GET',
@@ -84,7 +84,7 @@ describe('Auth Middleware', () => {
 
   describe('verifyAuthMiddleware', () => {
     it('should allow unauthenticated requests when auth not required', async () => {
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(null)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(null)
 
       const request = new NextRequest(new URL('http://localhost/api/test'), {
         method: 'GET',
@@ -97,7 +97,7 @@ describe('Auth Middleware', () => {
     })
 
     it('should return 401 when auth required but token missing', async () => {
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(null)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(null)
 
       const request = new NextRequest(new URL('http://localhost/api/test'), {
         method: 'GET',
@@ -118,7 +118,7 @@ describe('Auth Middleware', () => {
         exp: Date.now() + 24 * 60 * 60 * 1000,
       }
 
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
 
       const request = new NextRequest(new URL('http://localhost/api/admin'), {
         method: 'GET',
@@ -142,7 +142,7 @@ describe('Auth Middleware', () => {
         exp: Date.now() + 24 * 60 * 60 * 1000,
       }
 
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
 
       const request = new NextRequest(new URL('http://localhost/api/admin'), {
         method: 'GET',
@@ -159,7 +159,7 @@ describe('Auth Middleware', () => {
     })
 
     it('should skip audit logging when disabled', async () => {
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(null)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(null)
 
       const request = new NextRequest(new URL('http://localhost/api/test'), {
         method: 'GET',
@@ -184,9 +184,9 @@ describe('Auth Middleware', () => {
         exp: Date.now() + 24 * 60 * 60 * 1000,
       }
 
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
 
-      const mockHandler = vi.fn().mockResolvedValueOnce(new Response('Success'))
+      const mockHandler = jest.fn().mockResolvedValueOnce(new Response('Success'))
 
       const wrappedHandler = withAuth(mockHandler, { requireAuth: true })
 
@@ -201,9 +201,9 @@ describe('Auth Middleware', () => {
     })
 
     it('should return 401 if handler auth fails', async () => {
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(null)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(null)
 
-      const mockHandler = vi.fn()
+      const mockHandler = jest.fn()
 
       const wrappedHandler = withAuth(mockHandler, { requireAuth: true })
 
@@ -226,10 +226,10 @@ describe('Auth Middleware', () => {
         exp: Date.now() + 24 * 60 * 60 * 1000,
       }
 
-      vi.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
+      jest.mocked(auth.verifyToken).mockResolvedValueOnce(mockToken as any)
 
       const error = new Error('Handler failed')
-      const mockHandler = vi.fn().mockRejectedValueOnce(error)
+      const mockHandler = jest.fn().mockRejectedValueOnce(error)
 
       const wrappedHandler = withAuth(mockHandler)
 
@@ -311,3 +311,4 @@ describe('Auth Middleware', () => {
     })
   })
 })
+

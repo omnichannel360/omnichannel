@@ -3,26 +3,26 @@
  * Tests error logging across API routes with context, correlation IDs, and sanitization
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import { createLogContext, logger } from '@/lib/logger'
 import type { LogContext } from '@/lib/logger'
 
 // Mock console methods
 const consoleMocks = {
-  error: vi.spyOn(console, 'error').mockImplementation(() => {}),
-  warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
-  log: vi.spyOn(console, 'log').mockImplementation(() => {})
+  error: jest.spyOn(console, 'error').mockImplementation(() => {}),
+  warn: jest.spyOn(console, 'warn').mockImplementation(() => {}),
+  log: jest.spyOn(console, 'log').mockImplementation(() => {})
 }
 
 describe('Error Logging in API Routes', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
     logger.setMinLevel('debug')
   })
 
   afterEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('Correlation ID Tracking', () => {
@@ -332,3 +332,4 @@ describe('Error Logging in API Routes', () => {
     })
   })
 })
+

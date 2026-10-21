@@ -4,9 +4,14 @@
  */
 
 import { createMockRequest } from '../lib/test-utils'
-import { rateLimiters, createRateLimiter } from '@/lib/rate-limiting'
+import { rateLimiters, createRateLimiter, resetRateLimitStore } from '@/lib/rate-limiting'
 
 describe('Rate Limiting Integration', () => {
+  // CRITICAL: Reset global store before each test to prevent state pollution
+  // This ensures each test starts with a clean rate limit state
+  beforeEach(() => {
+    resetRateLimitStore()
+  })
   describe('Authentication Endpoints', () => {
     test('login endpoint enforces 5 req/min limit per IP', async () => {
       const config = {

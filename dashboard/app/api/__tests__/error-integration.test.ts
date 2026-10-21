@@ -3,7 +3,7 @@
  * Tests request/response validation, error logging integration, and end-to-end error scenarios
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from '@jest/globals'
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -483,3 +483,4 @@ describe('Error Handling Integration Tests', () => {
     })
   })
 })
+

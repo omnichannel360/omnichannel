@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from '@jest/globals'
 import {
   CircuitBreaker,
   retryWithBackoff,
@@ -25,14 +25,14 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should allow operations when CLOSED', async () => {
-      const operation = vi.fn().mockResolvedValue('success')
+      const operation = jest.fn().mockResolvedValue('success')
       const result = await circuitBreaker.execute(operation)
       expect(result).toBe('success')
       expect(operation).toHaveBeenCalledOnce()
     })
 
     it('should open after failure threshold', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Failed'))
+      const operation = jest.fn().mockRejectedValue(new Error('Failed'))
 
       for (let i = 0; i < 3; i++) {
         try {
@@ -50,7 +50,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should transition to HALF_OPEN after timeout', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Failed'))
+      const operation = jest.fn().mockRejectedValue(new Error('Failed'))
 
       for (let i = 0; i < 3; i++) {
         try {
@@ -64,14 +64,14 @@ describe('Error Handling - Comprehensive Suite', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 150))
 
-      const newOp = vi.fn().mockResolvedValue('recovered')
+      const newOp = jest.fn().mockResolvedValue('recovered')
       const result = await circuitBreaker.execute(newOp)
       expect(result).toBe('recovered')
     })
 
     it('should close after success threshold in HALF_OPEN', async () => {
       // Force to OPEN state
-      const failOp = vi.fn().mockRejectedValue(new Error('Fail'))
+      const failOp = jest.fn().mockRejectedValue(new Error('Fail'))
       for (let i = 0; i < 3; i++) {
         try {
           await circuitBreaker.execute(failOp)
@@ -83,7 +83,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Transition to HALF_OPEN with successful operations
-      const successOp = vi.fn().mockResolvedValue('ok')
+      const successOp = jest.fn().mockResolvedValue('ok')
       await circuitBreaker.execute(successOp)
       await circuitBreaker.execute(successOp)
 
@@ -92,7 +92,7 @@ describe('Error Handling - Comprehensive Suite', () => {
 
     it('should go back to OPEN if fails in HALF_OPEN', async () => {
       // Force to OPEN
-      const failOp = vi.fn().mockRejectedValue(new Error('Fail'))
+      const failOp = jest.fn().mockRejectedValue(new Error('Fail'))
       for (let i = 0; i < 3; i++) {
         try {
           await circuitBreaker.execute(failOp)
@@ -104,7 +104,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Fail in HALF_OPEN state
-      const failAgain = vi.fn().mockRejectedValue(new Error('Still failing'))
+      const failAgain = jest.fn().mockRejectedValue(new Error('Still failing'))
       try {
         await circuitBreaker.execute(failAgain)
       } catch (e) {
@@ -117,7 +117,7 @@ describe('Error Handling - Comprehensive Suite', () => {
 
   describe('retryWithBackoff', () => {
     it('should succeed on first try', async () => {
-      const operation = vi.fn().mockResolvedValue('success')
+      const operation = jest.fn().mockResolvedValue('success')
       const result = await retryWithBackoff(operation)
 
       expect(result).toBe('success')
@@ -125,7 +125,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should retry on transient errors', async () => {
-      const operation = vi.fn()
+      const operation = jest.fn()
         .mockRejectedValueOnce(new Error('timeout'))
         .mockResolvedValueOnce('recovered')
 
@@ -140,7 +140,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should fail after max retries', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('persistent error'))
+      const operation = jest.fn().mockRejectedValue(new Error('persistent error'))
 
       await expect(
         retryWithBackoff(operation, {
@@ -154,7 +154,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should respect isRetryable callback', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('not retryable'))
+      const operation = jest.fn().mockRejectedValue(new Error('not retryable'))
 
       await expect(
         retryWithBackoff(operation, {
@@ -167,7 +167,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should detect timeout errors as retryable', async () => {
-      const operation = vi.fn()
+      const operation = jest.fn()
         .mockRejectedValueOnce(new Error('ETIMEDOUT'))
         .mockResolvedValueOnce('recovered')
 
@@ -181,7 +181,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should detect connection errors as retryable', async () => {
-      const operation = vi.fn()
+      const operation = jest.fn()
         .mockRejectedValueOnce(new Error('ECONNREFUSED'))
         .mockResolvedValueOnce('recovered')
 
@@ -194,7 +194,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should apply exponential backoff', async () => {
-      const operation = vi.fn()
+      const operation = jest.fn()
         .mockRejectedValueOnce(new Error('timeout'))
         .mockResolvedValueOnce('ok')
 
@@ -648,3 +648,4 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
   })
 })
+

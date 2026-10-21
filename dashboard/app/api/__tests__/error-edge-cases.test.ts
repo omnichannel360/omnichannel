@@ -3,7 +3,7 @@
  * Tests timeout handling, retry logic, and circuit breaker patterns
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
 import {
   retryWithBackoff,
   DEFAULT_RETRY_CONFIG,
@@ -71,7 +71,7 @@ describe('Error Handling Edge Cases', () => {
 
   describe('retryWithBackoff function', () => {
     it('should succeed on first attempt if no error', async () => {
-      const operation = vi.fn().mockResolvedValue('success')
+      const operation = jest.fn().mockResolvedValue('success')
 
       const result = await retryWithBackoff(operation)
 
@@ -93,14 +93,14 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should fail on non-retryable error immediately', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Invalid input'))
+      const operation = jest.fn().mockRejectedValue(new Error('Invalid input'))
 
       await expect(retryWithBackoff(operation)).rejects.toThrow('Invalid input')
       expect(operation).toHaveBeenCalledTimes(1)
     })
 
     it('should fail after max retries exceeded', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('timeout'))
+      const operation = jest.fn().mockRejectedValue(new Error('timeout'))
 
       await expect(retryWithBackoff(operation, DEFAULT_RETRY_CONFIG)).rejects.toThrow('timeout')
       expect(operation).toHaveBeenCalledTimes(4) // initial + 3 retries
@@ -136,7 +136,7 @@ describe('Error Handling Edge Cases', () => {
     it('should respect maxDelayMs limit', async () => {
       vi.useFakeTimers()
 
-      const operation = vi.fn().mockRejectedValue(new Error('timeout'))
+      const operation = jest.fn().mockRejectedValue(new Error('timeout'))
 
       const config: RetryConfig = {
         maxRetries: 5,
@@ -159,7 +159,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should use custom isRetryable function', async () => {
-      const isRetryable = vi.fn((error) => {
+      const isRetryable = jest.fn((error) => {
         if (error instanceof Error) {
           return error.message.includes('temporary')
         }
@@ -215,7 +215,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should allow operations when CLOSED', async () => {
-      const operation = vi.fn().mockResolvedValue('success')
+      const operation = jest.fn().mockResolvedValue('success')
 
       const result = await circuitBreaker.execute(operation)
 
@@ -225,7 +225,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should track successful operations', async () => {
-      const operation = vi.fn().mockResolvedValue('ok')
+      const operation = jest.fn().mockResolvedValue('ok')
 
       await circuitBreaker.execute(operation)
       await circuitBreaker.execute(operation)
@@ -262,7 +262,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should open after failure threshold', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Failed'))
+      const operation = jest.fn().mockRejectedValue(new Error('Failed'))
 
       for (let i = 0; i < 2; i++) {
         try {
@@ -276,7 +276,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should reject operations when OPEN', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Failed'))
+      const operation = jest.fn().mockRejectedValue(new Error('Failed'))
 
       // Open the circuit
       for (let i = 0; i < 2; i++) {
@@ -288,14 +288,14 @@ describe('Error Handling Edge Cases', () => {
       }
 
       // Try to execute when OPEN
-      const okOperation = vi.fn().mockResolvedValue('ok')
+      const okOperation = jest.fn().mockResolvedValue('ok')
       await expect(circuitBreaker.execute(okOperation)).rejects.toThrow('Circuit breaker is OPEN')
 
       expect(okOperation).not.toHaveBeenCalled()
     })
 
     it('should transition to HALF_OPEN after timeout', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Failed'))
+      const operation = jest.fn().mockRejectedValue(new Error('Failed'))
 
       // Open the circuit
       for (let i = 0; i < 2; i++) {
@@ -312,7 +312,7 @@ describe('Error Handling Edge Cases', () => {
       await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Next operation should transition to HALF_OPEN
-      const okOperation = vi.fn().mockResolvedValue('recovered')
+      const okOperation = jest.fn().mockResolvedValue('recovered')
       const result = await circuitBreaker.execute(okOperation)
 
       expect(result).toBe('recovered')
@@ -328,7 +328,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should transition to CLOSED after success threshold', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Failed'))
+      const operation = jest.fn().mockRejectedValue(new Error('Failed'))
 
       // Open the circuit
       for (let i = 0; i < 2; i++) {
@@ -343,7 +343,7 @@ describe('Error Handling Edge Cases', () => {
       await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Transition to HALF_OPEN and succeed
-      const successOp = vi.fn().mockResolvedValue('ok')
+      const successOp = jest.fn().mockResolvedValue('ok')
       await circuitBreaker.execute(successOp)
       expect(circuitBreaker.getState()).toBe('HALF_OPEN')
 
@@ -352,7 +352,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should reopen if fails in HALF_OPEN', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Failed'))
+      const operation = jest.fn().mockRejectedValue(new Error('Failed'))
 
       // Open the circuit
       for (let i = 0; i < 2; i++) {
@@ -367,7 +367,7 @@ describe('Error Handling Edge Cases', () => {
       await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Transition to HALF_OPEN and fail
-      const failOp = vi.fn().mockRejectedValue(new Error('Still failing'))
+      const failOp = jest.fn().mockRejectedValue(new Error('Still failing'))
       try {
         await circuitBreaker.execute(failOp)
       } catch (e) {
@@ -381,12 +381,12 @@ describe('Error Handling Edge Cases', () => {
   describe('CircuitBreaker - stress testing', () => {
     it('should handle rapid success/failure cycles', async () => {
       const breaker = new CircuitBreaker(5, 3, 100)
-      const operation = vi.fn()
+      const operation = jest.fn()
 
       operation.mockResolvedValueOnce('ok').mockRejectedValueOnce(new Error('fail'))
 
       for (let i = 0; i < 100; i++) {
-        const op = operation.getMockImplementation() ? operation : vi.fn().mockResolvedValue('ok')
+        const op = operation.getMockImplementation() ? operation : jest.fn().mockResolvedValue('ok')
         try {
           await breaker.execute(op)
         } catch (e) {
@@ -399,7 +399,7 @@ describe('Error Handling Edge Cases', () => {
 
     it('should handle concurrent requests correctly', async () => {
       const breaker = new CircuitBreaker(3, 2, 100)
-      const operation = vi.fn().mockResolvedValue('ok')
+      const operation = jest.fn().mockResolvedValue('ok')
 
       const promises = Array.from({ length: 10 }, () => breaker.execute(operation).catch(() => {}))
 
@@ -409,3 +409,4 @@ describe('Error Handling Edge Cases', () => {
     })
   })
 })
+

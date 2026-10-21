@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { withFileLock, clearAllLocks, getLockCount } from '@/lib/file-lock'
@@ -336,3 +336,4 @@ describe('File Operations - Async I/O', () => {
     })
   })
 })
+

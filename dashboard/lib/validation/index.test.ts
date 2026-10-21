@@ -3,7 +3,7 @@
  * Tests all validation utilities, schema parsing, and error handling
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from '@jest/globals'
 import { z } from 'zod'
 import {
   validateBody,
@@ -495,3 +495,4 @@ describe('Type Inference', () => {
     expect(query.limit).toBeDefined()
   })
 })
+

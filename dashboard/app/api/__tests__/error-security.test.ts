@@ -3,7 +3,7 @@
  * Tests error message sanitization, sensitive data handling, and production safety
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import {
   sanitizeErrorDetails,
   getSafeErrorMessage,
@@ -438,3 +438,4 @@ describe('Error Handling Security', () => {
     })
   })
 })
+

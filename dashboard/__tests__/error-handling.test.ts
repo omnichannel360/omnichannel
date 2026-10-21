@@ -3,7 +3,7 @@
  * Tests all error scenarios across API endpoints
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   createErrorResponse,
@@ -341,3 +341,4 @@ describe('Error Handling Integration', () => {
     }
   })
 })
+

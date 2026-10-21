@@ -3,7 +3,7 @@
  * OWASP Top 10 coverage and advanced security testing
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 import {
@@ -585,3 +585,4 @@ describe('Concurrent Security Scenarios', () => {
     expect(result2.role).toBe('admin')
   })
 })
+

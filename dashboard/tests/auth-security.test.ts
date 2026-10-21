@@ -4,7 +4,7 @@
  * TDD approach: RED → GREEN → REFACTOR
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import {
@@ -844,3 +844,4 @@ describe('Integration Scenarios', () => {
     expect(response.status).toBe(403)
   })
 })
+
