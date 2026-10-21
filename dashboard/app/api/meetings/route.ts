@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     const registry = loadSkillRegistry()
 
-    let parsed = {
+    let parsed: { meeting_type: string | null; skill: string | null; description: string } = {
       meeting_type: meeting_type || null,
       skill: null,
       description: message || '',
