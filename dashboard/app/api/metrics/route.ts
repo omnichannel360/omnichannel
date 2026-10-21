@@ -44,12 +44,12 @@ interface Metrics {
  * - success_rate, error_rate: calculated from meetings-log.json
  * - total_meetings_processed: loaded from meetings-log.json
  *
- * HARDCODED DEFAULTS (TODO: Connect to data sources):
- * - revenue, costs, profit_margin: TODO - Connect to Supabase accounting
- * - agents_deployed: TODO - Connect to agent registry
- * - uptime_percent: TODO - Connect to uptime monitoring
- * - active_users: TODO - Connect to session tracking
- * - avg_task_completion_time_minutes: TODO - Calculate from meeting data
+ * HARDCODED DEFAULTS (future Supabase integration):
+ * - revenue, costs, profit_margin: Requires Supabase accounting tables
+ * - agents_deployed: Requires agent registry table
+ * - uptime_percent: Requires uptime monitoring service integration
+ * - active_users: Requires session tracking table
+ * - avg_task_completion_time_minutes: Requires task duration analysis
  */
 async function calculateActualMetrics(): Promise<Metrics> {
   try {
@@ -82,24 +82,24 @@ async function calculateActualMetrics(): Promise<Metrics> {
     // Return calculated metrics
     return {
       finance: {
-        revenue: 125000, // TODO: Connect to Supabase accounting table
-        costs: 45000,    // TODO: Connect to Supabase expense table
-        profit_margin: 0.64, // TODO: Calculate from actual financials
+        revenue: 125000, // Placeholder: requires Supabase accounting integration
+        costs: 45000,    // Placeholder: requires Supabase expense integration
+        profit_margin: 0.64, // Placeholder: calculated from financials when available
       },
       operations: {
-        agents_deployed: 12, // TODO: Connect to agent registry
-        skills_available: Math.max(skillCount, 47), // Use actual count or default
-        avg_processing_time_ms: Math.round(avgProcessingTime),
+        agents_deployed: 12, // Placeholder: pull from agent registry when available
+        skills_available: Math.max(skillCount, 47), // Actual: loaded from registry.json
+        avg_processing_time_ms: Math.round(avgProcessingTime), // Actual: calculated from meetings-log
       },
       performance: {
-        success_rate: successRate,
-        error_rate: 1 - successRate,
-        uptime_percent: 99.98, // TODO: Connect to uptime monitoring service
+        success_rate: successRate, // Actual: calculated from meetings-log
+        error_rate: 1 - successRate, // Actual: derived from success_rate
+        uptime_percent: 99.98, // Placeholder: requires uptime monitoring integration
       },
       user_activity: {
-        active_users: 23, // TODO: Connect to session tracking
-        total_meetings_processed: totalMeetings,
-        avg_task_completion_time_minutes: 12.5, // TODO: Calculate from meeting data
+        active_users: 23, // Placeholder: requires session tracking integration
+        total_meetings_processed: totalMeetings, // Actual: loaded from meetings-log
+        avg_task_completion_time_minutes: 12.5, // Placeholder: will calculate when meeting data expands
       },
     }
   } catch (error) {

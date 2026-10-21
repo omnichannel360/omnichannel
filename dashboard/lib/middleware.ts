@@ -7,9 +7,9 @@ const logger = createLogger('auth-middleware')
 // Default timeout for auth operations
 const AUTH_TIMEOUT_MS = 5000 // 5 seconds
 
-// Handler callback type - accepts TokenPayload or any user object shape for backward compatibility
-type AuthHandler = (req: NextRequest, user: TokenPayload | any) => Promise<NextResponse>
-type OptionalAuthHandler = (req: NextRequest, user?: TokenPayload | any) => Promise<NextResponse>
+// Handler callback type - accepts TokenPayload or compatible user object
+type AuthHandler = (req: NextRequest, user: TokenPayload | Record<string, unknown>) => Promise<NextResponse>
+type OptionalAuthHandler = (req: NextRequest, user?: TokenPayload | Record<string, unknown>) => Promise<NextResponse>
 
 /**
  * Middleware to protect API routes with JWT authentication

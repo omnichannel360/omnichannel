@@ -38,8 +38,11 @@ export function protectRoute(
 
       // If auth failed but no response (shouldn't happen), return 401
       if (!result.authenticated) {
+        const errorMessage = typeof result.context === 'object' && result.context !== null && 'error' in result.context
+          ? (result.context as Record<string, unknown>).error
+          : 'Unauthorized'
         return NextResponse.json(
-          { success: false, error: result.context.error || 'Unauthorized' },
+          { success: false, error: String(errorMessage || 'Unauthorized') },
           { status: 401 }
         )
       }
@@ -99,11 +102,24 @@ export function protectRouteMulti(
   DELETE?: (request: NextRequest) => Promise<NextResponse>
   PATCH?: (request: NextRequest) => Promise<NextResponse>
 } {
-  const result: any = {}
+  const result: Partial<{
+    GET: (request: NextRequest) => Promise<NextResponse>
+    POST: (request: NextRequest) => Promise<NextResponse>
+    PUT: (request: NextRequest) => Promise<NextResponse>
+    DELETE: (request: NextRequest) => Promise<NextResponse>
+    PATCH: (request: NextRequest) => Promise<NextResponse>
+  }> = {}
 
   Object.entries(handlers).forEach(([method, handler]) => {
-    result[method] = protectRoute(handler, config)
+    const httpMethod = method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+    result[httpMethod] = protectRoute(handler, config)
   })
 
-  return result
+  return result as {
+    GET?: (request: NextRequest) => Promise<NextResponse>
+    POST?: (request: NextRequest) => Promise<NextResponse>
+    PUT?: (request: NextRequest) => Promise<NextResponse>
+    DELETE?: (request: NextRequest) => Promise<NextResponse>
+    PATCH?: (request: NextRequest) => Promise<NextResponse>
+  }
 }

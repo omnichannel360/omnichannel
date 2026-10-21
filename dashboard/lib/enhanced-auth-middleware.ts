@@ -159,11 +159,11 @@ export async function applyAuthMiddleware(
  * This function uses unsafe type casting. The protectRoute() function provides
  * a properly typed alternative that passes auth context as a separate argument.
  */
-export function withEnhancedAuth<T extends (...args: any[]) => Promise<Response>>(
+export function withEnhancedAuth<T extends (...args: unknown[]) => Promise<Response>>(
   handler: T,
   options: EnhancedAuthOptions = {}
-): (...args: any[]) => Promise<Response> {
-  return async (request: NextRequest, ...args: any[]) => {
+): (...args: unknown[]) => Promise<Response> {
+  return async (request: NextRequest, ...args: unknown[]) => {
     const authResult = await applyAuthMiddleware(request, options)
 
     // If auth failed, return error response

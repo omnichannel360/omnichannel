@@ -82,7 +82,8 @@ export function withErrorLogging(
       // Extract error details
       const errorMessage = error instanceof Error ? error.message : String(error)
       const errorStack = error instanceof Error ? error.stack : undefined
-      const errorCode = (error as any)?.code || 'UNKNOWN'
+      const errorWithCode = error as Error & { code?: string }
+      const errorCode = errorWithCode.code || 'UNKNOWN'
 
       // Build request context
       const requestContext: LogContext = {
