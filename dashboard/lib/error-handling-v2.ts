@@ -337,11 +337,12 @@ export function getErrorDetails(error: unknown): {
   code?: string
 } {
   if (error instanceof Error) {
+    const errorWithCode = error as Error & { code?: string }
     return {
       message: error.message,
       stack: error.stack,
       name: error.name,
-      code: (error as any).code,
+      code: errorWithCode.code,
     }
   }
 
@@ -350,10 +351,10 @@ export function getErrorDetails(error: unknown): {
   }
 
   if (error && typeof error === 'object') {
-    const e = error as any
+    const errorObj = error as Record<string, unknown>
     return {
-      message: e.message || 'Unknown error',
-      ...(e.code && { code: e.code }),
+      message: String(errorObj.message || 'Unknown error'),
+      ...(errorObj.code && { code: String(errorObj.code) }),
     }
   }
 
@@ -414,7 +415,8 @@ export function handleRouteError(
     statusCode = 400
   } else if (error instanceof Error) {
     const errorMessage = error.message.toLowerCase()
-    const errorCode = (error as any).code
+    const errorWithCode = error as Error & { code?: string }
+    const errorCode = errorWithCode.code
 
     // Validation errors
     if (
@@ -533,16 +535,20 @@ export function handleRouteError(
 /**
  * Parse validation error details from Zod or similar schema validation
  */
-export function parseValidationErrors(error: any): ValidationErrorDetail[] {
+export function parseValidationErrors(
+  error: unknown
+): ValidationErrorDetail[] {
   const details: ValidationErrorDetail[] = []
 
   // Handle Zod errors
-  if (error.issues && Array.isArray(error.issues)) {
-    error.issues.forEach((issue: any) => {
+  const errorObj = error as Record<string, unknown>
+  if (errorObj.issues && Array.isArray(errorObj.issues)) {
+    errorObj.issues.forEach((issue: unknown) => {
+      const issueObj = issue as Record<string, unknown>
       details.push({
-        field: issue.path?.join('.') || 'unknown',
-        message: issue.message,
-        constraint: issue.code,
+        field: (Array.isArray(issueObj.path) ? issueObj.path.join('.') : 'unknown') || 'unknown',
+        message: String(issueObj.message || 'Validation error'),
+        constraint: String(issueObj.code || ''),
       })
     })
   }
