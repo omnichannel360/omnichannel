@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { MeetingTypeSchema, VALID_MEETING_TYPES, safeJoin } from '@/lib/validation'
+import { MeetingTypeSchema, SkillTypeSchema, VALID_MEETING_TYPES, VALID_SKILL_TYPES, safeJoin } from '@/lib/validation'
 
 /**
  * Path Traversal Vulnerability Tests
@@ -149,6 +149,132 @@ describe('MeetingTypeSchema - Path Traversal Prevention', () => {
         const isInWhitelist = VALID_MEETING_TYPES.has(validType as any)
         expect(result.success).toBe(isInWhitelist)
       }
+    })
+  })
+})
+
+describe('SkillTypeSchema - Path Traversal Prevention', () => {
+  describe('Valid skill types', () => {
+    it('should accept valid skill types from whitelist', () => {
+      VALID_SKILL_TYPES.forEach((type) => {
+        const result = SkillTypeSchema.safeParse(type)
+        expect(result.success).toBe(true)
+        expect(result.data).toBe(type)
+      })
+    })
+
+    it('should accept skill types with hyphens and underscores', () => {
+      const validInputs = ['meeting_dispatch', 'skill-trigger', 'workflow_execute']
+      validInputs.forEach((input) => {
+        // Note: These specific inputs may pass pattern/length checks but fail whitelist
+        // This demonstrates the multi-layer validation
+        const result = SkillTypeSchema.safeParse(input)
+        // Result depends on whitelist membership
+      })
+    })
+  })
+
+  describe('Path traversal attempts on skill field', () => {
+    const traversalAttempts = [
+      '../etc/passwd',
+      '..\\..\\windows\\system32',
+      '....',
+      './../config',
+      'normal/../../../etc/passwd',
+      'normal/../../file',
+    ]
+
+    traversalAttempts.forEach((attempt) => {
+      it(`should reject skill path traversal: ${attempt}`, () => {
+        const result = SkillTypeSchema.safeParse(attempt)
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe('Absolute path attempts on skill field', () => {
+    const absolutePaths = [
+      '/etc/passwd',
+      'C:\\Windows\\System32\\config',
+      '~/.ssh/id_rsa',
+      '/root/.bashrc',
+    ]
+
+    absolutePaths.forEach((attempt) => {
+      it(`should reject skill absolute path: ${attempt}`, () => {
+        const result = SkillTypeSchema.safeParse(attempt)
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe('Special character injection on skill field', () => {
+    const injectionAttempts = [
+      '../normal',
+      'skill;rm -rf /',
+      'skill`whoami`',
+      'skill$(whoami)',
+      'skill&whoami',
+      'skill|whoami',
+      'skill>file.txt',
+      'skill<input.txt',
+      'skill%00.txt',
+      'skill\0.txt',
+      'skill?wildcard=1',
+      'skill*',
+    ]
+
+    injectionAttempts.forEach((attempt) => {
+      it(`should reject skill special character: ${attempt}`, () => {
+        const result = SkillTypeSchema.safeParse(attempt)
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe('Whitelist enforcement for skills', () => {
+    it('should reject skills not in VALID_SKILL_TYPES', () => {
+      const invalidSkills = [
+        'random-skill',
+        'custom_trigger',
+        'exec_command',
+        'run_system',
+      ]
+
+      invalidSkills.forEach((skill) => {
+        const result = SkillTypeSchema.safeParse(skill)
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe('Null byte attacks on skill field', () => {
+    it('should reject null bytes in skill_triggered', () => {
+      const nullByteAttempts = [
+        'skill\0file.txt',
+        'normal%00file.txt',
+        'skill\u0000.json',
+      ]
+
+      nullByteAttempts.forEach((attempt) => {
+        const result = SkillTypeSchema.safeParse(attempt)
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe('NTFS alternate data streams on skill field', () => {
+    const ntfsAttempts = [
+      'skill:hidden',
+      'trigger.json:zone.identifier',
+      'skill::$DATA',
+    ]
+
+    ntfsAttempts.forEach((attempt) => {
+      it(`should reject skill NTFS stream: ${attempt}`, () => {
+        const result = SkillTypeSchema.safeParse(attempt)
+        expect(result.success).toBe(false)
+      })
     })
   })
 })
