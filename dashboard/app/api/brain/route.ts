@@ -6,6 +6,9 @@ import { atomicRead } from '@/lib/atomic-file-ops'
 import { atomicReaddir } from '@/lib/atomic-dir-ops'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { generateId } from '@/lib/validation'
+import { createLogger, createLogContext } from '@/lib/logger'
+
+const logger = createLogger('brain-api')
 
 interface Memory {
   id: string
@@ -32,8 +35,21 @@ interface MemoryData {
 const BRAIN_DIR = path.join(process.cwd(), '..', 'company-brain')
 
 async function getHandler(request: NextRequest) {
+  const startTime = Date.now()
+  const logContext = createLogContext({
+    method: request.method,
+    path: request.nextUrl.pathname,
+    operation: 'query_brain',
+  })
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
+    logger.warn('Unauthorized brain query attempt', {
+      ...logContext,
+      statusCode: 401,
+      responseTimeMs: Date.now() - startTime,
+      error: auth.error,
+    })
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
@@ -101,6 +117,16 @@ async function getHandler(request: NextRequest) {
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     ).slice(0, limit)
 
+    logger.info('Brain query completed successfully', {
+      ...logContext,
+      userId: auth.userId,
+      statusCode: 200,
+      responseTimeMs: Date.now() - startTime,
+      totalMemories: memories.length,
+      recentCount: recent.length,
+      categories: Object.keys(categoryCount).length,
+    })
+
     return NextResponse.json({
       success: true,
       data: {
@@ -110,6 +136,12 @@ async function getHandler(request: NextRequest) {
       } as BrainResponse,
     })
   } catch (error) {
+    logger.error('Brain query failed', error, {
+      ...logContext,
+      userId: auth.userId,
+      statusCode: 500,
+      responseTimeMs: Date.now() - startTime,
+    })
     return NextResponse.json(
       { success: false, error: 'Failed to query brain' },
       { status: 500 }

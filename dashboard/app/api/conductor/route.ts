@@ -6,6 +6,9 @@ import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { withFileLock } from '@/lib/file-lock'
 import { ensureDataDir } from '@/lib/ensure-dir'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { createLogger, createLogContext } from '@/lib/logger'
+
+const logger = createLogger('conductor-api')
 
 interface ConversationLog {
   timestamp: string
@@ -106,12 +109,32 @@ function parseTaskFromMessage(message: string): {
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+  const logContext = createLogContext({
+    method: request.method,
+    path: request.nextUrl.pathname,
+    operation: 'dispatch_task',
+  })
+
   // Apply rate limiting
   const rateLimitError = await applyRateLimit(request, 'conductor')
-  if (rateLimitError) return rateLimitError
+  if (rateLimitError) {
+    logger.warn('Rate limit exceeded for conductor', {
+      ...logContext,
+      statusCode: 429,
+      responseTimeMs: Date.now() - startTime,
+    })
+    return rateLimitError
+  }
 
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
+    logger.warn('Unauthorized conductor access attempt', {
+      ...logContext,
+      statusCode: 401,
+      responseTimeMs: Date.now() - startTime,
+      error: auth.error,
+    })
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
@@ -119,6 +142,12 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json()
   } catch (error) {
+    logger.warn('Conductor request JSON parse failed', {
+      ...logContext,
+      userId: auth.userId,
+      statusCode: 400,
+      responseTimeMs: Date.now() - startTime,
+    })
     return NextResponse.json(
       { success: false, error: 'Invalid JSON in request body' },
       { status: 400 }
@@ -129,6 +158,13 @@ export async function POST(request: NextRequest) {
     // Validate body against schema
     const parsedBody = ConductorMessageSchema.safeParse(body)
     if (!parsedBody.success) {
+      logger.warn('Conductor validation failed', {
+        ...logContext,
+        userId: auth.userId,
+        statusCode: 400,
+        responseTimeMs: Date.now() - startTime,
+        validationErrors: parsedBody.error.flatten().fieldErrors,
+      })
       return NextResponse.json(
         { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
         { status: 400 }
@@ -165,6 +201,16 @@ export async function POST(request: NextRequest) {
     })
     await saveLogs(logs)
 
+    logger.info('Task dispatched successfully', {
+      ...logContext,
+      userId: auth.userId,
+      statusCode: 200,
+      responseTimeMs: Date.now() - startTime,
+      taskAction: task.action,
+      agentCount: dispatchedAgents.length,
+      skillCount: dispatchedSkills.length,
+    })
+
     return NextResponse.json({
       success: true,
       response,
@@ -172,6 +218,12 @@ export async function POST(request: NextRequest) {
       dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
     })
   } catch (error) {
+    logger.error('Task dispatch failed', error, {
+      ...logContext,
+      userId: auth.userId,
+      statusCode: 500,
+      responseTimeMs: Date.now() - startTime,
+    })
     return NextResponse.json(
       { success: false, error: 'Failed to process request' },
       { status: 500 }
@@ -180,23 +232,56 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
+  const logContext = createLogContext({
+    method: request.method,
+    path: request.nextUrl.pathname,
+    operation: 'load_conductor_logs',
+  })
+
   // Apply rate limiting
   const rateLimitError = await applyRateLimit(request, 'conductor')
-  if (rateLimitError) return rateLimitError
+  if (rateLimitError) {
+    logger.warn('Rate limit exceeded for conductor logs', {
+      ...logContext,
+      statusCode: 429,
+      responseTimeMs: Date.now() - startTime,
+    })
+    return rateLimitError
+  }
 
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
+    logger.warn('Unauthorized conductor logs access attempt', {
+      ...logContext,
+      statusCode: 401,
+      responseTimeMs: Date.now() - startTime,
+      error: auth.error,
+    })
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
   try {
     const logs = await loadLogs()
+    logger.info('Conductor logs loaded successfully', {
+      ...logContext,
+      userId: auth.userId,
+      statusCode: 200,
+      responseTimeMs: Date.now() - startTime,
+      logCount: logs.length,
+    })
     return NextResponse.json({
       success: true,
       data: logs,
       meta: { total: logs.length },
     })
   } catch (error) {
+    logger.error('Failed to load conductor logs', error, {
+      ...logContext,
+      userId: auth.userId,
+      statusCode: 500,
+      responseTimeMs: Date.now() - startTime,
+    })
     return NextResponse.json(
       { success: false, error: 'Failed to load logs' },
       { status: 500 }

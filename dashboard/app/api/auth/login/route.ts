@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateToken } from '@/lib/auth'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { createLogger, createLogContext } from '@/lib/logger'
+
+const logger = createLogger('auth-login-api')
 
 interface LoginRequest {
   email: string
@@ -18,9 +21,21 @@ interface LoginResponse {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<LoginResponse>> {
+  const startTime = Date.now()
+  const logContext = createLogContext({
+    method: request.method,
+    path: request.nextUrl.pathname,
+    operation: 'login',
+  })
+
   // Apply rate limiting first
   const rateLimitError = await applyRateLimit(request, 'login')
   if (rateLimitError) {
+    logger.warn('Rate limit exceeded for login', {
+      ...logContext,
+      statusCode: 429,
+      responseTimeMs: Date.now() - startTime,
+    })
     return rateLimitError as NextResponse<LoginResponse>
   }
 
@@ -30,6 +45,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
 
     // Validate input
     if (!email || !password) {
+      logger.warn('Login validation failed - missing credentials', {
+        ...logContext,
+        email,
+        statusCode: 400,
+        responseTimeMs: Date.now() - startTime,
+      })
       return NextResponse.json(
         {
           success: false,
@@ -46,6 +67,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
 
     // Validate credentials
     if (email !== adminEmail || password !== adminPassword) {
+      logger.warn('Login failed - invalid credentials', {
+        ...logContext,
+        email,
+        statusCode: 401,
+        responseTimeMs: Date.now() - startTime,
+      })
       return NextResponse.json(
         {
           success: false,
@@ -57,6 +84,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
 
     // Create JWT token
     const token = await generateToken(email, email, 'admin')
+
+    logger.info('Login successful', {
+      ...logContext,
+      email,
+      statusCode: 200,
+      responseTimeMs: Date.now() - startTime,
+    })
 
     return NextResponse.json(
       {
@@ -71,6 +105,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Authentication failed'
+    logger.error('Login error - exception during authentication', error, {
+      ...logContext,
+      statusCode: 500,
+      responseTimeMs: Date.now() - startTime,
+    })
     return NextResponse.json(
       {
         success: false,
