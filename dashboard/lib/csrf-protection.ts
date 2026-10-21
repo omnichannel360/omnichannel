@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { createLogger } from './logger'
+
+const logger = createLogger('csrf-protection')
 
 const CSRF_TOKEN_LENGTH = 32
 const CSRF_COOKIE_NAME = '__Host-csrf'
@@ -126,8 +129,16 @@ export async function validateCsrfMiddleware(
         const clonedRequest = request.clone()
         const body = await clonedRequest.json()
         tokenFromBody = body._csrf || body.csrfToken || null
-      } catch {
-        // Body parse error - token must be in header
+      } catch (error) {
+        // Body parse error - token MUST be in header (not in body)
+        // Log for audit/security monitoring
+        const parseError = error instanceof Error ? error.message : 'Unknown parse error'
+        console.warn('[CSRF] Request body parse failed, enforcing header token validation', {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          error: parseError
+        })
+        // tokenFromBody remains null - CSRF verification will require header token
       }
     }
 
