@@ -13,21 +13,32 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
     locks.set(filePath, lock)
   }
 
-  return new Promise((resolve, reject) => {
-    const executeCallback = async () => {
+  return new Promise<T>((resolve, reject) => {
+    const executeCallback = async (): Promise<void> => {
       try {
         const result = await callback()
         resolve(result)
       } catch (error) {
         reject(error)
       } finally {
-        const nextCallback = lock!.queue.shift()
+        // Lock is guaranteed to exist: it was either retrieved or just created above
+        const fileLock = locks.get(filePath)
+        if (!fileLock) {
+          // Safety check: should never happen, but log if lock was deleted unexpectedly
+          console.error(`[FileLock] Lock for ${filePath} was deleted during execution`)
+          return
+        }
+
+        const nextCallback = fileLock.queue.shift()
         if (nextCallback) {
-          await nextCallback()
+          // Execute next queued callback; don't await to prevent blocking
+          nextCallback().catch((error) => {
+            console.error(`[FileLock] Error executing queued callback for ${filePath}:`, error)
+          })
         } else {
-          lock!.locked = false
+          fileLock.locked = false
           // Clean up lock entry when queue is empty to prevent memory leak
-          if (lock!.queue.length === 0) {
+          if (fileLock.queue.length === 0) {
             locks.delete(filePath)
           }
         }
@@ -38,7 +49,9 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
       lock.queue.push(executeCallback)
     } else {
       lock.locked = true
-      executeCallback()
+      // Initiate async execution without awaiting: the Promise will resolve/reject
+      // based on the callback's completion, independent of this Promise executor
+      void executeCallback()
     }
   })
 }

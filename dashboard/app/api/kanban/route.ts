@@ -3,11 +3,9 @@ import path from 'path'
 import { generateId } from '@/lib/validation'
 import { validateBody } from '@/lib/validation/middleware'
 import { KanbanItemSchema, type KanbanItem } from '@/lib/validation/schemas'
-import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
-import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
+import { atomicUpdate, atomicRead } from '@/lib/atomic-file-ops'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
-import { createLogger, LogContext, createLogContext } from '@/lib/logger'
-import { extractRequestContext, getOrCreateCorrelationId } from '@/lib/middleware/error-context'
+import { createLogger, createLogContext } from '@/lib/logger'
 import { protectRouteMulti } from '@/lib/protected-route'
 import {
   extractCorrelationFromRequest,
@@ -19,7 +17,7 @@ import {
 
 const logger = createLogger('kanban-api')
 
-interface Task {
+export interface Task {
   id: string
   title: string
   status: 'todo' | 'in-progress' | 'done'
@@ -27,12 +25,25 @@ interface Task {
   dueDate?: string
 }
 
+interface ErrorDetails {
+  errorType: string
+  errorMessage: string
+}
+
+function extractErrorDetails(error: unknown, contextFallback: string = 'Operation failed'): ErrorDetails {
+  if (error instanceof Error) {
+    const errorType = error instanceof SyntaxError ? 'SyntaxError' : error.constructor.name
+    return { errorType, errorMessage: error.message }
+  }
+  return { errorType: 'UnknownError', errorMessage: contextFallback }
+}
+
 const DATA_FILE = path.join(process.cwd(), 'data', 'kanban.json')
 
 const DEFAULT_TASKS: Task[] = [
   { id: generateId('task'), title: 'Complete API design', status: 'done' as const },
-  { id: generateId('task'), title: 'Implement authentication', status: 'in-progress' },
-  { id: generateId('task'), title: 'Write tests', status: 'todo' },
+  { id: generateId('task'), title: 'Implement authentication', status: 'in-progress' as const },
+  { id: generateId('task'), title: 'Write tests', status: 'todo' as const },
 ]
 
 const kanbanHandlers = protectRouteMulti(
@@ -130,8 +141,7 @@ const kanbanHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
-        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
-        const errorMessage = error instanceof Error ? error.message : 'Failed to create task'
+        const { errorType, errorMessage } = extractErrorDetails(error, 'Failed to create task')
 
         const { response, statusCode } = handleRouteError(error, requestId, {
           method: request.method,
@@ -219,11 +229,7 @@ const kanbanHandlers = protectRouteMulti(
           return [...workingTasks.slice(0, taskIndex), updatedTask, ...workingTasks.slice(taskIndex + 1)]
         }, DEFAULT_TASKS)
 
-        // Guaranteed non-null because atomicUpdate throws if task not found
-        if (updatedTaskResult === null) {
-          throw new Error('Internal error: task update failed')
-        }
-
+        // updatedTaskResult is guaranteed non-null: atomicUpdate throws if task not found
         logger.info('Task updated successfully', {
           ...logContext,
           statusCode: 200,
@@ -237,10 +243,10 @@ const kanbanHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
-        const message = error instanceof Error ? error.message : 'Failed to update task'
+        const { errorType, errorMessage } = extractErrorDetails(error, 'Failed to update task')
 
         // Handle task not found specifically
-        if (message === 'Task not found') {
+        if (errorMessage === 'Task not found') {
           const response = createErrorResponse(
             'Task not found',
             ERROR_CODES.RESOURCE_NOT_FOUND,
@@ -262,8 +268,6 @@ const kanbanHandlers = protectRouteMulti(
           userId,
           operation: 'update_task',
         })
-        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
-        const errorMessage = error instanceof Error ? error.message : 'Failed to update task'
 
         logger.error('Failed to update task', error, {
           ...logContext,
@@ -334,10 +338,10 @@ const kanbanHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
-        const message = error instanceof Error ? error.message : 'Failed to delete task'
+        const { errorType, errorMessage } = extractErrorDetails(error, 'Failed to delete task')
 
         // Handle task not found specifically
-        if (message === 'Task not found') {
+        if (errorMessage === 'Task not found') {
           const response = createErrorResponse(
             'Task not found',
             ERROR_CODES.RESOURCE_NOT_FOUND,
@@ -363,6 +367,8 @@ const kanbanHandlers = protectRouteMulti(
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
+          errorType,
+          errorMessage,
         })
         response.headers.set('x-correlation-id', requestId)
         return response
