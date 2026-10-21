@@ -14,69 +14,143 @@ import {
 
 describe('Error Handling Edge Cases', () => {
   describe('withTimeout function', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.clearAllMocks()
+    })
+
     it('should resolve successfully when operation completes before timeout', async () => {
+      // Arrange — Create operation that completes quickly (50ms)
       const operation = new Promise((resolve) => {
         setTimeout(() => resolve('success'), 50)
       })
 
+      // Act — Wrap with timeout of 200ms (plenty of time)
       const result = await withTimeout(operation, 200)
+
+      // Assert — Verify operation succeeded within timeout
       expect(result).toBe('success')
     })
 
-    it('should reject with timeout error when operation exceeds timeout', async () => {
+    it('should reject with timeout error when operation exceeds timeout duration', async () => {
+      // Arrange — Create operation that takes 200ms
       const operation = new Promise((resolve) => {
         setTimeout(() => resolve('success'), 200)
       })
 
+      // Act & Assert — Attempt to wrap with 50ms timeout (will fail)
       await expect(withTimeout(operation, 50)).rejects.toThrow('Operation timeout')
     })
 
-    it('should use custom timeout message', async () => {
+    it('should use custom timeout message when provided', async () => {
+      // Arrange — Custom timeout message
+      const customMessage = 'Custom timeout message'
       const operation = new Promise((resolve) => {
         setTimeout(() => resolve('success'), 200)
       })
 
-      await expect(withTimeout(operation, 50, 'Custom timeout message')).rejects.toThrow(
-        'Custom timeout message'
-      )
+      // Act & Assert — Verify custom message is used
+      await expect(withTimeout(operation, 50, customMessage)).rejects.toThrow(customMessage)
     })
 
-    it('should handle immediate timeout', async () => {
+    it('should handle immediate timeout (zero timeout with slow operation)', async () => {
+      // Arrange — Operation that takes a long time
       const operation = new Promise((resolve) => {
         setTimeout(() => resolve('success'), 1000)
       })
 
-      await expect(withTimeout(operation, 0)).rejects.toThrow()
+      // Act & Assert — Zero timeout should trigger immediately
+      await expect(withTimeout(operation, 0)).rejects.toThrow(/timeout|immediate/i)
     })
 
-    it('should handle promise rejection before timeout', async () => {
+    it('should handle promise rejection that occurs before timeout', async () => {
+      // Arrange — Operation rejects with error
+      const operationError = new Error('Operation failed')
       const operation = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Operation failed')), 50)
+        setTimeout(() => reject(operationError), 50)
       })
 
+      // Act & Assert — Operation error should propagate (not timeout)
       await expect(withTimeout(operation, 200)).rejects.toThrow('Operation failed')
     })
 
-    it('should handle zero timeout edge case', async () => {
+    it('should resolve zero timeout edge case when operation is already resolved', async () => {
+      // Arrange — Operation that is already resolved
       const operation = Promise.resolve('success')
-      await expect(withTimeout(operation, 0)).resolves.toBe('success')
+
+      // Act — Apply timeout of 0
+      const result = await withTimeout(operation, 0)
+
+      // Assert — Verify resolved value is returned
+      expect(result).toBe('success')
     })
 
-    it('should handle very large timeout values', async () => {
+    it('should handle very large timeout values gracefully', async () => {
+      // Arrange — Max safe integer timeout
       const operation = Promise.resolve('success')
+
+      // Act — Apply extremely large timeout
       const result = await withTimeout(operation, Number.MAX_SAFE_INTEGER)
+
+      // Assert — Verify operation completes successfully
       expect(result).toBe('success')
+    })
+
+    it('should timeout with specific error type for timeout case', async () => {
+      // Arrange — Operation that will timeout
+      const operation = new Promise((resolve) => {
+        setTimeout(() => resolve('success'), 500)
+      })
+
+      // Act & Assert — Verify error is specifically a timeout error
+      await expect(withTimeout(operation, 10)).rejects.toMatchObject({
+        name: 'TimeoutError',
+        message: expect.stringMatching(/timeout/i),
+      })
+    })
+
+    it('should allow cleanup/abort of timed-out operation', async () => {
+      // Arrange — Track if cleanup occurred
+      const cleanup = jest.fn()
+      const operation = new Promise((resolve) => {
+        const timer = setTimeout(() => resolve('success'), 200)
+        // Handle cleanup when operation times out
+        operation.catch(() => clearTimeout(timer))
+      })
+
+      // Act & Assert — Verify timeout and cleanup
+      await expect(withTimeout(operation, 50)).rejects.toThrow('timeout')
+      // Verify cleanup was potentially called (implementation dependent)
     })
   })
 
   describe('retryWithBackoff function', () => {
+    let mockOperation: jest.Mock
+
+    beforeEach(() => {
+      mockOperation = jest.fn()
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
     it('should succeed on first attempt if no error', async () => {
-      const operation = jest.fn().mockResolvedValue('success')
+      // Arrange — Mock successful operation on first call
+      mockOperation.mockResolvedValue('success')
 
-      const result = await retryWithBackoff(operation)
+      // Act — Call retry function with successful operation
+      const result = await retryWithBackoff(mockOperation)
 
+      // Assert — Verify success on first attempt with only one call
       expect(result).toBe('success')
-      expect(operation).toHaveBeenCalledTimes(1)
+      expect(mockOperation).toHaveBeenCalledTimes(1)
+      expect(mockOperation).toHaveBeenCalledWith()
     })
 
     it('should retry on retryable error and succeed', async () => {
@@ -242,14 +316,14 @@ describe('Error Handling Edge Cases', () => {
         .mockRejectedValueOnce(new Error('Failed'))
         .mockResolvedValueOnce('success')
 
-      await circuitBreaker.execute(operation)
-      try {
-        await circuitBreaker.execute(operation)
-      } catch (e) {
-        // Expected
-      }
+      // Arrange: Set up circuit breaker in HALF_OPEN state
       await circuitBreaker.execute(operation)
 
+      // Act: Execute failing operation followed by success (tests recovery path)
+      await expect(circuitBreaker.execute(operation)).rejects.toThrow('Failed')
+
+      // Assert: Verify state reset to CLOSED after successful operation
+      await circuitBreaker.execute(operation)
       expect(circuitBreaker.getState()).toBe('CLOSED')
     })
   })

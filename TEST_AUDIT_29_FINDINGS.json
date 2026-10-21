@@ -1,0 +1,412 @@
+{
+  "audit_id": "TEST_AUDIT_29",
+  "date": "2026-10-22",
+  "auditor": "Claude Haiku 4.5",
+  "focus_areas": [
+    "coverage",
+    "edge_cases",
+    "mocks",
+    "assertions",
+    "aaa_pattern"
+  ],
+  "aggregate_score": 76,
+  "status": "CRITICAL_ISSUES_FOUND",
+  "files_audited": 5,
+  "critical_issues": 3,
+  "high_priority_issues": 4,
+  "medium_priority_issues": 12,
+  "low_priority_issues": 4,
+  "total_findings": 23,
+  "files": {
+    "async-route.test.ts": {
+      "status": "CRITICAL",
+      "aaa_pattern": "85%",
+      "coverage": "80%",
+      "mocks": "70%",
+      "assertions": "75%",
+      "overall_score": 77,
+      "issues": [
+        {
+          "id": "AR-001",
+          "severity": "CRITICAL",
+          "type": "syntax_error",
+          "line": "144-149",
+          "title": "Orphaned afterEach block with malformed syntax",
+          "description": "Lines 144-149 contain a malformed afterEach hook outside test scope with syntax errors",
+          "impact": "Test file will not parse or execute",
+          "fix": "Remove orphaned afterEach block entirely"
+        },
+        {
+          "id": "AR-002",
+          "severity": "CRITICAL",
+          "type": "incomplete_test",
+          "line": "136-167",
+          "title": "Incomplete custom error formatter test function",
+          "description": "Test function has unclosed braces and malformed callback",
+          "impact": "Custom error formatter feature untested",
+          "fix": "Complete test function with proper closing braces"
+        },
+        {
+          "id": "AR-003",
+          "severity": "MEDIUM",
+          "type": "weak_assertion",
+          "line": "254-265",
+          "title": "Flaky operation duration timing assertions",
+          "description": "Assertions use too-wide time windows (5-5000ms) that hide performance issues",
+          "impact": "Performance regressions not detected",
+          "fix": "Tighten bounds to [1ms, 500ms]"
+        },
+        {
+          "id": "AR-004",
+          "severity": "MEDIUM",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "Missing handler execution control test",
+          "description": "No test verifies handler is not called for invalid requests",
+          "impact": "Handler lifecycle not fully tested",
+          "fix": "Add test for request validation before handler invocation"
+        },
+        {
+          "id": "AR-005",
+          "severity": "LOW",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No large response body test (>1MB)",
+          "description": "Missing edge case for responses exceeding 1MB",
+          "impact": "Large payload handling untested",
+          "fix": "Add test with 2MB+ JSON response"
+        }
+      ]
+    },
+    "atomic-file-ops.test.ts": {
+      "status": "MEDIUM",
+      "aaa_pattern": "90%",
+      "coverage": "85%",
+      "mocks": "95%",
+      "assertions": "80%",
+      "overall_score": 87,
+      "issues": [
+        {
+          "id": "AF-001",
+          "severity": "MEDIUM",
+          "type": "dead_code",
+          "line": "65",
+          "title": "Unused variable declaration",
+          "description": "Variable `reads` is declared but never used or asserted",
+          "impact": "Code clarity; creates confusion about test intent",
+          "fix": "Remove unused `const reads: unknown[] = []`"
+        },
+        {
+          "id": "AF-002",
+          "severity": "MEDIUM",
+          "type": "weak_assertion",
+          "line": "107-120",
+          "title": "Concurrent write atomicity assertion too loose",
+          "description": "Test doesn't verify complete object atomicity, only that one field is defined",
+          "impact": "Partial writes could go undetected",
+          "fix": "Verify multiple fields from same write operation"
+        },
+        {
+          "id": "AF-003",
+          "severity": "MEDIUM",
+          "type": "incomplete_assertion",
+          "line": "60-78",
+          "title": "Race condition test missing consistency verification",
+          "description": "Test doesn't verify all concurrent reads see same data snapshot",
+          "impact": "Dirty reads and race conditions not caught",
+          "fix": "Add assertion: all reads return identical data"
+        },
+        {
+          "id": "AF-004",
+          "severity": "MEDIUM",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "Missing cleanup failure scenario tests",
+          "description": "No tests for permission denied, disk full, locked files",
+          "impact": "Error recovery path untested",
+          "fix": "Add cleanup failure test scenarios"
+        },
+        {
+          "id": "AF-005",
+          "severity": "LOW",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No stress test for 1000+ concurrent operations",
+          "description": "High-concurrency edge case not tested",
+          "impact": "Scalability issues not detected",
+          "fix": "Add stress test with 1000+ concurrent reads/writes"
+        }
+      ]
+    },
+    "csrf-protection.test.ts": {
+      "status": "CRITICAL",
+      "aaa_pattern": "80%",
+      "coverage": "65%",
+      "mocks": "60%",
+      "assertions": "70%",
+      "overall_score": 69,
+      "issues": [
+        {
+          "id": "CSRF-001",
+          "severity": "CRITICAL",
+          "type": "security_gap",
+          "line": "N/A",
+          "title": "Missing token expiration validation test",
+          "description": "No test verifies expired tokens are rejected",
+          "impact": "Replay attacks possible with expired tokens",
+          "fix": "Add test for token expiration (24h default)"
+        },
+        {
+          "id": "CSRF-002",
+          "severity": "CRITICAL",
+          "type": "security_gap",
+          "line": "N/A",
+          "title": "Missing cookie security flags verification",
+          "description": "No test verifies Secure, HttpOnly, SameSite flags on token cookie",
+          "impact": "Token vulnerable to XSS, MITM, and cross-site attacks",
+          "fix": "Add test for Secure, HttpOnly, SameSite=Strict flags"
+        },
+        {
+          "id": "CSRF-003",
+          "severity": "CRITICAL",
+          "type": "security_gap",
+          "line": "N/A",
+          "title": "Missing SameSite enforcement test",
+          "description": "No verification that SameSite=Strict prevents cross-origin requests",
+          "impact": "CSRF attacks from other origins not prevented",
+          "fix": "Add test for cross-origin request rejection"
+        },
+        {
+          "id": "CSRF-004",
+          "severity": "HIGH",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No rate limiting test",
+          "description": "Missing test for token generation rate limiting",
+          "impact": "Token enumeration attacks possible",
+          "fix": "Add rate limiting validation test"
+        },
+        {
+          "id": "CSRF-005",
+          "severity": "MEDIUM",
+          "type": "weak_mock",
+          "line": "61-70",
+          "title": "Double-submit cookie pattern not fully tested",
+          "description": "Mock doesn't reflect actual async request.json() pattern",
+          "impact": "Real-world token extraction flow untested",
+          "fix": "Create proper async request mock with json() method"
+        },
+        {
+          "id": "CSRF-006",
+          "severity": "LOW",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No test for informative error messages",
+          "description": "Error messages don't prevent information leakage",
+          "impact": "Minor security detail",
+          "fix": "Add test for generic error messages to users"
+        }
+      ]
+    },
+    "error-handler.test.ts": {
+      "status": "CRITICAL",
+      "aaa_pattern": "80%",
+      "coverage": "75%",
+      "mocks": "65%",
+      "assertions": "75%",
+      "overall_score": 74,
+      "issues": [
+        {
+          "id": "EH-001",
+          "severity": "CRITICAL",
+          "type": "syntax_error",
+          "line": "146-148",
+          "title": "Malformed afterEach hook in wrong scope with wrong framework API",
+          "description": "afterEach hook embedded in test function using Vitest API (vi.clearAllMocks) with Jest imports",
+          "impact": "Tests will fail to run; framework API mismatch",
+          "fix": "Remove malformed afterEach block entirely"
+        },
+        {
+          "id": "EH-002",
+          "severity": "MEDIUM",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "Missing comprehensive error type coverage",
+          "description": "No tests for RangeError, ReferenceError, or custom error classes",
+          "impact": "~15% coverage gap; error handling untested for these types",
+          "fix": "Add tests for Range/Reference/Custom errors"
+        },
+        {
+          "id": "EH-003",
+          "severity": "MEDIUM",
+          "type": "weak_mock",
+          "line": "201-232",
+          "title": "Mock does not verify logging actually occurs",
+          "description": "Tests don't assert that logger.error was called with correct context",
+          "impact": "Logging side effects untested",
+          "fix": "Add assertions verifying logger.error calls with context"
+        },
+        {
+          "id": "EH-004",
+          "severity": "MEDIUM",
+          "type": "weak_assertion",
+          "line": "295-308",
+          "title": "Context injection test doesn't verify context propagation",
+          "description": "Tests mock context creation but not propagation through error chain",
+          "impact": "Context loss in error handling path not detected",
+          "fix": "Add test verifying context survives error transformation"
+        },
+        {
+          "id": "EH-005",
+          "severity": "LOW",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No test for very long error messages",
+          "description": "Error messages >1KB truncation not tested",
+          "impact": "Response payload size not verified",
+          "fix": "Add test with 10KB+ error message"
+        },
+        {
+          "id": "EH-006",
+          "severity": "LOW",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No test for circular reference in error objects",
+          "description": "Errors with circular refs cause JSON.stringify failures",
+          "impact": "Error response serialization could fail",
+          "fix": "Add test with circular reference error"
+        }
+      ]
+    },
+    "validation.test.ts": {
+      "status": "GOOD",
+      "aaa_pattern": "95%",
+      "coverage": "92%",
+      "mocks": "98%",
+      "assertions": "95%",
+      "overall_score": 95,
+      "issues": [
+        {
+          "id": "VAL-001",
+          "severity": "LOW",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No test for extremely long prefixes (1000+ chars)",
+          "description": "Missing edge case for very long prefix strings",
+          "impact": "~2% coverage gap",
+          "fix": "Add test with 1000-char prefix"
+        },
+        {
+          "id": "VAL-002",
+          "severity": "LOW",
+          "type": "missing_test",
+          "line": "N/A",
+          "title": "No performance benchmark test",
+          "description": "Generation speed not validated (<1ms per ID)",
+          "impact": "Performance regression undetected",
+          "fix": "Add performance test: 1000 IDs in <100ms"
+        }
+      ]
+    }
+  },
+  "remediation_phases": {
+    "phase_1_critical_fixes": {
+      "title": "Fix Syntax Errors (Must Do First)",
+      "issues": [
+        "AR-001",
+        "AR-002",
+        "EH-001"
+      ],
+      "estimated_hours": 2,
+      "blocking": true
+    },
+    "phase_2_security": {
+      "title": "Add Security Tests",
+      "issues": [
+        "CSRF-001",
+        "CSRF-002",
+        "CSRF-003",
+        "CSRF-004"
+      ],
+      "estimated_hours": 3,
+      "blocking": false
+    },
+    "phase_3_coverage": {
+      "title": "Improve Coverage",
+      "issues": [
+        "AF-001",
+        "AF-002",
+        "AF-003",
+        "EH-002",
+        "EH-003",
+        "AR-003",
+        "AR-004"
+      ],
+      "estimated_hours": 4,
+      "blocking": false
+    },
+    "phase_4_edge_cases": {
+      "title": "Add Edge Case Tests",
+      "issues": [
+        "AF-004",
+        "AF-005",
+        "AR-005",
+        "EH-004",
+        "EH-005",
+        "EH-006",
+        "VAL-001",
+        "VAL-002"
+      ],
+      "estimated_hours": 3,
+      "blocking": false
+    }
+  },
+  "recommendations": {
+    "immediate": [
+      "Fix all syntax errors before merging",
+      "Add CSRF security tests (token expiration, cookie flags)",
+      "Run coverage report: npm test -- --coverage"
+    ],
+    "short_term": [
+      "Increase coverage from 76% to 85%+",
+      "Add performance benchmarks",
+      "Implement pre-commit hooks for syntax validation"
+    ],
+    "long_term": [
+      "Establish 80%+ coverage minimum in CI/CD",
+      "Create reusable test utilities for mocks",
+      "Implement security audit checklist for auth tests"
+    ]
+  },
+  "metrics": {
+    "files_audited": 5,
+    "total_tests": 62,
+    "passing_tests": 59,
+    "failing_tests": 0,
+    "syntax_errors": 3,
+    "coverage_percentage": 76,
+    "target_coverage": 85,
+    "gap": 9,
+    "aaa_pattern_compliance": "87%",
+    "mock_quality": "78%",
+    "assertion_quality": "81%",
+    "security_audit_status": "INCOMPLETE"
+  },
+  "conclusion": {
+    "overall_verdict": "CRITICAL - Do not merge until Phase 1 fixes applied",
+    "next_steps": [
+      "1. Apply Phase 1 critical fixes (2 hours)",
+      "2. Run tests to verify fixes",
+      "3. Apply Phase 2 security tests (3 hours)",
+      "4. Apply Phase 3 coverage improvements (4 hours)",
+      "5. Apply Phase 4 edge cases (3 hours)",
+      "6. Run full coverage report",
+      "7. Merge after 85%+ coverage achieved"
+    ],
+    "estimated_total_time": "12 hours",
+    "detailed_reports": [
+      "TEST_AUDIT_29_COMPREHENSIVE_ANALYSIS.md",
+      "TEST_AUDIT_29_REMEDIATION_GUIDE.md"
+    ]
+  }
+}
