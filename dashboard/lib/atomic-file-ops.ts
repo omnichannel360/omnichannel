@@ -2,6 +2,16 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { withFileLock } from './file-lock'
 
+// Simple inline logger for file corruption detection
+const logFileCorruption = (filePath: string, error: unknown) => {
+  const errorMsg = error instanceof Error ? error.message : String(error)
+  const timestamp = new Date().toISOString()
+  const logEntry = { timestamp, level: 'WARN', module: 'atomic-file-ops', path: filePath, error: errorMsg }
+  if (typeof process !== 'undefined' && process.stderr) {
+    process.stderr.write(JSON.stringify(logEntry) + '\n')
+  }
+}
+
 export async function atomicRead<T>(filePath: string, fallback?: T): Promise<T> {
   return withFileLock(filePath, async () => {
     try {
@@ -60,7 +70,8 @@ export async function atomicUpdate<T>(
       try {
         current = JSON.parse(content) as T
       } catch (parseError) {
-        // If JSON parsing fails, use fallback
+        // If JSON parsing fails, log the corruption and use fallback
+        logFileCorruption(filePath, parseError)
         current = fallback
       }
     } catch (error: unknown) {
@@ -110,7 +121,8 @@ export async function atomicConditionalUpdate<T>(
       try {
         current = JSON.parse(content) as T
       } catch (parseError) {
-        // If JSON parsing fails, use fallback
+        // If JSON parsing fails, log the corruption and use fallback
+        logFileCorruption(filePath, parseError)
         current = fallback
       }
     } catch (error: unknown) {

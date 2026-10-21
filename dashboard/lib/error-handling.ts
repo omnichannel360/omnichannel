@@ -393,7 +393,9 @@ export class CircuitBreaker {
       const now = Date.now()
       if (now - this.lastFailureTime > this.resetTimeoutMs) {
         // Atomically transition from OPEN to HALF_OPEN
+        // CRITICAL FIX: Reset failure count to allow HALF_OPEN to test without immediate re-opening
         this.state = 'HALF_OPEN'
+        this.failureCount = 0
         this.successCount = 0
         return 'HALF_OPEN'
       }

@@ -34,7 +34,8 @@ export async function protectRoute(
     const verifyPromise = verifyToken(request)
 
     // Create timeout promise with proper cleanup
-    const timeoutPromise = new Promise<null>((_, reject) => {
+    // Type as Promise<never> because this promise only rejects, never resolves
+    const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         reject(new Error('Auth verification timeout'))
       }, AUTH_TIMEOUT_MS)
