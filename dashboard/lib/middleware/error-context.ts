@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { logger, createLogContext, LogContext } from '@/lib/logger'
+import { generateSecureRandomId } from '@/lib/crypto-utils'
 
 // Store context in request headers for access in route handlers
 const CORRELATION_ID_HEADER = 'x-correlation-id'
@@ -12,22 +13,11 @@ const REQUEST_START_TIME_HEADER = 'x-request-start-time'
 
 /**
  * Generate secure random component for correlation IDs
- * Uses consistent crypto API checking pattern
+ * Uses shared crypto utility for consistency
+ * @deprecated Use generateSecureRandomId from crypto-utils instead
  */
 function generateSecureRandomPart(): string {
-  // Try Node.js crypto module first
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-
-  // Fallback: use browser crypto API
-  if (globalThis.crypto?.getRandomValues) {
-    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(6))
-    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
-  }
-
-  // Last resort: timestamp + Math.random
-  return Math.random().toString(36).substring(2, 11)
+  return generateSecureRandomId()
 }
 
 /**

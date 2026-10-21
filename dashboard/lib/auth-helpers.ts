@@ -171,14 +171,22 @@ export function getAuthContextForLogging(request: NextRequest) {
 }
 
 /**
+ * Route context passed to Next.js handlers
+ */
+export interface RouteContext {
+  params?: Record<string, string | string[]>
+  [key: string]: unknown
+}
+
+/**
  * Middleware wrapper for API routes
  * Ensures route is protected and returns auth context
  */
 export async function withAuth(
-  handler: (request: NextRequest, context: any) => Promise<NextResponse>,
+  handler: (request: NextRequest, context: RouteContext) => Promise<NextResponse>,
   requiredRoles?: UserRole[]
 ) {
-  return async (request: NextRequest, context: any) => {
+  return async (request: NextRequest, context: RouteContext) => {
     // Verify authentication
     const authResult = verifyAuth(request)
     if (!authResult.authenticated) {

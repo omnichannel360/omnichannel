@@ -26,6 +26,11 @@ export function generateUUIDv4(): string {
 
   // Fallback for environments without crypto.getRandomValues
   // This is less secure but ensures the function works everywhere
+  // WARNING: NOT cryptographically secure, use only as last resort
+  console.warn(
+    '[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. ' +
+    'Consider using Node.js 15+ or modern browser crypto APIs.'
+  )
   const placeholder = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
   return placeholder.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0

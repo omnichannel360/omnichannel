@@ -4,6 +4,8 @@
  * stack traces, and contextual information.
  */
 
+import { generateSecureRandomId } from './crypto-utils'
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface LogContext {
@@ -307,20 +309,12 @@ export const logger = createLogger('default')
  * Generate secure random ID for correlation tracking
  * Uses crypto.randomUUID when available, falls back to secure random bytes
  */
+/**
+ * Generate a secure ID using shared crypto utilities
+ * @deprecated Use generateSecureRandomId from crypto-utils instead
+ */
 function generateSecureId(): string {
-  // Prefer crypto.randomUUID if available (Node.js 15+)
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-
-  // Fallback: use crypto.getRandomValues if available (browser)
-  if (globalThis.crypto?.getRandomValues) {
-    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(6))
-    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
-  }
-
-  // Last resort: timestamp + Math.random
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  return generateSecureRandomId()
 }
 
 /**

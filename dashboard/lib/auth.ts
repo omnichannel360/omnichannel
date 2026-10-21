@@ -54,15 +54,20 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 export async function verifyToken(request: NextRequest): Promise<TokenPayload | null> {
   try {
     const authHeader = request.headers.get('authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return null
     }
 
     const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, getJWTSecret()) as unknown as TokenPayload
+    const decoded = jwt.verify(token, getJWTSecret()) as JwtPayload
 
-    return decoded
+    // Validate decoded token has required fields before returning
+    if (!isValidTokenPayload(decoded)) {
+      return null
+    }
+
+    return decoded as TokenPayload
   } catch (error) {
     return null
   }
@@ -95,9 +100,14 @@ export function createUnauthorizedResponse(error: string): Response {
 export async function generateToken(
   userId: string,
   email: string,
-  role: string = 'user',
+  role: UserRole = 'user',
   expiresIn: number = 24 * 60 * 60 // 24 hours default
 ): Promise<string> {
+  // Type-safe validation: role must be one of the defined UserRole values
+  if (!['admin', 'user', 'viewer'].includes(role)) {
+    throw new Error(`Invalid role: "${role}". Must be one of: admin, user, viewer`)
+  }
+
   const token = jwt.sign(
     {
       sub: userId,

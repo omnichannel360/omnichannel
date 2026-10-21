@@ -154,6 +154,10 @@ export async function applyAuthMiddleware(
 /**
  * Middleware for Next.js route handlers
  * Wrap handler to enforce auth before execution
+ *
+ * DEPRECATION NOTICE: Use protectRoute() from protected-route.ts instead.
+ * This function uses unsafe type casting. The protectRoute() function provides
+ * a properly typed alternative that passes auth context as a separate argument.
  */
 export function withEnhancedAuth<T extends (...args: any[]) => Promise<Response>>(
   handler: T,
@@ -167,12 +171,21 @@ export function withEnhancedAuth<T extends (...args: any[]) => Promise<Response>
       return authResult
     }
 
-    // Attach auth context to request for handler use
-    const requestWithAuth = request as any
-    requestWithAuth.auth = authResult
-
     try {
-      return await handler(request, ...args)
+      // Pass auth context as middleware context via request headers
+      // This allows the handler to access auth without casting
+      const requestWithHeaders = request.clone()
+      if (authResult.userId) {
+        requestWithHeaders.headers.set('x-user-id', authResult.userId)
+      }
+      if (authResult.email) {
+        requestWithHeaders.headers.set('x-user-email', authResult.email)
+      }
+      if (authResult.role) {
+        requestWithHeaders.headers.set('x-user-role', authResult.role)
+      }
+
+      return await handler(requestWithHeaders, ...args)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Internal server error'
       logger.error('Auth middleware handler error', error, {

@@ -129,11 +129,10 @@ export async function verifyAuthMiddleware(
 /**
  * Higher-order function to wrap API handlers with auth middleware
  * Usage: export const POST = withAuth(myHandler, { allowedRoles: ['admin'] })
+ *
+ * NOTE: Auth context is available via getAuthContext(request), not via request mutation
+ * This preserves request immutability and follows functional patterns
  */
-interface AuthenticatedRequest extends NextRequest {
-  auth?: AuthContext
-}
-
 export function withAuth<T extends (req: NextRequest, ...args: unknown[]) => Promise<Response>>(
   handler: T,
   options: AuthMiddlewareOptions = {}
@@ -146,24 +145,28 @@ export function withAuth<T extends (req: NextRequest, ...args: unknown[]) => Pro
       return authResult
     }
 
-    // Attach auth context to request for use in handler
-    const requestWithAuth = request as AuthenticatedRequest
-    requestWithAuth.auth = authResult
+    // Auth context is injected via headers by Next.js middleware
+    // Handlers retrieve it using extractAuthFromHeaders(request)
+    // This preserves immutability: no request mutations
 
     try {
       return await handler(request, ...args)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Internal server error'
+      const errorMessage = error instanceof Error ? error.message : 'Internal server error'
+
+      // Log detailed error server-side only
       logger.error('Auth middleware handler error', error, {
         path: request.nextUrl.pathname,
         method: request.method,
         userId: authResult.userId,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
       })
 
+      // Return generic message to client (no info leakage)
       return NextResponse.json(
         {
           success: false,
-          error: message,
+          error: 'Request processing failed',
         },
         { status: 500 }
       )

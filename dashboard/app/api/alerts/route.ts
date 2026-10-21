@@ -6,7 +6,7 @@ import { validateBody } from '@/lib/validation/middleware'
 import { AlertCreateBodySchema, AlertUpdateBodySchema, type AlertCreateBody, type AlertUpdateBody } from '@/lib/validation/schemas'
 import path from 'path'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
-import { AlertSchema, type Alert as AlertType } from '@/lib/validation/schemas'
+import { AlertSchema } from '@/lib/validation/schemas'
 import { protectRouteMulti, type RouteHandler } from '@/lib/protected-route'
 import {
   extractCorrelationFromRequest,
@@ -16,15 +16,7 @@ import {
   withTimeout,
   sanitizeErrorDetails,
 } from '@/lib/error-handling'
-
-interface Alert {
-  id: string
-  timestamp: string
-  level: 'info' | 'warning' | 'critical'
-  component: string
-  message: string
-  status: 'active' | 'resolved'
-}
+import type { Alert } from '@/lib/validation/schemas'
 
 const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json')
 
@@ -219,6 +211,9 @@ const alertHandlers = protectRouteMulti(
         )
 
         const updated = result.find((a) => a.id === alert_id)
+        if (!updated) {
+          throw new Error(`Alert with id ${alert_id} not found after update`)
+        }
         const responseTime = Date.now() - startTime
 
         logger.info('Alert updated successfully', {

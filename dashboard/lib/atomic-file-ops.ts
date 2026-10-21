@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs'
+import path from 'path'
 import { withFileLock } from './file-lock'
 
 export async function atomicRead<T>(filePath: string, fallback?: T): Promise<T> {
@@ -16,8 +17,16 @@ export async function atomicRead<T>(filePath: string, fallback?: T): Promise<T> 
 
 export async function atomicWrite<T>(filePath: string, data: T): Promise<void> {
   return withFileLock(filePath, async () => {
-    const dir = filePath.substring(0, filePath.lastIndexOf('/'))
-    await fs.mkdir(dir, { recursive: true }).catch(() => {})
+    const dir = path.dirname(filePath)
+    try {
+      await fs.mkdir(dir, { recursive: true })
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      // EEXIST is expected and safe; other errors should be thrown
+      if (fsError?.code !== 'EEXIST') {
+        throw error
+      }
+    }
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
   })
 }
@@ -42,8 +51,16 @@ export async function atomicUpdate<T>(
     }
 
     const updated = await transform(current)
-    const dir = filePath.substring(0, filePath.lastIndexOf('/'))
-    await fs.mkdir(dir, { recursive: true }).catch(() => {})
+    const dir = path.dirname(filePath)
+    try {
+      await fs.mkdir(dir, { recursive: true })
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      // EEXIST is expected and safe; other errors should be thrown
+      if (fsError?.code !== 'EEXIST') {
+        throw error
+      }
+    }
     await fs.writeFile(filePath, JSON.stringify(updated, null, 2), 'utf-8')
     return updated
   })
@@ -74,8 +91,16 @@ export async function atomicConditionalUpdate<T>(
     }
 
     const updated = await transform(current)
-    const dir = filePath.substring(0, filePath.lastIndexOf('/'))
-    await fs.mkdir(dir, { recursive: true }).catch(() => {})
+    const dir = path.dirname(filePath)
+    try {
+      await fs.mkdir(dir, { recursive: true })
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      // EEXIST is expected and safe; other errors should be thrown
+      if (fsError?.code !== 'EEXIST') {
+        throw error
+      }
+    }
     await fs.writeFile(filePath, JSON.stringify(updated, null, 2), 'utf-8')
     return { updated: true, data: updated }
   })

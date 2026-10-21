@@ -58,13 +58,21 @@ async function getCompanyBrainStats(correlationId: string): Promise<{ count: num
     const files = (await fs.readdir(brainDir)).filter(f => f.endsWith('.json'))
     if (files.length === 0) return { count: 0, latest: null }
 
-    const latest = files.sort().pop()
+    // Safe array operation: sort and pop with null guard
+    const sortedFiles = files.sort()
+    const latest = sortedFiles[sortedFiles.length - 1]
+
     let latestTimestamp = null
-    if (latest) {
+    if (latest && typeof latest === 'string' && latest.length > 0) {
       try {
-        const content = await fs.readFile(path.join(brainDir, latest), 'utf-8')
+        const filePath = path.join(brainDir, latest)
+        const content = await fs.readFile(filePath, 'utf-8')
         const parsed = JSON.parse(content)
-        latestTimestamp = parsed.timestamp
+
+        // Type-safe access to timestamp field
+        if (parsed && typeof parsed === 'object' && 'timestamp' in parsed) {
+          latestTimestamp = String(parsed.timestamp)
+        }
       } catch (error) {
         logger.warn('Failed to parse company brain latest file', {
           requestId: correlationId,
@@ -137,9 +145,30 @@ async function getSkillRegistryStats(correlationId: string): Promise<number> {
   const regPath = path.join(process.cwd(), '..', 'skills', 'registry.json')
   try {
     return await withFileLock(regPath, async () => {
+      try {
+        await fs.stat(regPath)
+      } catch (error) {
+        logger.warn('Skill registry file not found', {
+          requestId: correlationId,
+          component: 'skill_registry',
+          operation: 'stat_file',
+          path: regPath,
+        })
+        return 0
+      }
+
       const content = await fs.readFile(regPath, 'utf-8')
       const registry = JSON.parse(content)
-      return registry.meeting_skills?.length || 0
+
+      // Type-safe null checking with proper validation
+      if (registry &&
+          typeof registry === 'object' &&
+          'meeting_skills' in registry &&
+          Array.isArray(registry.meeting_skills)) {
+        return registry.meeting_skills.length
+      }
+
+      return 0
     })
   } catch (error) {
     logger.error('Failed to load skill registry', error, {
