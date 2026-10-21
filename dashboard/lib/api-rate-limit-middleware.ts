@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit, rateLimiters, RateLimitConfig, createRateLimiter } from './rate-limiting'
+import { createLogger } from './logger'
+
+const logger = createLogger('rate-limit-middleware')
 
 /**
  * Wrapper function for API routes that need rate limiting
@@ -18,7 +21,11 @@ export async function applyRateLimit(
 ): Promise<NextResponse | null> {
   const limiter = rateLimiters[endpoint as keyof typeof rateLimiters]
   if (!limiter) {
-    console.error(`Rate limiter not found for endpoint: ${endpoint}`)
+    logger.error('Rate limiter not found for endpoint', new Error('Missing rate limiter'), {
+      endpoint,
+      method: request.method,
+      path: request.nextUrl.pathname,
+    })
     return null
   }
 

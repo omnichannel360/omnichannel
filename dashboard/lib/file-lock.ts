@@ -26,6 +26,10 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
           await nextCallback()
         } else {
           lock!.locked = false
+          // Clean up lock entry when queue is empty to prevent memory leak
+          if (lock!.queue.length === 0) {
+            locks.delete(filePath)
+          }
         }
       }
     }

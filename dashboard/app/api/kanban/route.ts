@@ -113,10 +113,9 @@ const kanbanHandlers = protectRouteMulti(
         }
 
         // Atomic operation: load → add → save in single critical section
-        const result = await atomicUpdate<Task[], Task>(DATA_FILE, async (tasks) => {
-          const updated = [...(tasks.length ? tasks : DEFAULT_TASKS), newTask]
-          return { updated, result: newTask }
-        })
+        await atomicUpdate<Task[]>(DATA_FILE, async (tasks) => {
+          return [...(tasks.length ? tasks : DEFAULT_TASKS), newTask]
+        }, DEFAULT_TASKS)
 
         logger.info('Task created successfully', {
           ...logContext,
@@ -126,7 +125,7 @@ const kanbanHandlers = protectRouteMulti(
           taskTitle: title,
         })
 
-        const response = NextResponse.json(createSuccessResponse(result, requestId), { status: 201 })
+        const response = NextResponse.json(createSuccessResponse(newTask, requestId), { status: 201 })
         response.headers.set('x-correlation-id', requestId)
         return response
       } catch (error) {
@@ -198,7 +197,10 @@ const kanbanHandlers = protectRouteMulti(
         if (status !== undefined) updates.status = status
 
         // Atomic operation: load → find → update → save in single critical section
-        const result = await atomicUpdate<Task[], Task>(DATA_FILE, async (tasks) => {
+        // Track the updated task for response
+        let updatedTaskResult: Task
+
+        await atomicUpdate<Task[]>(DATA_FILE, async (tasks) => {
           const workingTasks = tasks.length ? tasks : DEFAULT_TASKS
           const taskIndex = workingTasks.findIndex(t => t.id === id)
 
@@ -213,9 +215,9 @@ const kanbanHandlers = protectRouteMulti(
               Object.entries(updates).filter(([, v]) => v !== undefined)
             ),
           }
-          const updated = [...workingTasks.slice(0, taskIndex), updatedTask, ...workingTasks.slice(taskIndex + 1)]
-          return { updated, result: updatedTask }
-        })
+          updatedTaskResult = updatedTask
+          return [...workingTasks.slice(0, taskIndex), updatedTask, ...workingTasks.slice(taskIndex + 1)]
+        }, DEFAULT_TASKS)
 
         logger.info('Task updated successfully', {
           ...logContext,
@@ -225,7 +227,7 @@ const kanbanHandlers = protectRouteMulti(
           fieldsUpdated: Object.keys(updates),
         })
 
-        const response = NextResponse.json(createSuccessResponse(result, requestId))
+        const response = NextResponse.json(createSuccessResponse(updatedTaskResult!, requestId))
         response.headers.set('x-correlation-id', requestId)
         return response
       } catch (error) {
@@ -256,14 +258,14 @@ const kanbanHandlers = protectRouteMulti(
           operation: 'update_task',
         })
         const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
-        const errorMsg = error instanceof Error ? error.message : 'Failed to update task'
+        const errorMessage = error instanceof Error ? error.message : 'Failed to update task'
 
         logger.error('Failed to update task', error, {
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
           errorType,
-          errorMessage: errorMsg,
+          errorMessage,
         })
         response.headers.set('x-correlation-id', requestId)
         return response

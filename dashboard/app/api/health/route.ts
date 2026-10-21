@@ -40,42 +40,43 @@ interface HealthStatus {
 async function getCompanyBrainStats(correlationId: string): Promise<{ count: number; latest: string | null }> {
   try {
     const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
-    return await withFileLock(brainDir, async () => {
+    // Note: Removed file-level lock for directory read-only operation.
+    // Directory-level locking causes unnecessary serialization of independent file reads.
+    // Read-only operations on the directory do not require locking.
+    try {
+      await fs.stat(brainDir)
+    } catch (error) {
+      logger.warn('Company brain directory not found', {
+        requestId: correlationId,
+        component: 'company_brain',
+        operation: 'stat_directory',
+        path: brainDir,
+      })
+      return { count: 0, latest: null }
+    }
+
+    const files = (await fs.readdir(brainDir)).filter(f => f.endsWith('.json'))
+    if (files.length === 0) return { count: 0, latest: null }
+
+    const latest = files.sort().pop()
+    let latestTimestamp = null
+    if (latest) {
       try {
-        await fs.stat(brainDir)
+        const content = await fs.readFile(path.join(brainDir, latest), 'utf-8')
+        const parsed = JSON.parse(content)
+        latestTimestamp = parsed.timestamp
       } catch (error) {
-        logger.warn('Company brain directory not found', {
+        logger.warn('Failed to parse company brain latest file', {
           requestId: correlationId,
           component: 'company_brain',
-          operation: 'stat_directory',
-          path: brainDir,
+          operation: 'parse_latest_timestamp',
+          file: latest,
+          error: error instanceof Error ? error.message : String(error),
         })
-        return { count: 0, latest: null }
       }
+    }
 
-      const files = (await fs.readdir(brainDir)).filter(f => f.endsWith('.json'))
-      if (files.length === 0) return { count: 0, latest: null }
-
-      const latest = files.sort().pop()
-      let latestTimestamp = null
-      if (latest) {
-        try {
-          const content = await fs.readFile(path.join(brainDir, latest), 'utf-8')
-          const parsed = JSON.parse(content)
-          latestTimestamp = parsed.timestamp
-        } catch (error) {
-          logger.warn('Failed to parse company brain latest file', {
-            requestId: correlationId,
-            component: 'company_brain',
-            operation: 'parse_latest_timestamp',
-            file: latest,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
-
-      return { count: files.length, latest: latestTimestamp }
-    })
+    return { count: files.length, latest: latestTimestamp }
   } catch (error) {
     logger.error('Failed to get company brain stats', error, {
       requestId: correlationId,
