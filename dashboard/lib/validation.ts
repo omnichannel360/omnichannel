@@ -155,9 +155,8 @@ export const ENUM_VALUES = {
 } as const
 
 // Type definitions extracted from schemas
-export type AlertLevel = z.infer<typeof AlertLevelSchema>
-export type AlertStatus = z.infer<typeof AlertStatusSchema>
-export type MeetingStatus = z.infer<typeof MeetingStatusSchema>
+// NOTE: AlertLevel, AlertStatus, MeetingStatus already defined above (lines 85-87)
+// HealthStatus and ComponentStatus are defined below
 export type HealthStatus = z.infer<typeof HealthStatusSchema>
 export type ComponentStatus = z.infer<typeof ComponentStatusSchema>
 
