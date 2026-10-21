@@ -255,9 +255,6 @@ export function createAuthErrorResponse(
  * Usage: const auth = getAuthFromRequest(request)
  */
 export function getAuthFromRequest(request: NextRequest): EnhancedAuthContext {
-  const requestWithAuth = request as any
-  if (requestWithAuth.auth) {
-    return requestWithAuth.auth
-  }
+  // Extract auth context from request headers (set by middleware)
   return extractEnhancedAuthFromHeaders(request)
 }
