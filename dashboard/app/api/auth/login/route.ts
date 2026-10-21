@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateToken } from '@/lib/auth'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface LoginRequest {
   email: string
@@ -17,6 +18,12 @@ interface LoginResponse {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<LoginResponse>> {
+  // Apply rate limiting first
+  const rateLimitError = await applyRateLimit(request, 'login')
+  if (rateLimitError) {
+    return rateLimitError as NextResponse<LoginResponse>
+  }
+
   try {
     const body: LoginRequest = await request.json()
     const { email, password } = body
@@ -63,11 +70,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
       { status: 200 }
     )
   } catch (error) {
-    console.error('Login error:', error)
+    const message = error instanceof Error ? error.message : 'Authentication failed'
     return NextResponse.json(
       {
         success: false,
-        error: 'Authentication failed',
+        error: message,
       },
       { status: 500 }
     )

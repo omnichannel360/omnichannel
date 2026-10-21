@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from './lib/auth'
+import { withRateLimit, rateLimiters } from './lib/rate-limiting'
 
 // Routes that require authentication
 const PROTECTED_ROUTES = [
@@ -15,14 +16,53 @@ const PROTECTED_ROUTES = [
 // Routes that are public (health check, etc.)
 const PUBLIC_ROUTES = ['/api/health']
 
+// Auth-related routes (public but rate limited)
+const AUTH_ROUTES = ['/api/auth/login', '/api/auth/verify', '/api/auth']
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+
+  // Apply rate limiting based on route
+  let rateLimitResponse: NextResponse | null = null
+
+  if (pathname.startsWith('/api/auth/login')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.login)
+  } else if (pathname.startsWith('/api/auth/verify')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.verify)
+  } else if (pathname.startsWith('/api/auth')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.auth)
+  } else if (pathname.startsWith('/api/brain')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.brain)
+  } else if (pathname.startsWith('/api/alerts')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.alerts)
+  } else if (pathname.startsWith('/api/conductor')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.conductor)
+  } else if (pathname.startsWith('/api/kanban')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.kanban)
+  } else if (pathname.startsWith('/api/meetings')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.meetings)
+  } else if (pathname.startsWith('/api/metrics')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.metrics)
+  } else if (pathname.startsWith('/api/profiles')) {
+    rateLimitResponse = await withRateLimit(request, rateLimiters.profiles)
+  }
+
+  // If rate limit exceeded, return 429
+  if (rateLimitResponse) {
+    return rateLimitResponse
+  }
 
   // Check if route is protected
   const isProtected = PROTECTED_ROUTES.some(route => pathname.startsWith(route))
   const isPublic = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+  const isAuth = AUTH_ROUTES.some(route => pathname.startsWith(route))
 
-  if (!isProtected || isPublic) {
+  // Public and auth routes don't need authentication
+  if (isPublic || isAuth) {
+    return NextResponse.next()
+  }
+
+  if (!isProtected) {
     return NextResponse.next()
   }
 

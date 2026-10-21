@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { withFileLock } from '@/lib/file-lock'
 import { ensureDataDir } from '@/lib/ensure-dir'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface ConversationLog {
   timestamp: string
@@ -105,6 +106,10 @@ function parseTaskFromMessage(message: string): {
 }
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'conductor')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -175,6 +180,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'conductor')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')

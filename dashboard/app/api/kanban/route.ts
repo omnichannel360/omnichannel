@@ -5,6 +5,7 @@ import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { TaskCreateSchema, TaskUpdateSchema } from '@/lib/validation'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface Task {
   id: string
@@ -23,6 +24,10 @@ const DEFAULT_TASKS: Task[] = [
 ]
 
 export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'kanban')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -40,6 +45,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'kanban')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -84,6 +93,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'kanban')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -144,6 +157,10 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'kanban')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')

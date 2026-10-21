@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
+
+// Create rate limiter for this endpoint
+const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.metrics)
 
 interface Metrics {
   finance: {
@@ -25,6 +29,12 @@ interface Metrics {
 }
 
 export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitCheck = await rateLimitMiddleware(request)
+  if (!rateLimitCheck.allowed) {
+    return rateLimitCheck.response!
+  }
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -53,9 +63,19 @@ export async function GET(request: NextRequest) {
     },
   }
 
-  return NextResponse.json({
+  let response = NextResponse.json({
     success: true,
     data: metrics,
     timestamp: new Date().toISOString(),
   })
+
+  // Add rate limit headers
+  response = addRateLimitHeaders(
+    response,
+    rateLimitCheck.remaining!,
+    rateLimitCheck.resetTime!,
+    rateLimitCheck.limit!
+  )
+
+  return response
 }

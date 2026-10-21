@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/auth'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface VerifyResponse {
   success: boolean
@@ -13,6 +14,12 @@ interface VerifyResponse {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse<VerifyResponse>> {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'verify')
+  if (rateLimitError) {
+    return rateLimitError as NextResponse<VerifyResponse>
+  }
+
   try {
     const authResult = await verifyAuth(request)
 
@@ -41,12 +48,12 @@ export async function GET(request: NextRequest): Promise<NextResponse<VerifyResp
       { status: 200 }
     )
   } catch (error) {
-    console.error('Token verification error:', error)
+    const message = error instanceof Error ? error.message : 'Token verification failed'
     return NextResponse.json(
       {
         success: false,
         authenticated: false,
-        error: 'Token verification failed',
+        error: message,
       },
       { status: 500 }
     )

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import { generatePrefixedId } from '@/lib/uuid'
 
 interface Message {
   id: string
@@ -23,7 +24,7 @@ export function ConductorDock() {
     if (!input.trim()) return
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: generatePrefixedId('user'),
       role: 'user',
       content: input,
       timestamp: new Date().toISOString(),
@@ -44,7 +45,7 @@ export function ConductorDock() {
 
       if (data.success) {
         const assistantMessage: Message = {
-          id: Date.now().toString() + '-resp',
+          id: generatePrefixedId('assistant'),
           role: 'assistant',
           content: data.response,
           timestamp: new Date().toISOString(),
@@ -53,7 +54,7 @@ export function ConductorDock() {
       }
     } catch (error) {
       const errorMessage: Message = {
-        id: Date.now().toString() + '-err',
+        id: generatePrefixedId('error'),
         role: 'assistant',
         content: 'Error processing request',
         timestamp: new Date().toISOString(),

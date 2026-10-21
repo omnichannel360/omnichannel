@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/middleware/rateLimit'
+import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
+
+// Create rate limiter for this endpoint
+const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.health)
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy'
@@ -108,6 +113,12 @@ function generateAlerts(
 }
 
 export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitCheck = await rateLimitMiddleware(request)
+  if (!rateLimitCheck.allowed) {
+    return rateLimitCheck.response!
+  }
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -157,11 +168,21 @@ export async function GET(request: NextRequest) {
       alerts,
     }
 
-    return NextResponse.json(status, {
+    let response = NextResponse.json(status, {
       status: status.status === 'healthy' ? 200 : status.status === 'degraded' ? 200 : 503,
     })
+
+    // Add rate limit headers
+    response = addRateLimitHeaders(
+      response,
+      rateLimitCheck.remaining!,
+      rateLimitCheck.resetTime!,
+      rateLimitCheck.limit!
+    )
+
+    return response
   } catch (error) {
-    return NextResponse.json(
+    let response = NextResponse.json(
       {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
@@ -172,5 +193,15 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     )
+
+    // Add rate limit headers even on error
+    response = addRateLimitHeaders(
+      response,
+      rateLimitCheck.remaining!,
+      rateLimitCheck.resetTime!,
+      rateLimitCheck.limit!
+    )
+
+    return response
   }
 }

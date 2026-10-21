@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { atomicRead } from '@/lib/atomic-file-ops'
 import { atomicReaddir } from '@/lib/atomic-dir-ops'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface Memory {
   id: string
@@ -30,7 +31,7 @@ interface MemoryData {
 
 const BRAIN_DIR = path.join(process.cwd(), '..', 'company-brain')
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -114,4 +115,11 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+export async function GET(request: NextRequest) {
+  const rateLimitError = await applyRateLimit(request, 'brain')
+  if (rateLimitError) return rateLimitError
+
+  return getHandler(request)
 }
