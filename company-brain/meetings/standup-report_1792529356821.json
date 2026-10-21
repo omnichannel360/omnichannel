@@ -1,0 +1,12 @@
+{
+  "id": "meeting_1792529356821",
+  "timestamp": "2026-10-20T20:49:16.821Z",
+  "category": "meetings",
+  "meeting_type": "standup-report",
+  "skill_triggered": "standup-report",
+  "participants": [
+    "team"
+  ],
+  "outcomes": {},
+  "status": "scheduled"
+}

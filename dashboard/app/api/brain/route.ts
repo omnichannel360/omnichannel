@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface Memory {
   id: string
@@ -19,6 +20,11 @@ interface BrainResponse {
 const BRAIN_DIR = path.join(process.cwd(), '..', 'company-brain')
 
 export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')

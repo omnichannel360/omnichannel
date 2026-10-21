@@ -1,0 +1,126 @@
+[
+  {
+    "title": "Alerts API: Unhandled JSON Parse Exceptions",
+    "description": "POST and PATCH endpoints call await request.json() outside try-catch. Malformed JSON causes unhandled errors.",
+    "severity": "critical",
+    "category": "error-handling",
+    "file": "dashboard/app/api/alerts/route.ts",
+    "line": 59,
+    "evidence": "Line 59 POST, line 75 PATCH - request.json() calls outside try-catch block. Conductor route.ts line 88 shows correct pattern.",
+    "recommendation": "Wrap request.json() calls in try-catch. Return 400 with validation error on parse failure."
+  },
+  {
+    "title": "Brain API: Missing Crypto Module Import",
+    "description": "Uses crypto.randomUUID() without importing crypto module. Will fail at runtime with undefined reference.",
+    "severity": "critical",
+    "category": "runtime-error",
+    "file": "dashboard/app/api/brain/route.ts",
+    "line": 54,
+    "evidence": "Line 54 calls crypto.randomUUID() but imports (lines 1-3) do not include crypto module.",
+    "recommendation": "Add 'import { randomUUID } from crypto'. Replace crypto.randomUUID() with randomUUID()."
+  },
+  {
+    "title": "Zero Authentication and Authorization",
+    "description": "All 8 API endpoints lack authentication/authorization checks. Any client can call modifying operations without credentials.",
+    "severity": "critical",
+    "category": "security",
+    "file": "dashboard/app/api",
+    "evidence": "Search for auth patterns returns only dummy task. System marked PRODUCTION READY but has no security layer.",
+    "recommendation": "Implement JWT/API key authentication. Add authorization middleware to verify user permissions before operations."
+  },
+  {
+    "title": "No Rate Limiting on Any Endpoint",
+    "description": "All endpoints can be called unlimited times. No rate limiting, throttling, or request quotas implemented.",
+    "severity": "high",
+    "category": "security",
+    "file": "dashboard/app/api",
+    "evidence": "Search for 'rateLimit|RateLimit|middleware' returns zero results across all API endpoints.",
+    "recommendation": "Implement rate limiting middleware. Use redis-based or in-memory rate limiter. Limit to 100 requests/minute per IP."
+  },
+  {
+    "title": "Race Conditions in File-Based Storage",
+    "description": "Multiple API instances writing to same JSON files simultaneously will cause data corruption. No concurrency control.",
+    "severity": "high",
+    "category": "data-integrity",
+    "file": "dashboard/app/api",
+    "evidence": "All endpoints read, modify, then write JSON files directly. No locking mechanism. Example: loadTasks() -> push -> saveTasks() is not atomic.",
+    "recommendation": "Migrate to database (Supabase) or implement file-based locks using lockfile package. Add atomic write operations."
+  },
+  {
+    "title": "Brain API: Silent Failure on Malformed Files",
+    "description": "When reading company-brain JSON files, malformed files are silently skipped with empty catch block. No logging or alerting.",
+    "severity": "high",
+    "category": "error-handling",
+    "file": "dashboard/app/api/brain/route.ts",
+    "line": 49,
+    "evidence": "Line 49: catch (e) { // Skip malformed files } - silently ignores parsing errors without logging.",
+    "recommendation": "Log parsing errors to ensure visibility. Consider moving malformed files to quarantine directory for investigation."
+  },
+  {
+    "title": "Insecure ID Generation with Timestamp Collisions",
+    "description": "Multiple endpoints use Date.now() for ID generation. Can collide if called within same millisecond.",
+    "severity": "high",
+    "category": "uniqueness",
+    "file": "dashboard/app/api",
+    "evidence": "Alerts line 39: alert_${Date.now()}, Kanban line 68: Date.now().toString(), Meetings line 84: meeting_${Date.now()}",
+    "recommendation": "Use crypto.randomUUID() or append random suffix: Date.now() + '-' + Math.random().toString(36).substr(2,9)"
+  },
+  {
+    "title": "Data Files Not in .gitignore",
+    "description": "dashboard/data/ directory containing alerts.json, conductor-logs.json, meetings-log.json, etc. are NOT in .gitignore. May be committed to repository.",
+    "severity": "medium",
+    "category": "data-exposure",
+    "file": ".gitignore",
+    "evidence": ".gitignore has 75 lines but does not exclude /data or *.json files. Files exist: alerts.json (194B), meetings-log.json (2870B).",
+    "recommendation": "Add '/data/' and '/dashboard/data/' to .gitignore. Move sensitive data outside version control."
+  },
+  {
+    "title": "Brain API: Unbounded parseInt on Limit Parameter",
+    "description": "parseInt(searchParams.get('limit') || '20') does not validate result. NaN or invalid values passed silently.",
+    "severity": "medium",
+    "category": "input-validation",
+    "file": "dashboard/app/api/brain/route.ts",
+    "line": 25,
+    "evidence": "Line 25: const limit = Math.min(parseInt(...), 100) - no isNaN check. Invalid query param returns NaN then Math.min returns 100.",
+    "recommendation": "Add validation: const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20', 10) || 20, 1), 100)"
+  },
+  {
+    "title": "Health API: Type Safety Issue with Any Type",
+    "description": "getMeetingsLogStats() uses 'any' type in map callback. No type checking on log objects.",
+    "severity": "medium",
+    "category": "type-safety",
+    "file": "dashboard/app/api/health/route.ts",
+    "line": 51,
+    "evidence": "Line 51: logs.filter((l: any) => l.status === 'scheduled') - uses loose 'any' type instead of proper MeetingLog interface.",
+    "recommendation": "Replace (l: any) with proper type: (l: MeetingLog) or unknown type guard with type assertion."
+  },
+  {
+    "title": "Profiles API: Silently Fails on Missing Environment Variables",
+    "description": "Uses process.env.HOME or process.env.USERPROFILE without validation. Returns empty array silently on missing path.",
+    "severity": "medium",
+    "category": "error-handling",
+    "file": "dashboard/app/api/profiles/route.ts",
+    "line": 12,
+    "evidence": "Line 12: path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes', 'profiles') - if both env vars missing, path becomes wrong.",
+    "recommendation": "Validate env vars at startup. Throw error with clear message if HOME/USERPROFILE undefined. Add fallback path."
+  },
+  {
+    "title": "Metrics API: Hardcoded Static Data",
+    "description": "GET /api/metrics returns hardcoded static metrics instead of querying actual system data. Values never change.",
+    "severity": "medium",
+    "category": "data-freshness",
+    "file": "dashboard/app/api/metrics/route.ts",
+    "line": 27,
+    "evidence": "Lines 27-48 define metrics object with fixed values: revenue: 1250000, expenses: 850000, etc. Not fetched from database or service.",
+    "recommendation": "Replace with actual data fetch from Supabase or metrics service. Calculate real values from meetings-log.json or database."
+  },
+  {
+    "title": "Generic Error Handling Hides Root Causes",
+    "description": "All error responses return generic 500 with message like 'Failed to load meetings'. Actual error details not included in response.",
+    "severity": "low",
+    "category": "observability",
+    "file": "dashboard/app/api",
+    "evidence": "Example: meetings/route.ts line 148 returns generic 'Failed to load meetings' with no error details for debugging.",
+    "recommendation": "In development: include error.message and stack. In production: log detailed error, return unique error ID to client for tracking."
+  }
+]

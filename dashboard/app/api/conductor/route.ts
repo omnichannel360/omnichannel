@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface ConversationLog {
   timestamp: string
@@ -84,6 +85,11 @@ function parseTaskFromMessage(message: string): {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const body = await request.json()
     const { message } = body
@@ -137,7 +143,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const logs = loadLogs()
     return NextResponse.json({

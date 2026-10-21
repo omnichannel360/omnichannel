@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface AgentProfile {
   name: string
@@ -11,7 +12,20 @@ interface AgentProfile {
 
 const PROFILES_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes', 'profiles')
 
-export async function GET() {
+function inferRoleFromName(name: string): string {
+  const parts = name.split('-')
+  return parts
+    .slice(0, -1)
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ')
+}
+
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     if (!fs.existsSync(PROFILES_DIR)) {
       return NextResponse.json({
@@ -41,12 +55,4 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
-
-function inferRoleFromName(name: string): string {
-  const parts = name.split('-')
-  return parts
-    .slice(0, -1)
-    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(' ')
 }

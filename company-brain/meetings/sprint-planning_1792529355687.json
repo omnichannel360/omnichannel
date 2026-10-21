@@ -1,0 +1,12 @@
+{
+  "id": "meeting_1792529355687",
+  "timestamp": "2026-10-20T20:49:15.687Z",
+  "category": "meetings",
+  "meeting_type": "sprint-planning",
+  "skill_triggered": "sprint-planning",
+  "participants": [
+    "team"
+  ],
+  "outcomes": {},
+  "status": "scheduled"
+}

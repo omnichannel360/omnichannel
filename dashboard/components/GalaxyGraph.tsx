@@ -46,15 +46,25 @@ export function GalaxyGraph() {
         { source: 'james', target: 'ops' },
       ]
 
-      containerRef.current.innerHTML = `
-        <div style="padding: 20px; text-align: center; color: #666;">
-          <p>Galaxy Graph Visualization</p>
-          <p style="font-size: 12px; color: #999;">
-            Agents: ${nodeCount} | Base Nodes: ${nodes.length} | Links: ${links.length}
-            ${error ? ` | Error: ${error}` : ''}
-          </p>
-        </div>
-      `
+      const div = document.createElement('div')
+      div.style.padding = '20px'
+      div.style.textAlign = 'center'
+      div.style.color = '#666'
+
+      const title = document.createElement('p')
+      title.textContent = 'Galaxy Graph Visualization'
+      div.appendChild(title)
+
+      const stats = document.createElement('p')
+      stats.style.fontSize = '12px'
+      stats.style.color = '#999'
+      stats.textContent = `Agents: ${nodeCount} | Base Nodes: ${nodes.length} | Links: ${links.length}${
+        error ? ` | Error: ${error}` : ''
+      }`
+      div.appendChild(stats)
+
+      containerRef.current.innerHTML = ''
+      containerRef.current.appendChild(div)
     }
   }, [nodeCount, error])
 

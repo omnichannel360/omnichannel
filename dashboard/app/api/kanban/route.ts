@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface Task {
   id: string
@@ -39,7 +40,12 @@ function saveTasks(tasks: Task[]) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(tasks, null, 2))
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const tasks = loadTasks()
     return NextResponse.json({ success: true, data: tasks })
@@ -52,6 +58,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const body = await request.json()
     const { title, status = 'todo' } = body
@@ -83,6 +94,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const body = await request.json()
     const { id, ...updates } = body
@@ -117,6 +133,11 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

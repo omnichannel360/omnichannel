@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface Meeting {
   id: string
@@ -70,7 +71,6 @@ function loadSkillRegistry(): SkillRegistry | null {
   }
 }
 
-
 function logToBrain(log: MeetingLog) {
   const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
   if (!fs.existsSync(brainDir)) {
@@ -125,7 +125,12 @@ function parseMeetingFromMessage(message: string, registry: SkillRegistry | null
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const meetings = loadMeetingsConfig()
     const logs = loadMeetingLogs()
@@ -152,6 +157,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
   try {
     const body = await request.json()
     const { message, meeting_type, participants } = body
@@ -185,7 +195,8 @@ export async function POST(request: NextRequest) {
       outcomes: {},
     }
 
-    logs.push(log); logToBrain(log);
+    logs.push(log)
+    logToBrain(log)
     saveMeetingLogs(logs)
 
     const response = parsed.skill
@@ -205,4 +216,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

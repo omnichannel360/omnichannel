@@ -1,0 +1,136 @@
+[
+  {
+    "timestamp": "2026-10-20T20:37:24.955Z",
+    "meeting_type": "unknown",
+    "skill_triggered": "none",
+    "status": "failed",
+    "participants": [
+      "alice",
+      "bob",
+      "charlie"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:46:16.270Z",
+    "meeting_type": "unknown",
+    "skill_triggered": "none",
+    "status": "failed",
+    "participants": [
+      "alice",
+      "bob"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:46:17.322Z",
+    "meeting_type": "unknown",
+    "skill_triggered": "none",
+    "status": "failed",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:46:18.404Z",
+    "meeting_type": "unknown",
+    "skill_triggered": "none",
+    "status": "failed",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:47:37.317Z",
+    "meeting_type": "sprint-planning",
+    "skill_triggered": "sprint-planning",
+    "status": "scheduled",
+    "participants": [
+      "alice",
+      "bob"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:47:38.376Z",
+    "meeting_type": "sprint-review",
+    "skill_triggered": "sprint-review",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:47:39.435Z",
+    "meeting_type": "standup-report",
+    "skill_triggered": "standup-report",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:47:40.471Z",
+    "meeting_type": "retrospective-kaizen",
+    "skill_triggered": "retrospective-kaizen",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:49:15.687Z",
+    "meeting_type": "sprint-planning",
+    "skill_triggered": "sprint-planning",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:49:16.280Z",
+    "meeting_type": "sprint-review",
+    "skill_triggered": "sprint-review",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:49:16.821Z",
+    "meeting_type": "standup-report",
+    "skill_triggered": "standup-report",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:49:17.358Z",
+    "meeting_type": "retrospective-kaizen",
+    "skill_triggered": "retrospective-kaizen",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  },
+  {
+    "timestamp": "2026-10-20T20:49:17.904Z",
+    "meeting_type": "postmortem",
+    "skill_triggered": "postmortem",
+    "status": "scheduled",
+    "participants": [
+      "team"
+    ],
+    "outcomes": {}
+  }
+]

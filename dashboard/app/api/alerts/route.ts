@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface Alert {
   id: string
@@ -36,7 +37,7 @@ function saveAlerts(alerts: Alert[]) {
 
 function createAlert(level: Alert['level'], component: string, message: string): Alert {
   return {
-    id: `alert_${Date.now()}`,
+    id: `alert_${crypto.randomUUID()}`,
     timestamp: new Date().toISOString(),
     level,
     component,
@@ -46,47 +47,82 @@ function createAlert(level: Alert['level'], component: string, message: string):
 }
 
 export async function GET(request: NextRequest) {
-  const alerts = loadAlerts()
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
+  }
+
+  const alerts = await loadAlerts()
   const activeOnly = request.nextUrl.searchParams.get('active') === 'true'
 
   return NextResponse.json({
+    success: true,
     alerts: activeOnly ? alerts.filter(a => a.status === 'active') : alerts,
     total: alerts.length,
   })
 }
 
 export async function POST(request: NextRequest) {
-  const { level, component, message } = await request.json()
-
-  if (!level || !component || !message) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const alert = createAlert(level, component, message)
-  const alerts = loadAlerts()
+  try {
+    const { level, component, message } = await request.json()
 
-  alerts.push(alert)
-  saveAlerts(alerts)
+    if (!level || !component || !message) {
+      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
+    }
 
-  return NextResponse.json({ success: true, alert }, { status: 201 })
+    const alert = createAlert(level, component, message)
+    const alerts = await loadAlerts()
+
+    alerts.push(alert)
+    await saveAlerts(alerts)
+
+    return NextResponse.json({ success: true, alert }, { status: 201 })
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
+    }
+    return NextResponse.json({ success: false, error: 'Failed to create alert' }, { status: 500 })
+  }
 }
 
 export async function PATCH(request: NextRequest) {
-  const { alert_id, status } = await request.json()
-
-  if (!alert_id || !status) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const alerts = loadAlerts()
-  const alert = alerts.find(a => a.id === alert_id)
+  try {
+    const { alert_id, status } = await request.json()
 
-  if (!alert) {
-    return NextResponse.json({ error: 'Alert not found' }, { status: 404 })
+    if (!alert_id || !status) {
+      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
+    }
+
+    const validStatuses = ['active', 'resolved']
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ success: false, error: 'Invalid status' }, { status: 400 })
+    }
+
+    const alerts = await loadAlerts()
+    const alert = alerts.find(a => a.id === alert_id)
+
+    if (!alert) {
+      return NextResponse.json({ success: false, error: 'Alert not found' }, { status: 404 })
+    }
+
+    alert.status = status
+    await saveAlerts(alerts)
+
+    return NextResponse.json({ success: true, alert })
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
+    }
+    return NextResponse.json({ success: false, error: 'Failed to update alert' }, { status: 500 })
   }
-
-  alert.status = status
-  saveAlerts(alerts)
-
-  return NextResponse.json({ success: true, alert })
 }

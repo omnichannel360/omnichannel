@@ -1,0 +1,10 @@
+[
+  {
+    "id": "alert_1792532193481",
+    "timestamp": "2026-10-20T21:36:33.481Z",
+    "level": "info",
+    "component": "phase6_test",
+    "message": "Test alert",
+    "status": "active"
+  }
+]

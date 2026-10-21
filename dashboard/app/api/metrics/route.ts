@@ -1,70 +1,61 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface Metrics {
   finance: {
     revenue: number
-    expenses: number
-    profit: number
-    burn_rate: number
+    costs: number
+    profit_margin: number
   }
-  delivery: {
-    completed_tasks: number
-    pending_tasks: number
-    completion_rate: number
-    average_cycle_time: number
+  operations: {
+    agents_deployed: number
+    skills_available: number
+    avg_processing_time_ms: number
   }
-  sales: {
-    pipeline_value: number
-    conversion_rate: number
-    average_deal_size: number
-    month_to_date: number
+  performance: {
+    success_rate: number
+    error_rate: number
+    uptime_percent: number
   }
-  team: {
-    total_agents: number
-    active_agents: number
-    utilization_rate: number
-    training_hours: number
+  user_activity: {
+    active_users: number
+    total_meetings_processed: number
+    avg_task_completion_time_minutes: number
   }
 }
 
-export async function GET() {
-  try {
-    const metrics: Metrics = {
-      finance: {
-        revenue: 1250000,
-        expenses: 850000,
-        profit: 400000,
-        burn_rate: 12.5,
-      },
-      delivery: {
-        completed_tasks: 234,
-        pending_tasks: 56,
-        completion_rate: 80.7,
-        average_cycle_time: 4.2,
-      },
-      sales: {
-        pipeline_value: 3500000,
-        conversion_rate: 22.5,
-        average_deal_size: 145000,
-        month_to_date: 580000,
-      },
-      team: {
-        total_agents: 120,
-        active_agents: 105,
-        utilization_rate: 87.5,
-        training_hours: 1240,
-      },
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: metrics,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Failed to load metrics' },
-      { status: 500 }
-    )
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request)
+  if (!auth.authenticated) {
+    return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
+
+  const metrics: Metrics = {
+    finance: {
+      revenue: 125000,
+      costs: 45000,
+      profit_margin: 0.64,
+    },
+    operations: {
+      agents_deployed: 12,
+      skills_available: 47,
+      avg_processing_time_ms: 234,
+    },
+    performance: {
+      success_rate: 0.962,
+      error_rate: 0.038,
+      uptime_percent: 99.98,
+    },
+    user_activity: {
+      active_users: 23,
+      total_meetings_processed: 1847,
+      avg_task_completion_time_minutes: 12.5,
+    },
+  }
+
+  return NextResponse.json({
+    success: true,
+    data: metrics,
+    timestamp: new Date().toISOString(),
+  })
 }

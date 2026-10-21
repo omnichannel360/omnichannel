@@ -1,0 +1,12 @@
+{
+  "id": "meeting_1792529357358",
+  "timestamp": "2026-10-20T20:49:17.358Z",
+  "category": "meetings",
+  "meeting_type": "retrospective-kaizen",
+  "skill_triggered": "retrospective-kaizen",
+  "participants": [
+    "team"
+  ],
+  "outcomes": {},
+  "status": "scheduled"
+}

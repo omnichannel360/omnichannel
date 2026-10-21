@@ -1,0 +1,12 @@
+{
+  "id": "meeting_1792529357905",
+  "timestamp": "2026-10-20T20:49:17.904Z",
+  "category": "meetings",
+  "meeting_type": "postmortem",
+  "skill_triggered": "postmortem",
+  "participants": [
+    "team"
+  ],
+  "outcomes": {},
+  "status": "scheduled"
+}
