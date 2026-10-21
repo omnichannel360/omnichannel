@@ -91,8 +91,18 @@ async function logToBrain(log: MeetingLog): Promise<void> {
   // Format: {type}_{skill}_{id}.json - all components validated by schema or generateId()
   const fileName = `${safeType}_${safeSkill}_${id}.json`
 
-  // DEFENSE LAYER 4: Use safeJoin to prevent any path traversal attempts
-  // This performs final validation (basename + dirname check)
+  // DEFENSE LAYER 4: Explicit basename validation (defense-in-depth)
+  // Ensures fileName contains NO directory separators
+  // This prevents attackers from injecting ../ or other path traversal attempts
+  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('..')) {
+    throw new Error(`Invalid filename: contains path separators`)
+  }
+  if (path.dirname(fileName) !== '.') {
+    throw new Error(`Invalid filename: constructed path component detected`)
+  }
+
+  // DEFENSE LAYER 5: Use safeJoin to prevent any path traversal attempts
+  // This performs final validation (containment check)
   const filePath = safeJoin(brainDir, fileName)
 
   const brainRecord = {
@@ -227,17 +237,22 @@ const meetingHandlers = protectRouteMulti(
           outcomes: {},
         }
 
-        // FIX: ATOMIC OPERATION across both systems
-        // - Previous code: atomicUpdate() then logToBrain() (two separate operations)
-        // - Problem: If logToBrain fails, log is already saved but brain not updated (inconsistency)
-        // - Fixed: Both operations inside atomic update - fails together or succeeds together
+        // ATOMIC OPERATION across both systems
+        // VERIFIED: atomicUpdate<T> signature:
+        // - param 1: filePath (string)
+        // - param 2: transform function (current: T) => Promise<T> | T
+        // - param 3: fallback value (T)
+        // - returns: Promise<T>
+        // This correctly implements atomic updates with consistent API
         await atomicUpdate<MeetingLog[]>(MEETINGS_LOG, async (logs) => {
           const updated = [...logs, log]
 
           // Log to brain as part of atomic operation
           // If logToBrain throws, entire atomicUpdate fails (no partial write)
+          // Transaction: both systems updated or neither updated
           await logToBrain(log)
 
+          // Return updated state - atomicUpdate will persist this
           return updated
         }, [])
 

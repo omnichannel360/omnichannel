@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod'
+import { PASSWORD_VALIDATION } from './password-validation-constants'
 
 // Email validation - RFC 5322 compliant
 export const EmailSchema = z
@@ -16,7 +17,6 @@ export const EmailSchema = z
 
 // Password validation - strong password requirements
 // CONSOLIDATED: Single source of truth for password rules - imports from shared config
-import { PASSWORD_VALIDATION } from './password-validation-constants'
 
 export const PasswordSchema = z
   .string()

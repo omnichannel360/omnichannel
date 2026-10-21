@@ -272,8 +272,10 @@ export async function validateQuery<T>(
     const { searchParams } = url
     const queryObject: Record<string, unknown> = {}
 
-    // Convert URLSearchParams to object
-    // FIXED: Preserve original whitespace; only trim for type detection
+    // Convert URLSearchParams to object with whitespace normalization
+    // FIXED: Trim all string values to prevent data quality issues
+    // Whitespace in query parameters is typically unintentional (e.g., accidental spaces)
+    // Trimming ensures consistent behavior and prevents search/filter failures
     searchParams.forEach((value, key) => {
       const trimmed = value.trim()
 
@@ -284,16 +286,16 @@ export async function validateQuery<T>(
         if (isFinite(num)) {
           queryObject[key] = num
         } else {
-          // Parse failed, use original string
-          queryObject[key] = value
+          // Parse failed, use trimmed string
+          queryObject[key] = trimmed
         }
       } else if (trimmed.toLowerCase() === 'true') {
         queryObject[key] = true
       } else if (trimmed.toLowerCase() === 'false') {
         queryObject[key] = false
       } else {
-        // Use original value to preserve intentional whitespace
-        queryObject[key] = value
+        // Use trimmed value for all strings to normalize whitespace
+        queryObject[key] = trimmed
       }
     })
 
