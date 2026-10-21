@@ -13,6 +13,8 @@ import {
   createSuccessResponse,
   handleRouteError,
   formatErrorLog,
+  withTimeout,
+  sanitizeErrorDetails,
 } from '@/lib/error-handling'
 
 interface Alert {
@@ -45,7 +47,11 @@ const alertHandlers = protectRouteMulti(
       })
 
       try {
-        const alerts = await atomicRead<Alert[]>(ALERTS_FILE, [])
+        const alerts = await withTimeout(
+          atomicRead<Alert[]>(ALERTS_FILE, []),
+          30000,
+          'Load alerts timeout'
+        )
         const responseTime = Date.now() - startTime
 
         logger.info('Alerts loaded successfully', {
@@ -69,11 +75,15 @@ const alertHandlers = protectRouteMulti(
           operation: 'load_alerts',
         })
 
-        logger.error('Failed to load alerts', error, formatErrorLog('Load alerts error', error, {
-          ...logContext,
-          statusCode,
-          responseTimeMs: responseTime,
-        }))
+        logger.error(
+          'Failed to load alerts',
+          error,
+          formatErrorLog('Load alerts error', error, {
+            ...logContext,
+            statusCode,
+            responseTimeMs: responseTime,
+          })
+        )
 
         response.headers.set('x-correlation-id', requestId)
         return response

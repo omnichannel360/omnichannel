@@ -8,6 +8,11 @@ import { ProfileUpdateSchema, type ProfileUpdate } from '@/lib/validation/schema
 import { validateQuery } from '@/lib/validation/middleware'
 import { ProfileQuerySchema, type ProfileQuery } from '@/lib/validation/schemas'
 import { protectRoute } from '@/lib/protected-route'
+import {
+  extractCorrelationFromRequest,
+  handleRouteError,
+  createSuccessResponse,
+} from '@/lib/error-handling'
 
 interface AgentProfile {
   name: string
@@ -28,6 +33,7 @@ function inferRoleFromName(name: string): string {
 
 export const GET = protectRoute(
   async (request: NextRequest, { userId }) => {
+    const requestId = extractCorrelationFromRequest(request.headers)
     // Apply rate limiting
     const rateLimitError = await applyRateLimit(request, 'profiles')
     if (rateLimitError) return rateLimitError
@@ -38,6 +44,7 @@ export const GET = protectRoute(
       path: request.nextUrl.pathname,
       userId,
       operation: 'load_profiles',
+      requestId,
     })
 
     // Validate query parameters
@@ -54,11 +61,11 @@ export const GET = protectRoute(
           ...logContext,
           error: 'PROFILES_DIR_NOT_FOUND',
         })
-        return NextResponse.json({
-          success: true,
-          data: [],
-          meta: { total: 0 },
-        })
+        const response = NextResponse.json(
+          createSuccessResponse([], requestId)
+        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
 
       const entries = await fs.readdir(PROFILES_DIR, { withFileTypes: true })
@@ -77,21 +84,24 @@ export const GET = protectRoute(
         profileCount: profiles.length,
       })
 
-      return NextResponse.json({
-        success: true,
-        data: profiles,
-        meta: { total: profiles.length },
-      })
+      const response = NextResponse.json(createSuccessResponse(profiles, requestId))
+      response.headers.set('x-correlation-id', requestId)
+      return response
     } catch (error) {
+      const responseTime = Date.now() - startTime
+      const { response, statusCode } = handleRouteError(error, requestId, {
+        method: request.method,
+        path: request.nextUrl.pathname,
+        userId,
+        operation: 'load_profiles',
+      })
       logger.error('Failed to load profiles', error, {
         ...logContext,
-        statusCode: 500,
-        responseTimeMs: Date.now() - startTime,
+        statusCode,
+        responseTimeMs: responseTime,
       })
-      return NextResponse.json(
-        { success: false, error: 'Failed to load profiles' },
-        { status: 500 }
-      )
+      response.headers.set('x-correlation-id', requestId)
+      return response
     }
   },
   { requireAuth: true, rateLimitKey: 'profiles' }

@@ -9,6 +9,13 @@ import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { createLogger, LogContext, createLogContext } from '@/lib/logger'
 import { extractRequestContext, getOrCreateCorrelationId } from '@/lib/middleware/error-context'
 import { protectRouteMulti } from '@/lib/protected-route'
+import {
+  extractCorrelationFromRequest,
+  handleRouteError,
+  createSuccessResponse,
+  ERROR_CODES,
+  createErrorResponse,
+} from '@/lib/error-handling'
 
 const logger = createLogger('kanban-api')
 
@@ -31,6 +38,7 @@ const DEFAULT_TASKS: Task[] = [
 const kanbanHandlers = protectRouteMulti(
   {
     GET: async (request: NextRequest, { userId }) => {
+      const requestId = extractCorrelationFromRequest(request.headers)
       // Apply rate limiting
       const rateLimitError = await applyRateLimit(request, 'kanban')
       if (rateLimitError) return rateLimitError
@@ -41,6 +49,7 @@ const kanbanHandlers = protectRouteMulti(
         path: request.nextUrl.pathname,
         userId,
         operation: 'load_tasks',
+        requestId,
       })
 
       try {
@@ -51,21 +60,31 @@ const kanbanHandlers = protectRouteMulti(
           responseTimeMs: Date.now() - startTime,
           taskCount: tasks.length || DEFAULT_TASKS.length,
         })
-        return NextResponse.json({ success: true, data: tasks.length ? tasks : DEFAULT_TASKS })
+        const response = NextResponse.json(
+          createSuccessResponse(tasks.length ? tasks : DEFAULT_TASKS, requestId)
+        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       } catch (error) {
+        const responseTime = Date.now() - startTime
+        const { response, statusCode } = handleRouteError(error, requestId, {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          userId,
+          operation: 'load_tasks',
+        })
         logger.error('Failed to load tasks', error, {
           ...logContext,
-          statusCode: 500,
-          responseTimeMs: Date.now() - startTime,
+          statusCode,
+          responseTimeMs: responseTime,
         })
-        return NextResponse.json(
-          { success: false, error: 'Failed to load tasks' },
-          { status: 500 }
-        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
     },
 
     POST: async (request: NextRequest, { userId }) => {
+      const requestId = extractCorrelationFromRequest(request.headers)
       // Apply rate limiting
       const rateLimitError = await applyRateLimit(request, 'kanban')
       if (rateLimitError) return rateLimitError
@@ -76,6 +95,7 @@ const kanbanHandlers = protectRouteMulti(
         path: request.nextUrl.pathname,
         userId,
         operation: 'create_task',
+        requestId,
       })
 
       try {
@@ -106,21 +126,29 @@ const kanbanHandlers = protectRouteMulti(
           taskTitle: title,
         })
 
-        return NextResponse.json({ success: true, data: result }, { status: 201 })
+        const response = NextResponse.json(createSuccessResponse(result, requestId), { status: 201 })
+        response.headers.set('x-correlation-id', requestId)
+        return response
       } catch (error) {
+        const responseTime = Date.now() - startTime
+        const { response, statusCode } = handleRouteError(error, requestId, {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          userId,
+          operation: 'create_task',
+        })
         logger.error('Failed to create task', error, {
           ...logContext,
-          statusCode: 500,
-          responseTimeMs: Date.now() - startTime,
+          statusCode,
+          responseTimeMs: responseTime,
         })
-        return NextResponse.json(
-          { success: false, error: 'Failed to create task' },
-          { status: 500 }
-        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
     },
 
     PUT: async (request: NextRequest, { userId }) => {
+      const requestId = extractCorrelationFromRequest(request.headers)
       // Apply rate limiting
       const rateLimitError = await applyRateLimit(request, 'kanban')
       if (rateLimitError) return rateLimitError
@@ -131,6 +159,7 @@ const kanbanHandlers = protectRouteMulti(
         path: request.nextUrl.pathname,
         userId,
         operation: 'update_task',
+        requestId,
       })
 
       try {
@@ -151,9 +180,11 @@ const kanbanHandlers = protectRouteMulti(
             ...logContext,
             statusCode: 400,
           })
-          return NextResponse.json(
-            { success: false, error: 'ID required' },
-            { status: 400 }
+          return createErrorResponse(
+            'Task ID is required',
+            ERROR_CODES.VALIDATION_ERROR,
+            requestId,
+            400
           )
         }
 
@@ -189,31 +220,48 @@ const kanbanHandlers = protectRouteMulti(
           fieldsUpdated: Object.keys(updates),
         })
 
-        return NextResponse.json({ success: true, data: result })
+        const response = NextResponse.json(createSuccessResponse(result, requestId))
+        response.headers.set('x-correlation-id', requestId)
+        return response
       } catch (error) {
+        const responseTime = Date.now() - startTime
         const message = error instanceof Error ? error.message : 'Failed to update task'
-        const statusCode = message === 'Task not found' ? 404 : 500
 
+        // Handle task not found specifically
+        if (message === 'Task not found') {
+          const response = createErrorResponse(
+            'Task not found',
+            ERROR_CODES.RESOURCE_NOT_FOUND,
+            requestId,
+            404
+          )
+          response.headers.set('x-correlation-id', requestId)
+          logger.warn('Task not found during update', {
+            ...logContext,
+            statusCode: 404,
+            responseTimeMs: responseTime,
+          })
+          return response
+        }
+
+        const { response, statusCode } = handleRouteError(error, requestId, {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          userId,
+          operation: 'update_task',
+        })
         logger.error('Failed to update task', error, {
           ...logContext,
           statusCode,
-          responseTimeMs: Date.now() - startTime,
+          responseTimeMs: responseTime,
         })
-
-        if (message === 'Task not found') {
-          return NextResponse.json(
-            { success: false, error: 'Task not found' },
-            { status: 404 }
-          )
-        }
-        return NextResponse.json(
-          { success: false, error: message },
-          { status: 500 }
-        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
     },
 
     DELETE: async (request: NextRequest, { userId }) => {
+      const requestId = extractCorrelationFromRequest(request.headers)
       // Apply rate limiting
       const rateLimitError = await applyRateLimit(request, 'kanban')
       if (rateLimitError) return rateLimitError
@@ -228,6 +276,7 @@ const kanbanHandlers = protectRouteMulti(
         userId,
         operation: 'delete_task',
         taskId: id || 'unknown',
+        requestId,
       })
 
       if (!id) {
@@ -235,9 +284,11 @@ const kanbanHandlers = protectRouteMulti(
           ...logContext,
           statusCode: 400,
         })
-        return NextResponse.json(
-          { success: false, error: 'ID required' },
-          { status: 400 }
+        return createErrorResponse(
+          'Task ID is required',
+          ERROR_CODES.VALIDATION_ERROR,
+          requestId,
+          400
         )
       }
 
@@ -261,27 +312,43 @@ const kanbanHandlers = protectRouteMulti(
           taskId: id,
         })
 
-        return NextResponse.json({ success: true })
+        const response = NextResponse.json(createSuccessResponse(undefined, requestId))
+        response.headers.set('x-correlation-id', requestId)
+        return response
       } catch (error) {
+        const responseTime = Date.now() - startTime
         const message = error instanceof Error ? error.message : 'Failed to delete task'
-        const statusCode = message === 'Task not found' ? 404 : 500
 
+        // Handle task not found specifically
+        if (message === 'Task not found') {
+          const response = createErrorResponse(
+            'Task not found',
+            ERROR_CODES.RESOURCE_NOT_FOUND,
+            requestId,
+            404
+          )
+          response.headers.set('x-correlation-id', requestId)
+          logger.warn('Task not found during delete', {
+            ...logContext,
+            statusCode: 404,
+            responseTimeMs: responseTime,
+          })
+          return response
+        }
+
+        const { response, statusCode } = handleRouteError(error, requestId, {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          userId,
+          operation: 'delete_task',
+        })
         logger.error('Failed to delete task', error, {
           ...logContext,
           statusCode,
-          responseTimeMs: Date.now() - startTime,
+          responseTimeMs: responseTime,
         })
-
-        if (message === 'Task not found') {
-          return NextResponse.json(
-            { success: false, error: 'Task not found' },
-            { status: 404 }
-          )
-        }
-        return NextResponse.json(
-          { success: false, error: message },
-          { status: 500 }
-        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
     },
   },

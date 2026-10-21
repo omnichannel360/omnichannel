@@ -17,6 +17,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import { logger } from './lib/logger'
+import {
+  getOrCreateCorrelationId,
+  createErrorResponse,
+  ERROR_CODES,
+  formatErrorLog,
+} from './lib/error-handling'
 
 /**
  * Routes that require authentication (user must have valid JWT)
@@ -80,7 +86,10 @@ const ROUTE_ACCESS_CONFIG: Record<string, UserRole[]> = {
 function getJWTSecret(): string {
   const secret = process.env.JWT_SECRET
   if (!secret) {
-    console.error('JWT_SECRET environment variable is not set')
+    logger.error('JWT_SECRET environment variable is not set', new Error('Missing configuration'), {
+      component: 'middleware',
+      operation: 'getJWTSecret',
+    })
     throw new Error('JWT_SECRET not configured')
   }
   return secret
@@ -89,7 +98,11 @@ function getJWTSecret(): string {
 /**
  * Extract and verify JWT from Authorization header
  */
-function verifyTokenFromRequest(authHeader: string | null): { valid: boolean; payload?: AuthPayload; error?: string } {
+function verifyTokenFromRequest(authHeader: string | null): {
+  valid: boolean
+  payload?: AuthPayload
+  error?: string
+} {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
       valid: false,
@@ -158,19 +171,34 @@ function getRequiredRoles(pathname: string): UserRole[] {
  * Main middleware function
  * Validates authentication and role-based access for protected routes
  * Attaches user context to request headers for handlers
+ *
+ * Architecture:
+ * 1. Generate/extract correlation ID
+ * 2. Skip middleware for non-API routes
+ * 3. Skip for public endpoints
+ * 4. Verify authentication token
+ * 5. Check role-based access control
+ * 6. Inject auth context into headers
  */
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const method = request.method
 
+  // Generate or extract correlation ID for request tracing
+  const correlationId = getOrCreateCorrelationId(request.headers.get('x-correlation-id'))
+
   // Skip middleware for non-API routes
   if (!pathname.startsWith('/api/')) {
-    return NextResponse.next()
+    const response = NextResponse.next()
+    response.headers.set('x-correlation-id', correlationId)
+    return response
   }
 
   // Skip protected route check for public endpoints
   if (!isProtectedRoute(pathname)) {
-    return NextResponse.next()
+    const response = NextResponse.next()
+    response.headers.set('x-correlation-id', correlationId)
+    return response
   }
 
   // Route is protected - verify authentication
@@ -178,17 +206,21 @@ export async function middleware(request: NextRequest) {
   const tokenResult = verifyTokenFromRequest(authHeader)
 
   if (!tokenResult.valid) {
-    logger.warn('Authentication failed', {
-      method,
-      pathname,
-      reason: tokenResult.error,
-    })
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Unauthorized',
-      },
-      { status: 401 }
+    logger.warn(
+      'Authentication failed',
+      formatErrorLog('Token verification failed', new Error(tokenResult.error || 'Unknown error'), {
+        requestId: correlationId,
+        method,
+        pathname,
+        reason: tokenResult.error,
+      })
+    )
+
+    return createErrorResponse(
+      'Authentication required',
+      ERROR_CODES.AUTH_INVALID,
+      correlationId,
+      401
     )
   }
 
@@ -196,19 +228,23 @@ export async function middleware(request: NextRequest) {
   if (tokenResult.payload) {
     const requiredRoles = getRequiredRoles(pathname)
     if (requiredRoles.length > 0 && !canAccessRoute(pathname, tokenResult.payload.role)) {
-      logger.warn('Access denied - insufficient permissions', {
-        method,
-        pathname,
-        userId: tokenResult.payload.sub,
-        userRole: tokenResult.payload.role,
-        requiredRoles,
-      })
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Insufficient permissions',
-        },
-        { status: 403 }
+      logger.warn(
+        'Access denied - insufficient permissions',
+        formatErrorLog('Role check failed', new Error('Insufficient permissions'), {
+          requestId: correlationId,
+          method,
+          pathname,
+          userId: tokenResult.payload.sub,
+          userRole: tokenResult.payload.role,
+          requiredRoles,
+        })
+      )
+
+      return createErrorResponse(
+        `Insufficient permissions. Required role: ${requiredRoles.join(' or ')}`,
+        ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+        correlationId,
+        403
       )
     }
 
@@ -218,8 +254,10 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-user-email', tokenResult.payload.email || '')
     requestHeaders.set('x-user-role', tokenResult.payload.role || '')
     requestHeaders.set('x-auth-verified', 'true')
+    requestHeaders.set('x-correlation-id', correlationId)
 
     logger.info('Authentication successful', {
+      requestId: correlationId,
       method,
       pathname,
       userId: tokenResult.payload.sub,
@@ -234,12 +272,21 @@ export async function middleware(request: NextRequest) {
   }
 
   // Fallback error (should not reach here)
-  return NextResponse.json(
+  logger.error(
+    'Unexpected authentication failure',
+    new Error('Token present but payload missing'),
     {
-      success: false,
-      error: 'Authentication failed',
-    },
-    { status: 401 }
+      requestId: correlationId,
+      method,
+      pathname,
+    }
+  )
+
+  return createErrorResponse(
+    'Authentication failed',
+    ERROR_CODES.AUTH_INVALID,
+    correlationId,
+    401
   )
 }
 
