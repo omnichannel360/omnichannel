@@ -16,6 +16,7 @@ import {
   handleRouteError,
   createSuccessResponse,
 } from '@/lib/error-handling'
+import { generatePrefixedId } from '@/lib/uuid'
 
 /**
  * GET /api/protected-route-example
@@ -188,9 +189,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Example: Create resource
+    // Example: Create resource with cryptographically secure ID
     const resource = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: generatePrefixedId('resource'),
       name,
       description: description || '',
       createdBy: authContext.userId,

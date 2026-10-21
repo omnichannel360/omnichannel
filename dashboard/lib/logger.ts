@@ -133,7 +133,7 @@ function formatError(error: unknown): { name: string; message: string; stack?: s
       name: error.name,
       message: error.message,
       stack: error.stack,
-      code: (error as any).code
+      code: (error as Error & { code?: string }).code
     }
   }
 
@@ -299,12 +299,18 @@ export const logger = createLogger('default')
 
 /**
  * Create a logger context helper
+ * Uses secure UUID generation for correlation IDs
  */
 export function createLogContext(overrides?: Partial<LogContext>): LogContext {
+  // Use crypto.randomUUID if available, otherwise use generateId for secure fallback
+  const correlationId = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${globalThis.crypto?.getRandomValues ?
+      Array.from(globalThis.crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('') :
+      Math.random().toString(36).substring(2, 11)}`
+
   return {
-    correlationId: typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+    correlationId,
     timestamp: new Date().toISOString(),
     ...overrides
   }

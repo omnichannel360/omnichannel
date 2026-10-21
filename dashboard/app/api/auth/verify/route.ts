@@ -112,17 +112,18 @@ export async function GET(request: NextRequest): Promise<NextResponse<VerifyResp
 
     return response
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Token verification failed'
+    // Log detailed error for debugging, but never send to client
     logger.error('Token verification error - exception during verification', error, {
       ...logContext,
       statusCode: 500,
       responseTimeMs: Date.now() - startTime,
     })
+    // Return generic error message to client - never leak internal details
     return NextResponse.json(
       {
         success: false,
         authenticated: false,
-        error: message,
+        error: 'Token verification failed',
       },
       { status: 500 }
     )

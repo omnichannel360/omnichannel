@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { v4 as uuidv4 } from 'uuid'
+import { generateId } from './uuid'
 
 /**
  * Error response envelope with context
@@ -41,7 +41,7 @@ export interface SuccessResponse<T> {
  */
 export function generateCorrelationId(): string {
   const timestamp = Date.now()
-  const uuid = uuidv4().split('-')[0] // Take first segment of UUID
+  const uuid = generateId().split('-')[0] // Take first segment of UUID
   return `${timestamp}-${uuid}`
 }
 

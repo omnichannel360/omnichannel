@@ -97,17 +97,28 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
     }
 
     // Validate credentials using constant-time comparison to prevent timing attacks
-    const emailMatch = email === adminEmail
+    // Both email and password must use timing-safe comparison to prevent enumeration attacks
+    const emailBuffer = Buffer.from(email)
+    const adminEmailBuffer = Buffer.from(adminEmail)
     const passwordBuffer = Buffer.from(password || '')
     const adminPasswordBuffer = Buffer.from(adminPassword)
 
-    // Only perform timing-safe comparison if lengths match (prevents early exit on length mismatch)
+    // Timing-safe comparison for email (prevents account enumeration)
+    let emailMatch = false
+    if (emailBuffer.length === adminEmailBuffer.length) {
+      try {
+        emailMatch = timingSafeEqual(emailBuffer, adminEmailBuffer)
+      } catch {
+        emailMatch = false
+      }
+    }
+
+    // Timing-safe comparison for password
     let passwordMatch = false
     if (passwordBuffer.length === adminPasswordBuffer.length) {
       try {
         passwordMatch = timingSafeEqual(passwordBuffer, adminPasswordBuffer)
       } catch {
-        // timingSafeEqual throws if buffers have different lengths; set to false
         passwordMatch = false
       }
     }
@@ -156,16 +167,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
 
     return response
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Authentication failed'
+    // Log detailed error for debugging, but never send to client
     logger.error('Login error - exception during authentication', error, {
       ...logContext,
       statusCode: 500,
       responseTimeMs: Date.now() - startTime,
     })
+    // Return generic error message to client - never leak internal details
     return NextResponse.json(
       {
         success: false,
-        error: message,
+        error: 'Authentication failed',
       },
       { status: 500 }
     )

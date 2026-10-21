@@ -58,14 +58,9 @@ kanban.db
 backups/
 
 # OS
-.DS_Store
 .AppleDouble
 .LSOverride
 *.sublime-workspace
-
-# IDE
-.vscode/settings.json
-.idea/
 *.sublime-project
 
 # Optional npm cache

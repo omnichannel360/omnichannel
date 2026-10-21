@@ -12,6 +12,7 @@ const REQUEST_START_TIME_HEADER = 'x-request-start-time'
 
 /**
  * Generate or extract correlation ID from request
+ * Uses cryptographically secure random generation
  */
 export function getOrCreateCorrelationId(request: NextRequest): string {
   const existing = request.headers.get(CORRELATION_ID_HEADER)
@@ -19,7 +20,12 @@ export function getOrCreateCorrelationId(request: NextRequest): string {
     return existing
   }
 
-  return `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  // Use crypto.getRandomValues for secure random bytes, fallback to timestamp
+  const randomPart = globalThis.crypto?.getRandomValues
+    ? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('')
+    : Math.random().toString(36).substring(2, 11)
+
+  return `req-${Date.now()}-${randomPart}`
 }
 
 /**
@@ -27,9 +33,8 @@ export function getOrCreateCorrelationId(request: NextRequest): string {
  */
 export function extractRequestContext(request: NextRequest): LogContext {
   const correlationId = getOrCreateCorrelationId(request)
-  const startTime = request.headers.get(REQUEST_START_TIME_HEADER)
-    ? parseInt(request.headers.get(REQUEST_START_TIME_HEADER)!)
-    : Date.now()
+  const startTimeHeader = request.headers.get(REQUEST_START_TIME_HEADER)
+  const startTime = startTimeHeader ? parseInt(startTimeHeader, 10) : Date.now()
 
   return {
     correlationId,

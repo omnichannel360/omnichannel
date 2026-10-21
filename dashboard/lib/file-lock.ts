@@ -15,6 +15,7 @@ const locks = new Map<string, FileLock>()
 
 export async function withFileLock<T>(filePath: string, callback: () => Promise<T>, timeoutMs: number = DEFAULT_LOCK_TIMEOUT_MS): Promise<T> {
   let lock = locks.get(filePath)
+  const enqueuedAt = Date.now()
 
   if (!lock) {
     lock = { queue: [], locked: false, lastAccessTime: Date.now() }
@@ -22,19 +23,44 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
   }
 
   return new Promise<T>((resolve, reject) => {
-    // Set timeout to prevent indefinite lock waiting
-    const timeoutId = setTimeout(() => {
-      reject(new Error(`Lock acquisition timeout after ${timeoutMs}ms for file: ${filePath}`))
-    }, timeoutMs)
+    // Track if the promise has already settled to prevent double settlement
+    let settled = false
 
     const executeCallback = async (): Promise<void> => {
-      clearTimeout(timeoutId)
+      // Calculate remaining timeout based on when callback was queued
+      const elapsedMs = Date.now() - enqueuedAt
+      const remainingMs = timeoutMs - elapsedMs
+
+      // If timeout already exceeded while waiting in queue, reject without executing
+      if (remainingMs <= 0) {
+        if (!settled) {
+          settled = true
+          reject(new Error(`Lock acquisition timeout after ${timeoutMs}ms for file: ${filePath}`))
+        }
+        return
+      }
+
+      // Set timeout only for remaining duration
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          reject(new Error(`Lock execution timeout after ${timeoutMs}ms for file: ${filePath}`))
+        }
+      }, remainingMs)
 
       try {
         const result = await callback()
-        resolve(result)
+        clearTimeout(timeoutId)
+        if (!settled) {
+          settled = true
+          resolve(result)
+        }
       } catch (error) {
-        reject(error)
+        clearTimeout(timeoutId)
+        if (!settled) {
+          settled = true
+          reject(error)
+        }
       } finally {
         // Lock is guaranteed to exist: created above or retrieved from map
         const fileLock = locks.get(filePath)

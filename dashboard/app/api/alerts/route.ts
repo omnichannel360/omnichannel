@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { atomicUpdate, atomicRead } from '@/lib/atomic-file-ops'
-import { generateId } from '@/lib/validation'
+import { generatePrefixedId } from '@/lib/uuid'
 import { logger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { AlertCreateBodySchema, AlertUpdateBodySchema, type AlertCreateBody, type AlertUpdateBody } from '@/lib/validation/schemas'
@@ -123,7 +123,7 @@ const alertHandlers = protectRouteMulti(
         }
 
         const newAlert: Alert = {
-          id: generateId('alert'),
+          id: generatePrefixedId('alert'),
           timestamp: new Date().toISOString(),
           ...bodyResult.data,
           status: 'active',

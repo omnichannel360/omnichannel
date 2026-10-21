@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { z } from 'zod'
 import { MeetingRequestSchema, MeetingTypeSchema, SkillTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { validateBody } from '@/lib/validation/middleware'
 import { MeetingSchema, type Meeting as MeetingType } from '@/lib/validation/schemas'
@@ -189,7 +190,7 @@ const meetingHandlers = protectRouteMulti(
       if (rateLimitError) return rateLimitError
 
       try {
-        const bodyResult = await validateBody<any>(request, MeetingRequestSchema)
+        const bodyResult = await validateBody<z.infer<typeof MeetingRequestSchema>>(request, MeetingRequestSchema)
         if (!bodyResult.success) {
           return bodyResult.response
         }

@@ -6,8 +6,9 @@ export async function atomicRead<T>(filePath: string, fallback?: T): Promise<T> 
     try {
       const content = await fs.readFile(filePath, 'utf-8')
       return JSON.parse(content) as T
-    } catch (error: any) {
-      if (error.code === 'ENOENT' && fallback !== undefined) return fallback
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      if (fsError?.code === 'ENOENT' && fallback !== undefined) return fallback
       throw error
     }
   })
@@ -31,8 +32,13 @@ export async function atomicUpdate<T>(
     try {
       const content = await fs.readFile(filePath, 'utf-8')
       current = JSON.parse(content) as T
-    } catch (error: any) {
-      current = error.code === 'ENOENT' ? fallback : (() => { throw error })()
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      if (fsError?.code === 'ENOENT') {
+        current = fallback
+      } else {
+        throw error
+      }
     }
 
     const updated = await transform(current)
@@ -54,8 +60,13 @@ export async function atomicConditionalUpdate<T>(
     try {
       const content = await fs.readFile(filePath, 'utf-8')
       current = JSON.parse(content) as T
-    } catch (error: any) {
-      current = error.code === 'ENOENT' ? fallback : (() => { throw error })()
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      if (fsError?.code === 'ENOENT') {
+        current = fallback
+      } else {
+        throw error
+      }
     }
 
     if (!condition(current)) {
