@@ -60,10 +60,7 @@ export const PasswordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
   .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
-  // IMPROVED: Check for weak pattern repetition where same substring appears at start and end
-  // with minimal variation in between (0-9 digits). This rejects "test123test" but accepts
-  // legitimate passwords like "TestEnvironmentTest" where middle content is substantial
-  .refine((pwd) => !/^(.{3,})(\d{0,9})?\1$/.test(pwd), 'Password should not have obvious repeated patterns (e.g., "test123test")')
+  .refine((pwd) => !/^(.{3,}).*\1$/.test(pwd), 'Password should not start and end with the same 3+ character pattern')
 
 export const StringSchema = z
   .string()

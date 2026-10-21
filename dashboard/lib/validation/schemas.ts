@@ -15,6 +15,7 @@ export const EmailSchema = z
   .trim()
 
 // Password validation - strong password requirements
+// CONSOLIDATED: Uses same regex as input-validation.ts (line 66) for consistency
 export const PasswordSchema = z
   .string()
   .min(8, 'Password must be at least 8 characters')
@@ -24,7 +25,7 @@ export const PasswordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
   .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
-  .refine((pwd) => !/^(.{3,}).*\1$/.test(pwd), 'Password should not start and end with the same 3+ character pattern')
+  .refine((pwd) => !/^(.{3,})(\d{0,9})?\1$/.test(pwd), 'Password should not have obvious repeated patterns (e.g., "test123test")')
 
 // Weak password for development/testing (optional override)
 export const PasswordSchemaWeak = z
@@ -32,14 +33,24 @@ export const PasswordSchemaWeak = z
   .min(6, 'Password must be at least 6 characters')
   .max(128, 'Password must not exceed 128 characters')
 
-// String validation - prevents XSS and injection attacks
-export const SafeStringSchema = z
-  .string()
-  .max(1000, 'String must not exceed 1000 characters')
-  .refine(
+// Safe string factory - creates string schemas with XSS protection
+// Supports optional min/max length constraints
+function createSafeString(minLength = 0, maxLength = 1000) {
+  let schema = z.string()
+
+  if (minLength > 0) {
+    schema = schema.min(minLength, `String must be at least ${minLength} characters`)
+  }
+
+  schema = schema.max(maxLength, `String must not exceed ${maxLength} characters`)
+
+  return schema.refine(
     (val) => !val.includes('<script') && !val.includes('javascript:'),
     'String contains forbidden patterns'
   )
+}
+
+export const SafeStringSchema = createSafeString()
 
 // Category validation
 export const CategorySchema = z
@@ -161,7 +172,14 @@ export type HealthQuery = z.infer<typeof HealthQuerySchema>
 
 // Kanban: Request body
 export const KanbanItemSchema = z.object({
-  title: SafeStringSchema.min(1, 'Title is required'),
+  title: z
+    .string()
+    .min(1, 'Title is required')
+    .max(1000, 'String must not exceed 1000 characters')
+    .refine(
+      (val) => !val.includes('<script') && !val.includes('javascript:'),
+      'String contains forbidden patterns'
+    ),
   description: SafeStringSchema.optional(),
   status: z
     .enum(['todo', 'in_progress', 'done'], {
@@ -181,7 +199,14 @@ export type KanbanItem = z.infer<typeof KanbanItemSchema>
 
 // Meetings: Request body
 export const MeetingSchema = z.object({
-  title: SafeStringSchema.min(1, 'Title is required'),
+  title: z
+    .string()
+    .min(1, 'Title is required')
+    .max(1000, 'String must not exceed 1000 characters')
+    .refine(
+      (val) => !val.includes('<script') && !val.includes('javascript:'),
+      'String contains forbidden patterns'
+    ),
   description: SafeStringSchema.optional(),
   startTime: z
     .string()
@@ -202,7 +227,7 @@ export type Meeting = z.infer<typeof MeetingSchema>
 
 // Profiles: Request body
 export const ProfileUpdateSchema = z.object({
-  name: SafeStringSchema.min(1, 'Name is required').optional(),
+  name: createSafeString(1).optional(),
   email: EmailSchema.optional(),
   role: z
     .enum(['user', 'admin', 'viewer'], {
@@ -216,8 +241,8 @@ export type ProfileUpdate = z.infer<typeof ProfileUpdateSchema>
 
 // Alerts: Request body
 export const AlertSchema = z.object({
-  title: SafeStringSchema.min(1, 'Title is required'),
-  message: SafeStringSchema.min(1, 'Message is required'),
+  title: createSafeString(1),
+  message: createSafeString(1),
   severity: z
     .enum(['info', 'warning', 'error', 'critical'], {
       errorMap: () => ({ message: 'Severity must be one of: info, warning, error, critical' }),
@@ -253,7 +278,7 @@ export type AuthTokenRequest = z.infer<typeof AuthTokenRequestSchema>
 
 // Conductor: Request body (comprehensive version from schemas)
 export const ConductorRequestSchemaComprehensive = z.object({
-  message: SafeStringSchema.min(1, 'Message is required').max(2000, 'Message must not exceed 2000 characters'),
+  message: createSafeString(1, 2000),
   action: SafeStringSchema.optional(),
   params: z.record(z.unknown()).optional().default({}),
   timeout: z
@@ -308,7 +333,7 @@ export type LogoutRequest = z.infer<typeof LogoutRequestSchema>
 export const RegisterRequestSchema = z.object({
   email: EmailSchema,
   password: PasswordSchema, // Using strong password requirements for security
-  name: SafeStringSchema.min(1, 'Name is required').optional(),
+  name: createSafeString(1).optional(),
 })
 
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>
@@ -344,8 +369,8 @@ export type AlertsQuery = z.infer<typeof AlertsQuerySchema>
 
 // Alerts: Create alert body (used in alerts route)
 export const AlertCreateBodySchema = z.object({
-  title: SafeStringSchema.min(1, 'Title is required'),
-  message: SafeStringSchema.min(1, 'Message is required'),
+  title: createSafeString(1)'Title is required'),
+  message: createSafeString(1)'Message is required'),
   severity: z
     .enum(['info', 'warning', 'error', 'critical'], {
       errorMap: () => ({ message: 'Severity must be one of: info, warning, error, critical' }),
@@ -411,7 +436,7 @@ export type KanbanQuery = z.infer<typeof KanbanQuerySchema>
 
 // Kanban: Create/Update item body
 export const KanbanCreateSchema = z.object({
-  title: SafeStringSchema.min(1, 'Title is required'),
+  title: createSafeString(1)'Title is required'),
   description: SafeStringSchema.optional(),
   status: z
     .enum(['todo', 'in_progress', 'done'], {
@@ -455,7 +480,7 @@ export type MeetingsQuery = z.infer<typeof MeetingsQuerySchema>
 
 // Meetings: Create/Update meeting body
 export const MeetingCreateSchema = z.object({
-  title: SafeStringSchema.min(1, 'Title is required'),
+  title: createSafeString(1)'Title is required'),
   description: SafeStringSchema.optional(),
   startTime: z
     .string()

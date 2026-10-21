@@ -295,11 +295,13 @@ export async function GET(request: NextRequest) {
         },
         company_brain: {
           status: brainStats.count > 0 ? 'logging' : 'inactive',
+          response_time_ms: Date.now() - startTime,
           log_count: brainStats.count,
           latest_timestamp: brainStats.latest,
         },
         skill_registry: {
           status: skillCount > 0 ? 'loaded' : 'missing',
+          response_time_ms: Date.now() - startTime,
           skill_count: skillCount,
         },
       },

@@ -1,0 +1,319 @@
+{
+  "audit_metadata": {
+    "date": "2026-10-22T00:00:00Z",
+    "scope": "OmniChannel Systems Security Audit",
+    "audit_level": "XHIGH",
+    "categories": 7,
+    "total_vulnerabilities": 27,
+    "auditor": "Claude Haiku 4.5"
+  },
+  "findings_summary": {
+    "critical": 8,
+    "high": 7,
+    "medium": 9,
+    "low": 3,
+    "production_ready": false,
+    "risk_level": "MEDIUM-HIGH",
+    "estimated_fix_days": "7-14"
+  },
+  "vulnerabilities": [
+    {
+      "id": 1,
+      "category": "Injection Attacks",
+      "severity": "CRITICAL",
+      "title": "SQL Injection Detection Unused",
+      "file": "dashboard/lib/input-validation.ts",
+      "line": 252,
+      "issue": "Function exists but never called in 42 API routes",
+      "risk": "All database queries bypass injection detection",
+      "fix_priority": "P0"
+    },
+    {
+      "id": 2,
+      "category": "Injection Attacks",
+      "severity": "HIGH",
+      "title": "Missing Command Injection Protection",
+      "file": "dashboard/lib/error-handling.ts",
+      "issue": "No validation on command execution",
+      "risk": "Shell injection if used for system commands",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 3,
+      "category": "Injection Attacks",
+      "severity": "MEDIUM",
+      "title": "LDAP Injection (if applicable)",
+      "file": "Unknown",
+      "issue": "No LDAP validation found",
+      "risk": "Directory traversal if LDAP is used",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 4,
+      "category": "Injection Attacks",
+      "severity": "MEDIUM",
+      "title": "NoSQL Injection (if Supabase used)",
+      "file": "API routes with dynamic filters",
+      "issue": "Zod validation insufficient alone",
+      "risk": "Object injection if filters accept nested objects",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 5,
+      "category": "XSS",
+      "severity": "CRITICAL",
+      "title": "Query Parameter XSS",
+      "file": "dashboard/lib/validation/index.ts",
+      "line": 159,
+      "issue": "Query parameters stored without sanitization",
+      "risk": "Malicious scripts in query params echoed in HTML",
+      "impact": "Session hijacking, credential theft",
+      "fix_priority": "P0"
+    },
+    {
+      "id": 6,
+      "category": "XSS",
+      "severity": "HIGH",
+      "title": "Response Body Not HTML-Escaped",
+      "file": "All API response handlers",
+      "issue": "JSON responses don't HTML-escape strings",
+      "risk": "If frontend uses innerHTML instead of textContent",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 7,
+      "category": "XSS",
+      "severity": "HIGH",
+      "title": "Error Messages with Unescaped User Input",
+      "file": "dashboard/lib/error-handling.ts",
+      "line": 150,
+      "issue": "Error messages may include unescaped input",
+      "risk": "Attacker input + error message = XSS vector",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 8,
+      "category": "XSS",
+      "severity": "MEDIUM",
+      "title": "DOM-Based XSS in Client Components",
+      "file": "React components",
+      "issue": "Frontend component security",
+      "risk": "Depends on component implementation",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 9,
+      "category": "CSRF",
+      "severity": "MEDIUM",
+      "title": "SameSite Cookie Flag Not Verified",
+      "file": "dashboard/auth.config.ts",
+      "issue": "NextAuth.js configuration not verified",
+      "risk": "Reduced CSRF protection if misconfigured",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 10,
+      "category": "CSRF",
+      "severity": "HIGH",
+      "title": "Custom Form Submissions May Bypass CSRF",
+      "file": "API routes not using NextAuth session",
+      "issue": "Custom endpoints may not have CSRF tokens",
+      "risk": "Forms on external sites can trigger state changes",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 11,
+      "category": "CSRF",
+      "severity": "MEDIUM",
+      "title": "Origin Header Not Validated",
+      "file": "All API routes",
+      "issue": "No origin header validation on state-changing operations",
+      "risk": "Cross-origin requests allowed if no other validation",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 12,
+      "category": "Authentication",
+      "severity": "CRITICAL",
+      "title": "Password Authentication Disabled",
+      "file": "dashboard/auth.config.ts",
+      "line": 297,
+      "issue": "validateUserCredentials() returns null for all inputs",
+      "impact": "Password-based login broken (only token auth works)",
+      "risk": "Users cannot log in with passwords",
+      "fix_priority": "P0"
+    },
+    {
+      "id": 13,
+      "category": "Authentication",
+      "severity": "CRITICAL",
+      "title": "x-user-id Header Not Validated",
+      "file": "dashboard/lib/rate-limit-middleware.ts",
+      "line": 110,
+      "issue": "Header extracted without validation",
+      "risk": "Header injection if middleware order changes",
+      "impact": "Rate limit bypass by spoofing user ID",
+      "fix_priority": "P0"
+    },
+    {
+      "id": 14,
+      "category": "Authentication",
+      "severity": "HIGH",
+      "title": "JWT Error Handling Too Broad",
+      "file": "dashboard/auth.config.ts",
+      "line": 88,
+      "issue": "JWT signature failures masked in error handling",
+      "risk": "Tampered tokens may be accepted",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 15,
+      "category": "Authentication",
+      "severity": "MEDIUM",
+      "title": "Session Cookie Used Without Validation",
+      "file": "dashboard/lib/rate-limit-middleware.ts",
+      "line": 125,
+      "issue": "Cookie value used directly as user ID",
+      "risk": "Session fixation if not server-side validated",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 16,
+      "category": "Authentication",
+      "severity": "MEDIUM",
+      "title": "No Multi-Factor Authentication",
+      "file": "Authentication system",
+      "issue": "No MFA/2FA support",
+      "risk": "Account takeover via password compromise",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 17,
+      "category": "Data Leakage",
+      "severity": "CRITICAL",
+      "title": "Error Messages Leak Database Schema",
+      "file": "dashboard/lib/error-handling.ts",
+      "line": 150,
+      "issue": "Whitelist check allows pattern bypass",
+      "risk": "Database schema exposed in error responses",
+      "impact": "Attacker learns table/column names and constraints",
+      "fix_priority": "P0"
+    },
+    {
+      "id": 18,
+      "category": "Data Leakage",
+      "severity": "HIGH",
+      "title": "Sensitive Field Filtering Incomplete",
+      "file": "dashboard/lib/error-handling.ts",
+      "line": 456,
+      "issue": "Not all sensitive fields filtered before logging",
+      "risk": "Credentials may leak in logs",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 19,
+      "category": "Data Leakage",
+      "severity": "MEDIUM",
+      "title": "Rate Limit Metadata Exposes User Behavior",
+      "file": "Response headers",
+      "issue": "Retry-After headers reveal rate limiting patterns",
+      "risk": "Attacker learns rate limit thresholds",
+      "fix_priority": "P3"
+    },
+    {
+      "id": 20,
+      "category": "Data Leakage",
+      "severity": "MEDIUM",
+      "title": "Correlation IDs Logged Verbosely",
+      "file": "Logging throughout",
+      "issue": "Correlation IDs in logs may leak request context",
+      "risk": "If logs are accessible, request patterns exposed",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 21,
+      "category": "Cryptography",
+      "severity": "HIGH",
+      "title": "Non-Crypto Fallback Uses Math.random()",
+      "file": "dashboard/lib/crypto-utils.ts",
+      "line": 18,
+      "issue": "Falls back to Math.random() when crypto unavailable",
+      "risk": "Weak randomness for tokens/IDs",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 22,
+      "category": "Cryptography",
+      "severity": "CRITICAL",
+      "title": "Security Logging Fails Silently",
+      "file": "dashboard/lib/uuid.ts",
+      "line": 20,
+      "issue": "Logger module failure causes silent fallback",
+      "risk": "Security warnings never logged to monitoring",
+      "impact": "Production blind to cryptographic failures",
+      "fix_priority": "P0"
+    },
+    {
+      "id": 23,
+      "category": "Cryptography",
+      "severity": "MEDIUM",
+      "title": "JWT Secret Not Rotation Policy",
+      "file": "dashboard/lib/auth.ts",
+      "issue": "No documented JWT secret rotation schedule",
+      "risk": "Old secrets never invalidated",
+      "fix_priority": "P2"
+    },
+    {
+      "id": 24,
+      "category": "Rate Limiting",
+      "severity": "CRITICAL",
+      "title": "IP Fallback to 'anonymous'",
+      "file": "dashboard/lib/rate-limit-middleware.ts",
+      "issue": "All unauthenticated users share quota when IP missing",
+      "risk": "Distributed DoS — attacker + users share bucket",
+      "impact": "Attacker exhausts limit for all anonymous users",
+      "fix_priority": "P0"
+    },
+    {
+      "id": 25,
+      "category": "Rate Limiting",
+      "severity": "HIGH",
+      "title": "Token-Based Limiting Lacks Revocation Check",
+      "file": "Rate limiting middleware",
+      "issue": "Rate limits applied by token, revoked tokens not checked",
+      "risk": "Revoked API keys still have quota",
+      "fix_priority": "P1"
+    },
+    {
+      "id": 26,
+      "category": "Rate Limiting",
+      "severity": "MEDIUM",
+      "title": "No Graduated Response Scaling",
+      "file": "Rate limit response",
+      "issue": "Binary on/off instead of graduated blocking",
+      "risk": "Legitimate spikes cause hard blocks",
+      "fix_priority": "P3"
+    },
+    {
+      "id": 27,
+      "category": "Rate Limiting",
+      "severity": "MEDIUM",
+      "title": "Distributed Rate Limiting Not Implemented",
+      "file": "All rate limiting (in-memory)",
+      "issue": "Single-instance only; breaks under horizontal scaling",
+      "risk": "Attackers hit different instances; no global limit",
+      "fix_priority": "P2"
+    }
+  ],
+  "phase_1_critical": [
+    "SQL Injection Detection Unused",
+    "Query Parameter XSS",
+    "Password Authentication Disabled",
+    "x-user-id Header Not Validated",
+    "Error Messages Leak Database Schema",
+    "Security Logging Fails Silently",
+    "IP Fallback to 'anonymous'"
+  ],
+  "production_recommendation": "BLOCK DEPLOYMENT — 8 critical vulnerabilities must be fixed before production release",
+  "estimated_fix_time": "7-14 days"
+}

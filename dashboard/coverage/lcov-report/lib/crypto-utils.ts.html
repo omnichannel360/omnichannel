@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">43.47% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>10/23</span>
+                <span class='fraction'>0/16</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">14.28% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/7</span>
+                <span class='fraction'>0/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">35% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/20</span>
+                <span class='fraction'>0/16</span>
             </div>
         
             
@@ -130,10 +130,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -153,14 +153,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -168,7 +160,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -190,8 +190,8 @@
 import type { Logger } from './logger'
 import { generateUUIDv4 } from './uuid'
 &nbsp;
-let logger: Logger | null = null
-let nonCryptoWarningLogged = false
+let logger: Logger | null = <span class="cstat-no" title="statement not covered" >null</span>
+let nonCryptoWarningLogged = <span class="cstat-no" title="statement not covered" >false</span>
 &nbsp;
 function <span class="fstat-no" title="function not covered" >getLogger(</span>) {
 <span class="cstat-no" title="statement not covered" >  <span class="missing-if-branch" title="if path not taken" >I</span>if (!logger) {</span>
@@ -211,14 +211,14 @@ function <span class="fstat-no" title="function not covered" >getLogger(</span>)
 <span class="cstat-no" title="statement not covered" >  return logger</span>
 }
 &nbsp;
-export { <span class="fstat-no" title="function not covered" >generateUUIDv4,</span> <span class="fstat-no" title="function not covered" >generateId,</span> <span class="fstat-no" title="function not covered" >generatePrefixedId </span>} from './uuid'
+export { generateUUIDv4, generateId, generatePrefixedId } from './uuid'
 &nbsp;
 /**
  * Aliases for backwards compatibility
  * FIXED: Moved require() to top-level import for better performance and consistency
  */
-export function generateSecureRandomId(): string {
-  return generateUUIDv4()
+export function <span class="fstat-no" title="function not covered" >generateSecureRandomId(</span>): string {
+<span class="cstat-no" title="statement not covered" >  return generateUUIDv4()</span>
 }
 &nbsp;
 /**
@@ -244,7 +244,7 @@ export function <span class="fstat-no" title="function not covered" >generateNon
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-21T19:31:51.002Z
+                at 2026-10-21T19:42:37.472Z
             </div>
         <script src="../prettify.js"></script>
         <script>

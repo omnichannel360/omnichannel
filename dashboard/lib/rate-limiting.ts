@@ -263,6 +263,15 @@ export const rateLimiters = {
     windowMs: 60 * 1000, // 1 minute
     keyGenerator: userKeyGenerator,
   }),
+
+  // Health check - public endpoint with lenient limit
+  // SECURITY: Health checks are public and used for monitoring/load balancing
+  // Lenient rate limit to avoid blocking health checks during incidents
+  health: createRateLimiter({
+    maxRequests: 100,
+    windowMs: 60 * 1000, // 1 minute
+    keyGenerator: defaultKeyGenerator, // Rate limit by IP, not user
+  }),
 }
 
 /**
