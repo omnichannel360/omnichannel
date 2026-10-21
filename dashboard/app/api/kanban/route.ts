@@ -168,7 +168,7 @@ const kanbanHandlers = protectRouteMulti(
 
       try {
         // Validate body against schema
-        const bodyResult = await validateBody<any>(request, KanbanItemSchema)
+        const bodyResult = await validateBody<KanbanItem>(request, KanbanItemSchema)
         if (!bodyResult.success) {
           return bodyResult.response
         }
@@ -192,13 +192,13 @@ const kanbanHandlers = protectRouteMulti(
           )
         }
 
-        const updates: any = {}
+        const updates: Partial<Omit<Task, 'id'>> = {}
         if (title !== undefined) updates.title = title
         if (status !== undefined) updates.status = status
 
         // Atomic operation: load → find → update → save in single critical section
         // Track the updated task for response
-        let updatedTaskResult: Task
+        let updatedTaskResult: Task | null = null
 
         await atomicUpdate<Task[]>(DATA_FILE, async (tasks) => {
           const workingTasks = tasks.length ? tasks : DEFAULT_TASKS
@@ -219,6 +219,11 @@ const kanbanHandlers = protectRouteMulti(
           return [...workingTasks.slice(0, taskIndex), updatedTask, ...workingTasks.slice(taskIndex + 1)]
         }, DEFAULT_TASKS)
 
+        // Guaranteed non-null because atomicUpdate throws if task not found
+        if (updatedTaskResult === null) {
+          throw new Error('Internal error: task update failed')
+        }
+
         logger.info('Task updated successfully', {
           ...logContext,
           statusCode: 200,
@@ -227,7 +232,7 @@ const kanbanHandlers = protectRouteMulti(
           fieldsUpdated: Object.keys(updates),
         })
 
-        const response = NextResponse.json(createSuccessResponse(updatedTaskResult!, requestId))
+        const response = NextResponse.json(createSuccessResponse(updatedTaskResult, requestId))
         response.headers.set('x-correlation-id', requestId)
         return response
       } catch (error) {
@@ -306,7 +311,7 @@ const kanbanHandlers = protectRouteMulti(
 
       try {
         // Atomic operation: load → filter → save in single critical section
-        await atomicUpdate<Task[], void>(DATA_FILE, async (tasks) => {
+        await atomicUpdate<Task[]>(DATA_FILE, async (tasks) => {
           const workingTasks = tasks.length ? tasks : DEFAULT_TASKS
           const filtered = workingTasks.filter(t => t.id !== id)
 
@@ -314,8 +319,8 @@ const kanbanHandlers = protectRouteMulti(
             throw new Error('Task not found')
           }
 
-          return { updated: filtered, result: undefined }
-        })
+          return filtered
+        }, DEFAULT_TASKS)
 
         logger.info('Task deleted successfully', {
           ...logContext,

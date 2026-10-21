@@ -129,10 +129,12 @@ const conductorHandlers = protectRouteMulti(
   {
     POST: async (request: NextRequest, { userId }) => {
       const startTime = Date.now()
+      const requestId = extractCorrelationFromRequest(request)
       const logContext = createLogContext({
         method: request.method,
         path: request.nextUrl.pathname,
         operation: 'dispatch_task',
+        requestId,
       })
 
       // Apply rate limiting
@@ -155,7 +157,7 @@ const conductorHandlers = protectRouteMulti(
 
         const { message } = bodyResult.data
 
-        const registry = await loadSkillRegistry()
+        const registry = await loadSkillRegistry(requestId)
         const skillId = findMatchingSkill(message, registry)
         const task = parseTaskFromMessage(message)
 
@@ -173,7 +175,7 @@ const conductorHandlers = protectRouteMulti(
           response = `Processing: ${task.action}. No specific agents assigned. Awaiting clarification.`
         }
 
-        const logs = await loadLogs()
+        const logs = await loadLogs(requestId)
         logs.push({
           timestamp: new Date().toISOString(),
           userMessage: message,
@@ -215,10 +217,12 @@ const conductorHandlers = protectRouteMulti(
 
     GET: async (request: NextRequest, { userId }) => {
       const startTime = Date.now()
+      const requestId = extractCorrelationFromRequest(request)
       const logContext = createLogContext({
         method: request.method,
         path: request.nextUrl.pathname,
         operation: 'load_conductor_logs',
+        requestId,
       })
 
       // Apply rate limiting
@@ -233,7 +237,7 @@ const conductorHandlers = protectRouteMulti(
       }
 
       try {
-        const logs = await loadLogs()
+        const logs = await loadLogs(requestId)
         logger.info('Conductor logs loaded successfully', {
           ...logContext,
           userId,
