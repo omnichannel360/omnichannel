@@ -3,9 +3,20 @@
  * Uses crypto.getRandomValues() when available, falls back to Math.random()
  */
 
+import type { Logger } from './logger'
 import { createLogger } from './logger'
 
-const logger = createLogger('uuid')
+let logger: Logger | null = null
+
+/**
+ * Lazy-load logger to avoid circular dependency with logger.ts
+ */
+function getLogger(): Logger {
+  if (!logger) {
+    logger = createLogger('uuid')
+  }
+  return logger
+}
 
 export function generateUUIDv4(): string {
   // Use native crypto.getRandomValues if available (Node.js 15+, modern browsers)
@@ -31,7 +42,7 @@ export function generateUUIDv4(): string {
   // Fallback for environments without crypto.getRandomValues
   // This is less secure but ensures the function works everywhere
   // WARNING: NOT cryptographically secure, use only as last resort
-  logger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. Consider using Node.js 15+ or modern browser crypto APIs.')
+  getLogger().warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. Consider using Node.js 15+ or modern browser crypto APIs.')
   const placeholder = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
   return placeholder.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0

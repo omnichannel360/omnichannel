@@ -47,6 +47,15 @@ export const AlertStatusSchema = z.enum(['active', 'resolved'])
 export const HealthStatusSchema = z.enum(['healthy', 'degraded', 'unhealthy'])
 export const ComponentStatusSchema = z.enum(['operational', 'no_activity', 'logging', 'inactive', 'loaded', 'missing'])
 
+// Health query parameters: optional detailed flag for verbose health check info
+export const HealthQuerySchema = z.object({
+  detailed: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((val) => val === 'true'),
+})
+
 export const MeetingRequestSchema = z.object({
   message: z.string().optional(),
   meeting_type: MeetingTypeSchema.optional(),

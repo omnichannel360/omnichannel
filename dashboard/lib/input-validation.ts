@@ -299,16 +299,6 @@ export function validateRequestSize(request: NextRequest): boolean {
 export function validateQuerySize(url: URL): boolean {
   return url.search.length <= MAX_QUERY_STRING_SIZE
 }
-  } catch (error) {
-    return {
-      success: false,
-      errors: [{
-        field: 'body',
-        message: 'Invalid request body format',
-      }],
-    }
-  }
-}
 
 /**
  * Validates query parameters against a Zod schema

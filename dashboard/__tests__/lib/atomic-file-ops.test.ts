@@ -222,10 +222,10 @@ describe('atomic-file-ops', () => {
           atomicUpdate<Data, string>(testFile, (current) => {
             const updated = {
               ...current,
-              operations: [...current.operations, \write_\$\{i\}\],
+              operations: [...current.operations, `write_${i}`],
               lastTimestamp: Date.now(),
             }
-            return { updated, result: \write_\$\{i\}\ }
+            return { updated, result: `write_${i}` }
           })
         )
       }
@@ -355,7 +355,7 @@ describe('file-lock', () => {
       const staleDir = path.join(os.tmpdir(), '.file-locks')
       const crypto = require('crypto')
       const hash = crypto.createHash('sha256').update(testFile).digest('hex')
-      const staleLockPath = path.join(staleDir, \\$\{hash}.lock\)
+      const staleLockPath = path.join(staleDir, `${hash}.lock`)
 
       await fs.mkdir(staleDir, { recursive: true })
       await fs.writeFile(

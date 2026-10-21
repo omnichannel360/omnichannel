@@ -100,7 +100,6 @@ async function calculateActualMetrics(): Promise<Metrics> {
 
     // Calculate performance metrics
     const successCount = meetingsLog.filter(m => m.status === 'completed').length
-    const failureCount = meetingsLog.filter(m => m.status === 'failed').length
     const totalMeetings = meetingsLog.length
     const successRate = totalMeetings > 0 ? successCount / totalMeetings : 1.0
 
@@ -136,8 +135,9 @@ async function calculateActualMetrics(): Promise<Metrics> {
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    logger.error('Failed to calculate actual metrics, using defaults', { message: errorMessage }, {
+    logger.error('Failed to calculate actual metrics, using defaults', {
       operation: 'calculate_actual_metrics',
+      errorMessage,
     })
 
     // Return safe defaults if calculation fails (using shared getConfigValue function)
@@ -225,11 +225,12 @@ export const GET = protectRoute(
       return response
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error('Metrics retrieval failed', { message: errorMessage }, {
+      logger.error('Metrics retrieval failed', {
         ...logContext,
         userId,
         statusCode: 500,
         responseTimeMs: Date.now() - startTime,
+        errorMessage,
       })
 
       return NextResponse.json(

@@ -12,10 +12,11 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
     "@types/jsonwebtoken": "^9.0.5",
-    "jose": "^6.2.13",
     "jsonwebtoken": "^9.0.3",
     "next": "^16.4.2",
+    "next-auth": "^4.24.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-force-graph-2d": "^1.25.0",
@@ -23,6 +24,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@jest/globals": "^30.5.2",
     "@types/jest": "^29.5.14",
     "@types/node": "20.17.6",
     "@types/react": "18.3.31",

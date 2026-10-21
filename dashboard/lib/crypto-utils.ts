@@ -4,9 +4,20 @@
  * NOTE: Fallback to Math.random is NOT cryptographically secure
  */
 
+import type { Logger } from './logger'
 import { createLogger } from './logger'
 
-const logger = createLogger('crypto-utils')
+let logger: Logger | null = null
+
+/**
+ * Lazy-load logger to avoid circular dependency with logger.ts
+ */
+function getLogger(): Logger {
+  if (!logger) {
+    logger = createLogger('crypto-utils')
+  }
+  return logger
+}
 
 /**
  * Generate a cryptographically secure random ID
@@ -33,7 +44,7 @@ export function generateSecureRandomId(): string {
 
   // FALLBACK: This is NOT cryptographically secure
   // Use only as last resort; prefer upgrading to Node.js 15+ or using browser APIs
-  logger.warn('[SECURITY] generateSecureRandomId: Using non-secure Math.random() fallback. Consider upgrading Node.js to 15+ or using browser crypto APIs.')
+  getLogger().warn('[SECURITY] generateSecureRandomId: Using non-secure Math.random() fallback. Consider upgrading Node.js to 15+ or using browser crypto APIs.')
   return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 }
 
