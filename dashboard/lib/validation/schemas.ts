@@ -262,6 +262,7 @@ export const MeetingSchema = z.object({
     .optional(),
   attendees: z
     .array(EmailSchema)
+    .min(1, 'At least one attendee is required')
     .optional()
     .default([]),
 })

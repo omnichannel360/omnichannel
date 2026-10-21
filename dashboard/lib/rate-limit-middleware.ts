@@ -20,12 +20,20 @@ import {
 // SECURITY: JWT_SECRET is REQUIRED for secure token verification
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 
-// SECURITY: Validate JWT_SECRET is configured
-if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error(
-    'CRITICAL: JWT_SECRET or NEXTAUTH_SECRET not configured in production. ' +
-    'JWT verification will fail. Ensure environment variables are set.'
-  )
+// SECURITY: Validate JWT_SECRET is configured in production
+// CRITICAL: Startup fails if JWT_SECRET missing in production (prevent weak fallback security)
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'CRITICAL: JWT_SECRET or NEXTAUTH_SECRET not configured in production. ' +
+      'Application cannot start. Ensure environment variables are set before deployment.'
+    )
+  } else {
+    console.warn(
+      'WARNING: JWT_SECRET or NEXTAUTH_SECRET not configured in development. ' +
+      'JWT verification will skip signature validation (development only).'
+    )
+  }
 }
 
 /**

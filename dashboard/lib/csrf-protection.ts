@@ -156,8 +156,21 @@ export async function validateCsrfMiddleware(
 
 /**
  * Get current CSRF token from cookies (for responses)
+ * SECURITY: Returns the CSRF token that should be sent by the client in future requests
+ * This is typically called after setCsrfTokenCookie to provide token to client
+ *
+ * @param response - Next.js response object
+ * @returns CSRF token value to send to client, or null if not set
  */
 export function getCsrfTokenFromResponse(response: NextResponse): string | null {
-  // Cookies are set but not directly readable; generate new for client
-  return null
+  // Extract the CSRF token from the Set-Cookie headers if it was just set
+  const setCookieHeader = response.headers.get('set-cookie')
+  if (!setCookieHeader || !setCookieHeader.includes(CSRF_COOKIE_NAME)) {
+    return null
+  }
+
+  // Extract token value from cookie string
+  // Cookie format: __Host-csrf=<token>; HttpOnly; ...
+  const match = setCookieHeader.match(new RegExp(`${CSRF_COOKIE_NAME}=([^;]+)`))
+  return match ? match[1] : null
 }
