@@ -23,7 +23,7 @@ describe('Input Validation - Authentication', () => {
     test('valid login request', () => {
       const input = {
         email: 'user@example.com',
-        password: 'password123',
+        password: 'ValidPass@123',
       }
       const result = LoginRequestSchema.safeParse(input)
       expect(result.success).toBe(true)
@@ -35,7 +35,7 @@ describe('Input Validation - Authentication', () => {
     test('invalid email format', () => {
       const input = {
         email: 'not-an-email',
-        password: 'password123',
+        password: 'ValidPass@123',
       }
       const result = LoginRequestSchema.safeParse(input)
       expect(result.success).toBe(false)
@@ -61,7 +61,7 @@ describe('Input Validation - Authentication', () => {
     test('email normalization (lowercase + trim)', () => {
       const input = {
         email: '  USER@EXAMPLE.COM  ',
-        password: 'password123',
+        password: 'ValidPass@123',
       }
       const result = LoginRequestSchema.safeParse(input)
       expect(result.success).toBe(true)
@@ -437,7 +437,7 @@ describe('Type Inference', () => {
     type LoginRequest = z.infer<typeof LoginRequestSchema>
     const data: LoginRequest = {
       email: 'user@example.com',
-      password: 'password123',
+      password: 'ValidPass@123',
     }
     expect(data.email).toBeDefined()
     expect(data.password).toBeDefined()

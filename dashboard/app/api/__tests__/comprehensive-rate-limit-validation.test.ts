@@ -274,7 +274,7 @@ describe('Comprehensive Rate Limiting & Input Validation', () => {
       it('should accept valid login request', () => {
         const validPayload = {
           email: 'test@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
         }
         const result = LoginRequestSchema.safeParse(validPayload)
         expect(result.success).toBe(true)

@@ -159,9 +159,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id
         token.email = user.email
-        token.role = (user as any).role || 'user'
-        token.accessToken = (user as any).accessToken
-        token.refreshToken = (user as any).refreshToken
+        token.role = (user as unknown as { role?: string }).role || 'user'
+        token.accessToken = (user as unknown as { accessToken?: string }).accessToken || ''
+        token.refreshToken = (user as unknown as { refreshToken?: string }).refreshToken
         token.expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60
       }
 
@@ -170,7 +170,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           if (token.refreshToken) {
             // Verify refresh token is still valid
-            const refreshPayload = jwt.verify(token.refreshToken, JWT_SECRET) as any
+            const refreshPayload = jwt.verify(token.refreshToken, JWT_SECRET) as JWTPayload
 
             // Generate new access token
             token.accessToken = generateAccessToken(token.sub, token.email, token.role)

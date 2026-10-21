@@ -51,7 +51,7 @@ describe('Email Validation', () => {
 
 describe('Password Validation', () => {
   it('accepts valid weak passwords', () => {
-    expect(PasswordSchemaWeak.safeParse('password123').success).toBe(true)
+    expect(PasswordSchemaWeak.safeParse('ValidPass@123').success).toBe(true)
   })
 
   it('rejects passwords that are too short', () => {
@@ -129,14 +129,14 @@ describe('Login Request Validation', () => {
   it('accepts valid login requests', () => {
     const result = LoginRequestSchema.safeParse({
       email: 'user@example.com',
-      password: 'password123',
+      password: 'ValidPass@123',
     })
     expect(result.success).toBe(true)
   })
 
   it('rejects requests with missing email', () => {
     const result = LoginRequestSchema.safeParse({
-      password: 'password123',
+      password: 'ValidPass@123',
     })
     expect(result.success).toBe(false)
   })
@@ -151,7 +151,7 @@ describe('Login Request Validation', () => {
   it('rejects requests with invalid email format', () => {
     const result = LoginRequestSchema.safeParse({
       email: 'not-an-email',
-      password: 'password123',
+      password: 'ValidPass@123',
     })
     expect(result.success).toBe(false)
   })

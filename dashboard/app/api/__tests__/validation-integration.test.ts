@@ -25,7 +25,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should infer correct LoginRequest type', () => {
       const data: LoginRequest = {
         email: 'user@example.com',
-        password: 'password123',
+        password: 'ValidPass@123',
       }
       const result = LoginRequestSchema.safeParse(data)
       expect(result.success).toBe(true)
@@ -58,7 +58,7 @@ describe('Validation Integration & Type Inference', () => {
       // This tests that TS would catch missing required fields
       const validData: LoginRequest = {
         email: 'user@example.com',
-        password: 'password123',
+        password: 'ValidPass@123',
       }
       expect(validData).toBeDefined()
     })
@@ -68,7 +68,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should narrow unknown to typed object after validation', () => {
       const input: unknown = {
         email: 'user@example.com',
-        password: 'password123',
+        password: 'ValidPass@123',
       }
       const result = LoginRequestSchema.safeParse(input)
       if (result.success) {
@@ -100,7 +100,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should transform uppercase to lowercase', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'USER@EXAMPLE.COM',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(true)
       if (result.success) {
@@ -111,7 +111,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should transform mixed case to lowercase', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'User@Example.Com',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(true)
       if (result.success) {
@@ -124,7 +124,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should trim leading whitespace from email', () => {
       const result = LoginRequestSchema.safeParse({
         email: '  user@example.com',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(true)
       if (result.success) {
@@ -135,7 +135,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should trim trailing whitespace from email', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'user@example.com  ',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(true)
       if (result.success) {
@@ -146,7 +146,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should trim both leading and trailing whitespace', () => {
       const result = LoginRequestSchema.safeParse({
         email: '  user@example.com  ',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(true)
       if (result.success) {
@@ -212,7 +212,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should apply email transform within nested schema', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'USER@EXAMPLE.COM',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(true)
       if (result.success) {
@@ -229,7 +229,7 @@ describe('Validation Integration & Type Inference', () => {
     it('should include custom error message for invalid email', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'not-an-email',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -314,7 +314,7 @@ describe('Validation Integration & Type Inference', () => {
       // User enters credentials with whitespace and mixed case
       const userInput = {
         email: '  USER@EXAMPLE.COM  ',
-        password: 'password123',
+        password: 'ValidPass@123',
       }
 
       const result = LoginRequestSchema.safeParse(userInput)
@@ -323,7 +323,7 @@ describe('Validation Integration & Type Inference', () => {
       if (result.success) {
         // Server receives properly normalized data
         expect(result.data.email).toBe('user@example.com')
-        expect(result.data.password).toBe('password123')
+        expect(result.data.password).toBe('ValidPass@123')
       }
     })
 
@@ -485,7 +485,7 @@ describe('Validation Integration & Type Inference', () => {
       for (let i = 0; i < iterations; i++) {
         LoginRequestSchema.safeParse({
           email: 'user@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
         })
       }
 

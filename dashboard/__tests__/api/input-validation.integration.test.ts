@@ -82,7 +82,7 @@ describe('Input Validation Integration Tests', () => {
    */
   describe('Password Validation', () => {
     it('should validate correct password format (weak schema)', () => {
-      const result = PasswordSchemaWeak.safeParse('password123')
+      const result = PasswordSchemaWeak.safeParse('ValidPass@123')
       expect(result.success).toBe(true)
     })
 
@@ -105,7 +105,7 @@ describe('Input Validation Integration Tests', () => {
     it('should trim whitespace from password', () => {
       const result = PasswordSchemaWeak.safeParse('  password123  ')
       expect(result.success).toBe(true)
-      expect(result.data).toBe('password123')
+      expect(result.data).toBe('ValidPass@123')
     })
   })
 
@@ -116,14 +116,14 @@ describe('Input Validation Integration Tests', () => {
     it('should validate correct login request', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'test@example.com',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(true)
     })
 
     it('should reject login request with missing email', () => {
       const result = LoginRequestSchema.safeParse({
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(false)
     })
@@ -138,7 +138,7 @@ describe('Input Validation Integration Tests', () => {
     it('should reject login request with invalid email', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'not-an-email',
-        password: 'password123',
+        password: 'ValidPass@123',
       })
       expect(result.success).toBe(false)
     })
@@ -146,7 +146,7 @@ describe('Input Validation Integration Tests', () => {
     it('should reject login request with extra fields (strict mode)', () => {
       const result = LoginRequestSchema.safeParse({
         email: 'test@example.com',
-        password: 'password123',
+        password: 'ValidPass@123',
         extra: 'field',
       })
       expect(result.success).toBe(false)

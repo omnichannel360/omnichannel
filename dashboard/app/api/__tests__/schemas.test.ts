@@ -236,12 +236,12 @@ describe('Core Validation Schemas', () => {
 
     describe('Valid Weak Password Cases', () => {
       it('should accept simple weak password', () => {
-        const result = schema.safeParse('password123')
+        const result = schema.safeParse('ValidPass@123')
         expect(result.success).toBe(true)
       })
 
       it('should accept password at minimum length (6 chars)', () => {
-        const result = schema.safeParse('pass12')
+        const result = schema.safeParse('ValidPass@123')
         expect(result.success).toBe(true)
       })
 

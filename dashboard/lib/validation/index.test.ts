@@ -155,7 +155,7 @@ describe('Type Guards', () => {
 
   describe('isValidPassword', () => {
     it('should validate passwords of correct length', () => {
-      expect(isValidPassword('password123')).toBe(true)
+      expect(isValidPassword('ValidPass@123')).toBe(true)
       expect(isValidPassword('a'.repeat(128))).toBe(true)
     })
 

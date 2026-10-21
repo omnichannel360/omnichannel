@@ -51,7 +51,7 @@ describe('Input Validation - Email Schema', () => {
 
 describe('Input Validation - Password Schema', () => {
   it('should validate strong passwords', () => {
-    expect(PasswordSchemaWeak.safeParse('TestPass123').success).toBe(true)
+    expect(PasswordSchemaWeak.safeParse('ValidPass@123').success).toBe(true)
   })
 
   it('should reject passwords below min length', () => {
@@ -110,14 +110,14 @@ describe('Input Validation - Login Request', () => {
   it('should validate correct login requests', () => {
     const result = LoginRequestSchema.safeParse({
       email: 'user@example.com',
-      password: 'TestPass123',
+      password: 'ValidPass@123',
     })
     expect(result.success).toBe(true)
   })
 
   it('should reject missing email', () => {
     const result = LoginRequestSchema.safeParse({
-      password: 'TestPass123',
+      password: 'ValidPass@123',
     })
     expect(result.success).toBe(false)
   })
@@ -132,7 +132,7 @@ describe('Input Validation - Login Request', () => {
   it('should reject invalid email format', () => {
     const result = LoginRequestSchema.safeParse({
       email: 'invalid-email',
-      password: 'TestPass123',
+      password: 'ValidPass@123',
     })
     expect(result.success).toBe(false)
   })
@@ -140,7 +140,7 @@ describe('Input Validation - Login Request', () => {
   it('should convert email to lowercase', () => {
     const result = LoginRequestSchema.safeParse({
       email: 'User@EXAMPLE.COM',
-      password: 'TestPass123',
+      password: 'ValidPass@123',
     })
     expect(result.success).toBe(true)
     if (result.success) {

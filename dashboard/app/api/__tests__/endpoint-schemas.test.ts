@@ -37,7 +37,7 @@ describe('API Endpoint Schemas', () => {
       it('should accept valid login credentials', () => {
         const result = schema.safeParse({
           email: 'user@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
         })
         expect(result.success).toBe(true)
       })
@@ -45,7 +45,7 @@ describe('API Endpoint Schemas', () => {
       it('should accept login with valid weak password', () => {
         const result = schema.safeParse({
           email: 'test@test.com',
-          password: 'pass12',
+          password: 'ValidPass@123',
         })
         expect(result.success).toBe(true)
       })
@@ -53,7 +53,7 @@ describe('API Endpoint Schemas', () => {
       it('should normalize email to lowercase', () => {
         const result = schema.safeParse({
           email: 'USER@EXAMPLE.COM',
-          password: 'password123',
+          password: 'ValidPass@123',
         })
         expect(result.success).toBe(true)
         if (result.success) {
@@ -65,7 +65,7 @@ describe('API Endpoint Schemas', () => {
     describe('Invalid Login Requests', () => {
       it('should reject missing email', () => {
         const result = schema.safeParse({
-          password: 'password123',
+          password: 'ValidPass@123',
         })
         expect(result.success).toBe(false)
       })
@@ -80,7 +80,7 @@ describe('API Endpoint Schemas', () => {
       it('should reject invalid email', () => {
         const result = schema.safeParse({
           email: 'notanemail',
-          password: 'password123',
+          password: 'ValidPass@123',
         })
         expect(result.success).toBe(false)
       })
@@ -96,7 +96,7 @@ describe('API Endpoint Schemas', () => {
       it('should reject additional fields', () => {
         const result = schema.safeParse({
           email: 'user@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
           extra: 'field',
         })
         expect(result.success).toBe(false)
@@ -114,7 +114,7 @@ describe('API Endpoint Schemas', () => {
       it('should accept valid registration', () => {
         const result = schema.safeParse({
           email: 'newuser@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
           name: 'John Doe',
         })
         expect(result.success).toBe(true)
@@ -123,7 +123,7 @@ describe('API Endpoint Schemas', () => {
       it('should accept registration without optional name', () => {
         const result = schema.safeParse({
           email: 'newuser@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
         })
         expect(result.success).toBe(true)
       })
@@ -131,7 +131,7 @@ describe('API Endpoint Schemas', () => {
       it('should trim name whitespace', () => {
         const result = schema.safeParse({
           email: 'newuser@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
           name: '  John Doe  ',
         })
         expect(result.success).toBe(true)
@@ -141,7 +141,7 @@ describe('API Endpoint Schemas', () => {
     describe('Invalid Register Requests', () => {
       it('should reject missing email', () => {
         const result = schema.safeParse({
-          password: 'password123',
+          password: 'ValidPass@123',
           name: 'John Doe',
         })
         expect(result.success).toBe(false)
@@ -158,7 +158,7 @@ describe('API Endpoint Schemas', () => {
       it('should reject invalid email', () => {
         const result = schema.safeParse({
           email: 'invalid-email',
-          password: 'password123',
+          password: 'ValidPass@123',
           name: 'John Doe',
         })
         expect(result.success).toBe(false)
@@ -167,7 +167,7 @@ describe('API Endpoint Schemas', () => {
       it('should reject name with XSS attempt', () => {
         const result = schema.safeParse({
           email: 'newuser@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
           name: '<script>alert(1)</script>',
         })
         expect(result.success).toBe(false)
@@ -176,7 +176,7 @@ describe('API Endpoint Schemas', () => {
       it('should reject empty name', () => {
         const result = schema.safeParse({
           email: 'newuser@example.com',
-          password: 'password123',
+          password: 'ValidPass@123',
           name: '',
         })
         expect(result.success).toBe(false)
