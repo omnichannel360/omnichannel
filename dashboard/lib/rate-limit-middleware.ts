@@ -104,6 +104,23 @@ export function withRateLimit(
 }
 
 /**
+ * Validate session cookie format
+ * Accepts UUID or standard JWT format
+ */
+function isValidSessionCookie(value: string): boolean {
+  if (!value) return false
+
+  // Check format: UUID or JWT (3 parts separated by dots)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  const isJWT = /^[A-Za-z0-9_-]{20,}\./.test(value) // Starts like JWT
+
+  // Maximum reasonable length (512 chars)
+  if (value.length > 512) return false
+
+  return isUUID || isJWT
+}
+
+/**
  * Extract user ID from request (from auth token or session)
  * SECURITY: Always validate/decode token before using for rate limiting
  */
@@ -124,11 +141,33 @@ function extractUserId(request: NextRequest): string | undefined {
   // Try to get from cookie
   const sessionCookie = request.cookies.get('auth')
   if (sessionCookie?.value) {
-    // SECURITY: Only use if it's a session cookie with server-side validation
+    // SECURITY: Validate session cookie format
+    if (!isValidSessionCookie(sessionCookie.value)) {
+      return undefined // Invalid format → fall back to IP-based limiting
+    }
     return sessionCookie.value
   }
 
   return undefined
+}
+
+/**
+ * Validate API key format
+ * Assumes keys are at least 12 characters (adjust based on your spec)
+ */
+function isValidApiKey(key: string): boolean {
+  if (!key) return false
+
+  // Minimum 12 characters
+  if (key.length < 12) return false
+
+  // Maximum 256 characters
+  if (key.length > 256) return false
+
+  // Should be alphanumeric + underscore/hyphen (adjust if you allow symbols)
+  if (!/^[a-zA-Z0-9_-]{12,256}$/.test(key)) return false
+
+  return true
 }
 
 /**
@@ -138,12 +177,24 @@ function extractApiKey(request: NextRequest): string | undefined {
   // Try Authorization header with ApiKey scheme
   const authHeader = request.headers.get('authorization')
   if (authHeader?.startsWith('ApiKey ')) {
-    return authHeader.substring(7)
+    const key = authHeader.substring(7)
+
+    // SECURITY: Validate API key format
+    if (!isValidApiKey(key)) {
+      return undefined // Invalid format → fall back to IP-based limiting
+    }
+
+    return key
   }
 
   // Try X-API-Key header
   const apiKeyHeader = request.headers.get('x-api-key')
   if (apiKeyHeader) {
+    // SECURITY: Validate API key format
+    if (!isValidApiKey(apiKeyHeader)) {
+      return undefined
+    }
+
     return apiKeyHeader
   }
 

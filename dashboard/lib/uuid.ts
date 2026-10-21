@@ -25,7 +25,19 @@ function getLogger() {
 }
 
 export function generateUUIDv4(): string {
-  // Use native crypto.getRandomValues if available (Node.js 15+, modern browsers)
+  // PRIORITY 1: Use Node.js native crypto.randomUUID() (fastest, most secure)
+  // Available in Node.js 15.7+, uses OS entropy pool
+  try {
+    // eslint-disable-next-line global-require
+    const { randomUUID } = require('crypto')
+    if (typeof randomUUID === 'function') {
+      return randomUUID()
+    }
+  } catch {
+    // Fall through to next option
+  }
+
+  // PRIORITY 2: Use browser/universal crypto.getRandomValues (modern browsers)
   if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) {
     const array = new Uint8Array(16)
     globalThis.crypto.getRandomValues(array)
@@ -45,13 +57,11 @@ export function generateUUIDv4(): string {
     ].join('-')
   }
 
-  // Fallback for environments without crypto.getRandomValues
-  // This is less secure but ensures the function works everywhere
-  // WARNING: NOT cryptographically secure, use only as last resort
+  // PRIORITY 3: Fallback for environments without crypto (development only)
+  // This is NOT cryptographically secure, use only as last resort
   const fallbackLogger = getLogger()
-  if (fallbackLogger) {
-    fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. Consider using Node.js 15+ or modern browser crypto APIs.')
-  }
+  fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. Consider using Node.js 15+ or modern browser crypto APIs.')
+
   const placeholder = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
   return placeholder.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0
