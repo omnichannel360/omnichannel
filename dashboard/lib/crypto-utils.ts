@@ -4,17 +4,29 @@
  * NOTE: Fallback to Math.random is NOT cryptographically secure
  */
 
-import type { Logger } from './logger'
-import { createLogger } from './logger'
-
-let logger: Logger | null = null
-
-/**
- * Lazy-load logger to avoid circular dependency with logger.ts
- */
-function getLogger(): Logger {
+// Use dynamic require to avoid circular dependency with logger
+let logger: any = null
+function getLogger() {
   if (!logger) {
-    logger = createLogger('crypto-utils')
+    try {
+      const loggerModule = require('./logger')
+      logger = loggerModule.createLogger('crypto-utils')
+    } catch {
+      // Fallback if logger cannot be loaded - create minimal structured logger
+      logger = {
+        warn: (message: string, context?: any) => {
+          const timestamp = new Date().toISOString()
+          const logEntry = { timestamp, level: 'WARN', module: 'crypto-utils', message, ...context }
+          // Write to stderr to avoid mixing with stdout
+          if (typeof process !== 'undefined' && process.stderr) {
+            process.stderr.write(JSON.stringify(logEntry) + '\n')
+          } else if (typeof console !== 'undefined') {
+            // Browser fallback - still use console but structured
+            console.warn('[WARN]', logEntry)
+          }
+        }
+      }
+    }
   }
   return logger
 }

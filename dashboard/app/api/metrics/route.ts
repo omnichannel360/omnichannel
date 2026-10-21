@@ -12,6 +12,11 @@ import { atomicRead } from '@/lib/atomic-file-ops'
 const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.metrics)
 const logger = createLogger('metrics-api')
 
+// Configuration defaults for consistency across all code paths
+const METRICS_DEFAULTS = {
+  AVG_TASK_COMPLETION_MINUTES: 12,
+} as const
+
 export interface Metrics {
   finance: {
     revenue: number
@@ -108,7 +113,9 @@ async function calculateActualMetrics(): Promise<Metrics> {
     const avgTaskCompletionMs = completedMeetings.length > 0
       ? completedMeetings.reduce((sum, m) => sum + (m.duration_ms ?? 0), 0) / completedMeetings.length
       : 0
-    const avgTaskCompletionMinutes = Math.round(avgTaskCompletionMs / 60000 * 10) / 10
+    const avgTaskCompletionMinutes = avgTaskCompletionMs > 0
+      ? Math.round(avgTaskCompletionMs / 60000 * 10) / 10
+      : getConfigValue('METRICS_AVG_TASK_COMPLETION_MINUTES', METRICS_DEFAULTS.AVG_TASK_COMPLETION_MINUTES)
 
     // Return calculated metrics
     return {
@@ -130,14 +137,12 @@ async function calculateActualMetrics(): Promise<Metrics> {
       user_activity: {
         active_users: getConfigValue('METRICS_ACTIVE_USERS', 23),
         total_meetings_processed: totalMeetings, // Actual: loaded from meetings-log
-        avg_task_completion_time_minutes: avgTaskCompletionMinutes > 0 ? avgTaskCompletionMinutes : 12.5,
+        avg_task_completion_time_minutes: avgTaskCompletionMinutes,
       },
     }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    logger.error('Failed to calculate actual metrics, using defaults', {
+    logger.error('Failed to calculate actual metrics, using defaults', error, {
       operation: 'calculate_actual_metrics',
-      errorMessage,
     })
 
     // Return safe defaults if calculation fails (using shared getConfigValue function)
@@ -160,7 +165,7 @@ async function calculateActualMetrics(): Promise<Metrics> {
       user_activity: {
         active_users: getConfigValue('METRICS_ACTIVE_USERS', 23),
         total_meetings_processed: 0,
-        avg_task_completion_time_minutes: 12.5,
+        avg_task_completion_time_minutes: getConfigValue('METRICS_AVG_TASK_COMPLETION_MINUTES', METRICS_DEFAULTS.AVG_TASK_COMPLETION_MINUTES),
       },
     }
   }
@@ -224,13 +229,11 @@ export const GET = protectRoute(
 
       return response
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error('Metrics retrieval failed', {
+      logger.error('Metrics retrieval failed', error, {
         ...logContext,
         userId,
         statusCode: 500,
         responseTimeMs: Date.now() - startTime,
-        errorMessage,
       })
 
       return NextResponse.json(

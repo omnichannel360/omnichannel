@@ -102,8 +102,8 @@ describe('API Security Tests — All Endpoints', () => {
             headers: { 'content-type': 'application/json' }
           })
           // Verification: confirm test setup has no authorization header
-          // NOTE: This is a unit test of request construction. Integration tests calling
-          // actual route handlers are in auth-middleware-integration.test.ts
+          // NOTE: This is a unit test of request construction.
+          // Integration tests with actual route handlers are in auth-middleware-integration.test.ts
           expect(testRequest.headers.get('authorization')).toBeNull()
         })
 

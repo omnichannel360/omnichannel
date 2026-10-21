@@ -181,6 +181,13 @@ async function getSkillRegistryStats(correlationId: string): Promise<number> {
   }
 }
 
+// Alert severity levels - extracted to constants to enable consistent detection
+const ALERT_LEVELS = {
+  INFO: '[INFO]',
+  WARNING: '[WARNING]',
+  ERROR: '[ERROR]',
+} as const
+
 function generateAlerts(
   meetingsProcessed: number,
   successRate: number,
@@ -190,19 +197,19 @@ function generateAlerts(
   const alerts: string[] = []
 
   if (successRate < 0.8) {
-    alerts.push(`⚠️ Keyword dispatch success rate low: ${(successRate * 100).toFixed(1)}%`)
+    alerts.push(`${ALERT_LEVELS.WARNING} Keyword dispatch success rate low: ${(successRate * 100).toFixed(1)}%`)
   }
 
   if (meetingsProcessed === 0) {
-    alerts.push('ℹ️ No meetings processed yet')
+    alerts.push(`${ALERT_LEVELS.INFO} No meetings processed yet`)
   }
 
   if (brainLogCount === 0) {
-    alerts.push('⚠️ Company-brain not logging outcomes')
+    alerts.push(`${ALERT_LEVELS.WARNING} Company-brain not logging outcomes`)
   }
 
   if (skillCount === 0) {
-    alerts.push('❌ Skill registry not found or empty')
+    alerts.push(`${ALERT_LEVELS.ERROR} Skill registry not found or empty`)
   }
 
   return alerts
@@ -256,7 +263,7 @@ export async function GET(request: NextRequest) {
 
     const status: HealthStatus = {
       status:
-        alerts.length === 0 ? 'healthy' : alerts.some(a => a.startsWith('❌')) ? 'unhealthy' : 'degraded',
+        alerts.length === 0 ? 'healthy' : alerts.some(a => a.startsWith(ALERT_LEVELS.ERROR)) ? 'unhealthy' : 'degraded',
       timestamp: new Date().toISOString(),
       components: {
         meetings_api: {
@@ -279,6 +286,9 @@ export async function GET(request: NextRequest) {
       },
       metrics: {
         total_meetings_processed: meetingsStats.count,
+        // NOTE: total_skills_triggered currently reflects meetings with 'scheduled' status
+        // To accurately track skills triggered, would need separate skill execution logs
+        // Future: integrate skill_execution_logs table for actual skill trigger counts
         total_skills_triggered: meetingsStats.success_count,
         success_rate: successRate,
         recent_logs: Math.min(brainStats.count, 10),
