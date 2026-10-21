@@ -4,6 +4,9 @@ import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { HealthStatusResponseSchema, HealthComponentSchema } from '@/lib/validation'
+import { logger, createLogContext, LogContext } from '@/lib/logger'
+import { asyncRoute } from '@/lib/async-route'
+import { getOrCreateCorrelationId } from '@/lib/middleware/error-context'
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy'
@@ -42,11 +45,20 @@ async function getCompanyBrainStats(): Promise<{ count: number; latest: string |
         const content = await fs.readFile(path.join(brainDir, latest), 'utf-8')
         const parsed = JSON.parse(content)
         latestTimestamp = parsed.timestamp
-      } catch {}
+      } catch (error) {
+        logger.warn('Failed to parse company brain latest file', {
+          component: 'company_brain',
+          operation: 'parse_latest_timestamp',
+        })
+      }
     }
 
     return { count: files.length, latest: latestTimestamp }
-  } catch {
+  } catch (error) {
+    logger.error('Failed to get company brain stats', error, {
+      component: 'company_brain',
+      operation: 'get_stats',
+    })
     return { count: 0, latest: null }
   }
 }
@@ -62,11 +74,22 @@ async function getMeetingsLogStats(): Promise<{ count: number; success_count: nu
 
     const content = await fs.readFile(logPath, 'utf-8')
     const logs = JSON.parse(content)
-    if (!Array.isArray(logs)) return { count: 0, success_count: 0 }
+    if (!Array.isArray(logs)) {
+      logger.warn('Meetings log is not an array', {
+        component: 'meetings_api',
+        operation: 'parse_log',
+        actualType: typeof logs,
+      })
+      return { count: 0, success_count: 0 }
+    }
 
     const successCount = logs.filter((l: any) => l.status === 'scheduled').length
     return { count: logs.length, success_count: successCount }
-  } catch {
+  } catch (error) {
+    logger.error('Failed to get meetings log stats', error, {
+      component: 'meetings_api',
+      operation: 'get_stats',
+    })
     return { count: 0, success_count: 0 }
   }
 }
@@ -77,7 +100,11 @@ async function getSkillRegistryStats(): Promise<number> {
     const content = await fs.readFile(regPath, 'utf-8')
     const registry = JSON.parse(content)
     return registry.meeting_skills?.length || 0
-  } catch {
+  } catch (error) {
+    logger.error('Failed to load skill registry', error, {
+      component: 'skill_registry',
+      operation: 'load_registry',
+    })
     return 0
   }
 }
@@ -116,10 +143,20 @@ export async function GET(request: NextRequest) {
 
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
+    logger.warn('Unauthorized health check attempt', {
+      method: request.method,
+      path: request.nextUrl.pathname,
+      error: auth.error,
+    })
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
   const startTime = Date.now()
+  const logContext = createLogContext({
+    method: request.method,
+    path: request.nextUrl.pathname,
+    userId: auth.userId,
+  })
 
   try {
     const [brainStats, meetingsStats, skillCount] = await Promise.all([
@@ -166,17 +203,38 @@ export async function GET(request: NextRequest) {
     // Validate response against schema
     const validated = HealthStatusResponseSchema.safeParse(status)
     if (!validated.success) {
-      console.error('Health response validation failed:', validated.error)
+      logger.error('Health response validation failed', new Error(JSON.stringify(validated.error)), {
+        ...logContext,
+        statusCode: 500,
+        responseTimeMs: Date.now() - startTime,
+      })
       return NextResponse.json(
         { success: false, error: 'Health check response validation failed' },
         { status: 500 }
       )
     }
 
+    const httpStatus = status.status === 'healthy' ? 200 : status.status === 'degraded' ? 200 : 503
+    logger.info('Health check completed', {
+      ...logContext,
+      statusCode: httpStatus,
+      responseTimeMs: Date.now() - startTime,
+      healthStatus: status.status,
+      alertCount: alerts.length,
+    })
+
     return NextResponse.json(validated.data, {
-      status: status.status === 'healthy' ? 200 : status.status === 'degraded' ? 200 : 503,
+      status: httpStatus,
     })
   } catch (error) {
+    const responseTimeMs = Date.now() - startTime
+    logger.error('Health check failed', error, {
+      ...logContext,
+      statusCode: 500,
+      responseTimeMs,
+      operation: 'health_check',
+    })
+
     return NextResponse.json(
       {
         status: 'unhealthy',
