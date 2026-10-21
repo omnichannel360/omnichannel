@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateToken, generateRefreshToken } from '@/lib/auth'
 import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
 import { logger, createLogContext } from '@/lib/logger'
+import { validateBody } from '@/lib/validation/middleware'
+import { TokenGenerationSchema, type TokenGeneration } from '@/lib/validation/schemas'
 
 // Create rate limiter for this endpoint
 const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.auth)
@@ -27,43 +29,18 @@ export async function POST(request: NextRequest) {
     operation: 'auth_token_generation',
   })
 
-  let body: unknown
   try {
-    body = await request.json()
-  } catch (error) {
-    logger.error('Failed to parse auth request body', error, {
-      ...logContext,
-      statusCode: 400,
-      responseTimeMs: Date.now() - startTime,
-    })
-    return NextResponse.json(
-      { error: 'Invalid JSON in request body' },
-      { status: 400 }
-    )
-  }
-
-  try {
-    const { userId, email, role = 'user' } = body as Record<string, unknown>
-
-    // Validate input
-    if (!userId || !email) {
-      logger.warn('Auth request missing required fields', {
-        ...logContext,
-        statusCode: 400,
-        missingFields: {
-          userId: !userId,
-          email: !email,
-        },
-      })
-      return NextResponse.json(
-        { error: 'Missing required fields: userId, email' },
-        { status: 400 }
-      )
+    // Validate request body with Zod schema
+    const bodyResult = await validateBody<TokenGeneration>(request, TokenGenerationSchema)
+    if (!bodyResult.success) {
+      return bodyResult.response
     }
 
+    const { userId, email, role } = bodyResult.data
+
     // Generate tokens
-    const accessToken = await generateToken(userId as string, email as string, role as string, 24 * 60 * 60) // 24 hours
-    const refreshToken = await generateRefreshToken(userId as string, email as string, 7 * 24 * 60 * 60) // 7 days
+    const accessToken = await generateToken(userId, email, role, 24 * 60 * 60) // 24 hours
+    const refreshToken = await generateRefreshToken(userId, email, 7 * 24 * 60 * 60) // 7 days
 
     logger.info('Auth tokens generated successfully', {
       ...logContext,

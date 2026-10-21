@@ -1,12 +1,13 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { z } from 'zod'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { withFileLock } from '@/lib/file-lock'
 import { ensureDataDir } from '@/lib/ensure-dir'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { createLogger, createLogContext } from '@/lib/logger'
+import { validateBody } from '@/lib/validation/middleware'
+import { ConductorRequestSchemaComprehensive, type ConductorRequestMessage } from '@/lib/validation/schemas'
 
 const logger = createLogger('conductor-api')
 
@@ -24,11 +25,6 @@ interface SkillRegistry {
 
 const LOG_FILE = path.join(process.cwd(), 'data', 'conductor-logs.json')
 const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
-
-// Schema validation for conductor request body
-const ConductorMessageSchema = z.object({
-  message: z.string().min(1).max(2000),
-})
 
 async function loadSkillRegistry(): Promise<SkillRegistry | null> {
   try {
@@ -138,40 +134,14 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  let body: unknown
   try {
-    body = await request.json()
-  } catch (error) {
-    logger.warn('Conductor request JSON parse failed', {
-      ...logContext,
-      userId: auth.userId,
-      statusCode: 400,
-      responseTimeMs: Date.now() - startTime,
-    })
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON in request body' },
-      { status: 400 }
-    )
-  }
-
-  try {
-    // Validate body against schema
-    const parsedBody = ConductorMessageSchema.safeParse(body)
-    if (!parsedBody.success) {
-      logger.warn('Conductor validation failed', {
-        ...logContext,
-        userId: auth.userId,
-        statusCode: 400,
-        responseTimeMs: Date.now() - startTime,
-        validationErrors: parsedBody.error.flatten().fieldErrors,
-      })
-      return NextResponse.json(
-        { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
-        { status: 400 }
-      )
+    // Validate request body with comprehensive Zod schema
+    const bodyResult = await validateBody<ConductorRequestMessage>(request, ConductorRequestSchemaComprehensive)
+    if (!bodyResult.success) {
+      return bodyResult.response
     }
 
-    const { message } = parsedBody.data
+    const { message } = bodyResult.data
 
     const registry = await loadSkillRegistry()
     const skillId = findMatchingSkill(message, registry)

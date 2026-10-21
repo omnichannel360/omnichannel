@@ -1,0 +1,36 @@
+﻿COMPREHENSIVE INPUT VALIDATION FIX - TASK BREAKDOWN
+
+SCOPE: Add comprehensive input validation to all OmniCompany API endpoints
+
+API ROUTES TO VALIDATE:
+1. auth/route.ts - POST (generate tokens)
+2. auth/login/route.ts - POST (login) 
+3. auth/verify/route.ts - POST (verify tokens)
+4. health/route.ts - GET (health check)
+5. kanban/route.ts - GET/POST/PUT/DELETE (kanban board)
+6. alerts/route.ts - GET/POST/PUT/DELETE (alerts)
+7. profiles/route.ts - GET/POST/PUT (profiles)
+8. metrics/route.ts - GET (metrics)
+9. brain/route.ts - GET (brain queries)
+10. conductor/route.ts - GET/POST (orchestration)
+11. meetings/route.ts - GET/POST/DELETE (meetings)
+
+CURRENT STATE:
+- validation/middleware.ts exists with Zod utilities
+- input-validation.ts exists with some schemas
+- Inconsistent usage across routes
+- Some routes missing validation entirely
+
+REQUIREMENTS:
+1. Create unified validation schema catalog (all endpoints)
+2. Implement validateBody/validateQuery consistently
+3. Add error handling with proper logging
+4. Create comprehensive test suite (unit + integration)
+5. Ensure security (injection prevention, rate limiting)
+6. Type-safe throughout
+
+CONSTRAINTS:
+- Use Zod for schema validation
+- Maintain existing error logging integration
+- Ensure backward compatibility where possible
+- 80%+ test coverage minimum

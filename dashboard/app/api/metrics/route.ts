@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
 import { createLogger, createLogContext } from '@/lib/logger'
+import { validateQuery } from '@/lib/validation/middleware'
+import { MetricsQuerySchema, type MetricsQuery } from '@/lib/validation/schemas'
 
 // Create rate limiter for this endpoint
 const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.metrics)
@@ -61,6 +63,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Validate query parameters with Zod schema
+    const queryResult = await validateQuery<MetricsQuery>(request, MetricsQuerySchema)
+    if (!queryResult.success) {
+      return queryResult.response
+    }
+
+    const queryData = queryResult.data as Record<string, unknown>
+    // Note: period and format are validated but not currently used in metrics calculation
+    // They can be used when implementing historical metrics
+
     const metrics: Metrics = {
       finance: {
         revenue: 125000,

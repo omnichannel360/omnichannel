@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { atomicUpdate, atomicRead } from '@/lib/atomic-file-ops'
-import { AlertCreateSchema, AlertUpdateSchema, AlertLevelSchema, AlertStatusSchema, generateId } from '@/lib/validation'
+import { generateId } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { logger, createLogContext } from '@/lib/logger'
+import { validateBody } from '@/lib/validation/middleware'
+import { AlertCreateBodySchema, AlertUpdateBodySchema, type AlertCreateBody, type AlertUpdateBody } from '@/lib/validation/schemas'
 import path from 'path'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { validateBody } from '@/lib/validation/middleware'
+import { AlertSchema, type Alert as AlertType } from '@/lib/validation/schemas'
 
 interface Alert {
   id: string
@@ -83,22 +87,15 @@ export async function POST(request: NextRequest) {
   })
 
   try {
-    const body = await request.json()
-    const parsed = AlertCreateSchema.safeParse(body)
-    if (!parsed.success) {
-      logger.warn('Alert creation validation failed', {
-        ...logContext,
-        statusCode: 400,
-        responseTimeMs: Date.now() - startTime,
-        validationErrors: parsed.error.flatten().fieldErrors,
-      })
-      return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
+    const bodyResult = await validateBody<AlertCreateBody>(request, AlertCreateBodySchema)
+    if (!bodyResult.success) {
+      return bodyResult.response
     }
 
     const newAlert: Alert = {
       id: generateId('alert'),
       timestamp: new Date().toISOString(),
-      ...parsed.data,
+      ...bodyResult.data,
       status: 'active',
     }
 
@@ -159,19 +156,12 @@ export async function PATCH(request: NextRequest) {
   })
 
   try {
-    const body = await request.json()
-    const parsed = AlertUpdateSchema.safeParse(body)
-    if (!parsed.success) {
-      logger.warn('Alert update validation failed', {
-        ...logContext,
-        statusCode: 400,
-        responseTimeMs: Date.now() - startTime,
-        validationErrors: parsed.error.flatten().fieldErrors,
-      })
-      return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
+    const bodyResult = await validateBody<AlertUpdateBody>(request, AlertUpdateBodySchema)
+    if (!bodyResult.success) {
+      return bodyResult.response
     }
 
-    const { alert_id, status } = parsed.data
+    const { alert_id, status } = bodyResult.data
 
     const result = await atomicUpdate<Alert[]>(
       ALERTS_FILE,

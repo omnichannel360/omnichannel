@@ -7,6 +7,8 @@ import { atomicReaddir } from '@/lib/atomic-dir-ops'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { generateId } from '@/lib/validation'
 import { createLogger, createLogContext } from '@/lib/logger'
+import { validateQuery } from '@/lib/validation/middleware'
+import { BrainQuerySchema, type BrainQuery } from '@/lib/validation/schemas'
 
 const logger = createLogger('brain-api')
 
@@ -54,9 +56,13 @@ async function getHandler(request: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100)
+    // Validate query parameters with Zod schema
+    const queryResult = await validateQuery<BrainQuery>(request, BrainQuerySchema)
+    if (!queryResult.success) {
+      return queryResult.response
+    }
+
+    const { category, limit } = queryResult.data
 
     // FIX: Use atomicReaddir to prevent race condition
     // - Previous code: fs.stat() → fs.readdir() (race with mkdir/delete)
@@ -109,7 +115,11 @@ async function getHandler(request: NextRequest) {
         }
       } catch (error) {
         const err = error instanceof Error ? error.message : String(error)
-        console.error(`Failed to parse memory file ${file}:`, err)
+        logger.warn(`Failed to parse memory file ${file}`, {
+          file,
+          error: err,
+          operation: 'parse_memory_file',
+        })
       }
     }
 

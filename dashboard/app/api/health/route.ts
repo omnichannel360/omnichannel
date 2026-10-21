@@ -3,7 +3,8 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
-import { HealthStatusResponseSchema, HealthComponentSchema } from '@/lib/validation'
+import { HealthStatusResponseSchema, HealthComponentSchema, HealthQuerySchema } from '@/lib/validation'
+import { validateQuery } from '@/lib/validation/middleware'
 import { logger, createLogContext, LogContext } from '@/lib/logger'
 import { asyncRoute } from '@/lib/async-route'
 import { getOrCreateCorrelationId } from '@/lib/middleware/error-context'
@@ -140,6 +141,12 @@ export async function GET(request: NextRequest) {
   // Apply rate limiting
   const rateLimitError = await applyRateLimit(request, 'health')
   if (rateLimitError) return rateLimitError
+
+  // Validate query parameters
+  const queryResult = await validateQuery(request, HealthQuerySchema)
+  if (!queryResult.success) {
+    return queryResult.response
+  }
 
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {

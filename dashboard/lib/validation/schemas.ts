@@ -230,3 +230,265 @@ export const AlertSchema = z.object({
 })
 
 export type Alert = z.infer<typeof AlertSchema>
+
+// Auth Token Generation: Request body
+export const AuthTokenRequestSchema = z.object({
+  userId: z
+    .string()
+    .min(1, 'User ID is required')
+    .max(100, 'User ID must not exceed 100 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'User ID must contain only alphanumeric characters, underscores, and hyphens'),
+  email: EmailSchema,
+  role: z
+    .enum(['user', 'admin', 'viewer'], {
+      errorMap: () => ({ message: 'Role must be one of: user, admin, viewer' }),
+    })
+    .optional()
+    .default('user'),
+})
+
+export type AuthTokenRequest = z.infer<typeof AuthTokenRequestSchema>
+
+// Conductor: Request body (comprehensive version from schemas)
+export const ConductorRequestSchemaComprehensive = z.object({
+  message: SafeStringSchema.min(1, 'Message is required').max(2000, 'Message must not exceed 2000 characters'),
+  action: SafeStringSchema.optional(),
+  params: z.record(z.unknown()).optional().default({}),
+  timeout: z
+    .number()
+    .int('Timeout must be an integer')
+    .min(100, 'Timeout must be at least 100ms')
+    .max(300000, 'Timeout must not exceed 300000ms (5 minutes)')
+    .optional()
+    .default(30000),
+})
+
+export type ConductorRequestMessage = z.infer<typeof ConductorRequestSchemaComprehensive>
+
+// Auth Token Generation: Request body
+export const TokenGenerationSchema = z.object({
+  userId: z
+    .string()
+    .min(1, 'User ID is required')
+    .max(100, 'User ID must not exceed 100 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'User ID must contain only alphanumeric characters, underscores, and hyphens'),
+  email: EmailSchema,
+  role: z
+    .enum(['user', 'admin', 'viewer'], {
+      errorMap: () => ({ message: 'Role must be one of: user, admin, viewer' }),
+    })
+    .optional()
+    .default('user'),
+})
+
+export type TokenGeneration = z.infer<typeof TokenGenerationSchema>
+
+// ============================================================================
+// ADDITIONAL ENDPOINT SCHEMAS
+// ============================================================================
+
+// Profiles: Get profile query parameters
+export const ProfileQuerySchema = z.object({
+  userId: z
+    .string()
+    .min(1, 'User ID is required')
+    .max(100, 'User ID must not exceed 100 characters')
+    .optional(),
+})
+
+export type ProfileQuery = z.infer<typeof ProfileQuerySchema>
+
+// Profiles: Delete request
+export const ProfileDeleteSchema = z.object({
+  userId: z
+    .string()
+    .min(1, 'User ID is required')
+    .max(100, 'User ID must not exceed 100 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'User ID must contain only alphanumeric characters, underscores, and hyphens'),
+})
+
+export type ProfileDelete = z.infer<typeof ProfileDeleteSchema>
+
+// Auth: Logout request (no required fields, but can have optional body)
+export const LogoutRequestSchema = z.object({
+  revokeToken: z.boolean().optional().default(true),
+})
+
+export type LogoutRequest = z.infer<typeof LogoutRequestSchema>
+
+// Auth: Register request
+export const RegisterRequestSchema = z.object({
+  email: EmailSchema,
+  password: PasswordSchemaWeak, // Using weak schema for development
+  name: SafeStringSchema.min(1, 'Name is required').optional(),
+})
+
+export type RegisterRequest = z.infer<typeof RegisterRequestSchema>
+
+// Alerts: Query parameters
+export const AlertsQuerySchema = z.object({
+  level: z
+    .enum(['info', 'warning', 'critical'], {
+      errorMap: () => ({ message: 'Level must be one of: info, warning, critical' }),
+    })
+    .optional(),
+  status: z
+    .enum(['active', 'resolved'], {
+      errorMap: () => ({ message: 'Status must be one of: active, resolved' }),
+    })
+    .optional(),
+  limit: z
+    .number()
+    .int('Limit must be an integer')
+    .min(1, 'Limit must be at least 1')
+    .max(1000, 'Limit must not exceed 1000')
+    .optional()
+    .default(50),
+  offset: z
+    .number()
+    .int('Offset must be an integer')
+    .min(0, 'Offset must be 0 or greater')
+    .optional()
+    .default(0),
+})
+
+export type AlertsQuery = z.infer<typeof AlertsQuerySchema>
+
+// Alerts: Create alert body (used in alerts route)
+export const AlertCreateBodySchema = z.object({
+  level: z.enum(['info', 'warning', 'critical'], {
+    errorMap: () => ({ message: 'Level must be one of: info, warning, critical' }),
+  }),
+  component: z
+    .string()
+    .min(1, 'Component is required')
+    .max(100, 'Component must not exceed 100 characters'),
+  message: z
+    .string()
+    .min(1, 'Message is required')
+    .max(2000, 'Message must not exceed 2000 characters'),
+})
+
+export type AlertCreateBody = z.infer<typeof AlertCreateBodySchema>
+
+// Alerts: Update alert body
+export const AlertUpdateBodySchema = z.object({
+  alert_id: z
+    .string()
+    .min(1, 'Alert ID is required')
+    .max(100, 'Alert ID must not exceed 100 characters'),
+  status: z.enum(['active', 'resolved'], {
+    errorMap: () => ({ message: 'Status must be one of: active, resolved' }),
+  }),
+})
+
+export type AlertUpdateBody = z.infer<typeof AlertUpdateBodySchema>
+
+// Health: Detailed query parameter
+export const HealthDetailedQuerySchema = z.object({
+  detailed: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((val) => val === 'true'),
+})
+
+export type HealthDetailedQuery = z.infer<typeof HealthDetailedQuerySchema>
+
+// Kanban: Query parameters
+export const KanbanQuerySchema = z.object({
+  status: z
+    .enum(['todo', 'in_progress', 'done'], {
+      errorMap: () => ({ message: 'Status must be one of: todo, in_progress, done' }),
+    })
+    .optional(),
+  limit: z
+    .number()
+    .int('Limit must be an integer')
+    .min(1, 'Limit must be at least 1')
+    .max(500, 'Limit must not exceed 500')
+    .optional()
+    .default(50),
+  offset: z
+    .number()
+    .int('Offset must be an integer')
+    .min(0, 'Offset must be 0 or greater')
+    .optional()
+    .default(0),
+})
+
+export type KanbanQuery = z.infer<typeof KanbanQuerySchema>
+
+// Kanban: Create/Update item body
+export const KanbanCreateSchema = z.object({
+  title: SafeStringSchema.min(1, 'Title is required'),
+  description: SafeStringSchema.optional(),
+  status: z
+    .enum(['todo', 'in_progress', 'done'], {
+      errorMap: () => ({ message: 'Status must be one of: todo, in_progress, done' }),
+    })
+    .optional()
+    .default('todo'),
+  priority: z
+    .enum(['low', 'medium', 'high'], {
+      errorMap: () => ({ message: 'Priority must be one of: low, medium, high' }),
+    })
+    .optional()
+    .default('medium'),
+})
+
+export type KanbanCreate = z.infer<typeof KanbanCreateSchema>
+
+// Meetings: Query parameters
+export const MeetingsQuerySchema = z.object({
+  status: z
+    .enum(['scheduled', 'completed', 'failed'], {
+      errorMap: () => ({ message: 'Status must be one of: scheduled, completed, failed' }),
+    })
+    .optional(),
+  limit: z
+    .number()
+    .int('Limit must be an integer')
+    .min(1, 'Limit must be at least 1')
+    .max(500, 'Limit must not exceed 500')
+    .optional()
+    .default(50),
+  offset: z
+    .number()
+    .int('Offset must be an integer')
+    .min(0, 'Offset must be 0 or greater')
+    .optional()
+    .default(0),
+})
+
+export type MeetingsQuery = z.infer<typeof MeetingsQuerySchema>
+
+// Meetings: Create/Update meeting body
+export const MeetingCreateSchema = z.object({
+  title: SafeStringSchema.min(1, 'Title is required'),
+  description: SafeStringSchema.optional(),
+  startTime: z
+    .string()
+    .datetime('Invalid ISO 8601 datetime')
+    .optional(),
+  endTime: z
+    .string()
+    .datetime('Invalid ISO 8601 datetime')
+    .optional(),
+  attendees: z
+    .array(EmailSchema)
+    .min(1, 'At least one attendee is required')
+    .optional()
+    .default([]),
+})
+
+export type MeetingCreate = z.infer<typeof MeetingCreateSchema>
+
+// Auth: Register
+export const AuthRegisterSchema = z.object({
+  email: EmailSchema,
+  password: PasswordSchemaWeak,
+  name: SafeStringSchema.min(1, 'Name is required').optional(),
+})
+
+export type AuthRegister = z.infer<typeof AuthRegisterSchema>

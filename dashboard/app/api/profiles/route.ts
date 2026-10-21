@@ -4,6 +4,10 @@ import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { logger, createLogContext } from '@/lib/logger'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { validateBody } from '@/lib/validation/middleware'
+import { ProfileUpdateSchema, type ProfileUpdate } from '@/lib/validation/schemas'
+import { validateQuery } from '@/lib/validation/middleware'
+import { ProfileQuerySchema, type ProfileQuery } from '@/lib/validation/schemas'
 
 interface AgentProfile {
   name: string
@@ -44,6 +48,12 @@ export async function GET(request: NextRequest) {
     userId: auth.userId,
     operation: 'load_profiles',
   })
+
+  // Validate query parameters
+  const queryResult = await validateQuery<ProfileQuery>(request, ProfileQuerySchema)
+  if (!queryResult.success) {
+    return queryResult.response
+  }
 
   try {
     try {

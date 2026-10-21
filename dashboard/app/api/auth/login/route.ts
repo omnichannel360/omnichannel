@@ -2,13 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateToken } from '@/lib/auth'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { createLogger, createLogContext } from '@/lib/logger'
+import { validateBody } from '@/lib/validation/middleware'
+import { LoginRequestSchema, type LoginRequest } from '@/lib/validation/schemas'
 
 const logger = createLogger('auth-login-api')
-
-interface LoginRequest {
-  email: string
-  password: string
-}
 
 interface LoginResponse {
   success: boolean
@@ -40,25 +37,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
   }
 
   try {
-    const body: LoginRequest = await request.json()
-    const { email, password } = body
-
-    // Validate input
-    if (!email || !password) {
-      logger.warn('Login validation failed - missing credentials', {
-        ...logContext,
-        email,
-        statusCode: 400,
-        responseTimeMs: Date.now() - startTime,
-      })
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Email and password are required',
-        },
-        { status: 400 }
-      )
+    // Validate request body with Zod schema
+    const bodyResult = await validateBody<LoginRequest>(request, LoginRequestSchema)
+    if (!bodyResult.success) {
+      return bodyResult.response
     }
+
+    const { email, password } = bodyResult.data
 
     // TODO: Replace with actual user database lookup
     // This is a placeholder implementation for development

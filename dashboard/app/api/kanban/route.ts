@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
-import { TaskCreateSchema, TaskUpdateSchema, generateId } from '@/lib/validation'
+import { generateId } from '@/lib/validation'
+import { validateBody } from '@/lib/validation/middleware'
+import { KanbanItemSchema, type KanbanItem } from '@/lib/validation/schemas'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
@@ -94,32 +96,14 @@ export async function POST(request: NextRequest) {
     operation: 'create_task',
   })
 
-  const parsed = await parseRequestJson(request)
-  if (!parsed.success) {
-    logger.warn('Failed to parse kanban POST request', {
-      ...logContext,
-      statusCode: 400,
-    })
-    return jsonParseErrorResponse()
-  }
-
-  const body = parsed.body
-  // Validate body against schema
-  const parsedBody = TaskCreateSchema.safeParse(body)
-  if (!parsedBody.success) {
-    logger.warn('Invalid task creation request', {
-      ...logContext,
-      statusCode: 400,
-      validationErrors: parsedBody.error.flatten().fieldErrors,
-    })
-    return NextResponse.json(
-      { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
-      { status: 400 }
-    )
-  }
-
   try {
-    const { title, status } = parsedBody.data
+    // Validate body against schema
+    const bodyResult = await validateBody<KanbanItem>(request, KanbanItemSchema)
+    if (!bodyResult.success) {
+      return bodyResult.response
+    }
+
+    const { title, status } = bodyResult.data
     const newTask: Task = {
       id: generateId('task'),
       title,
@@ -177,32 +161,33 @@ export async function PUT(request: NextRequest) {
     operation: 'update_task',
   })
 
-  const parsed = await parseRequestJson(request)
-  if (!parsed.success) {
-    logger.warn('Failed to parse kanban PUT request', {
-      ...logContext,
-      statusCode: 400,
-    })
-    return jsonParseErrorResponse()
-  }
-
-  const body = parsed.body
-  // Validate body against schema
-  const parsedBody = TaskUpdateSchema.safeParse(body)
-  if (!parsedBody.success) {
-    logger.warn('Invalid task update request', {
-      ...logContext,
-      statusCode: 400,
-      validationErrors: parsedBody.error.flatten().fieldErrors,
-    })
-    return NextResponse.json(
-      { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
-      { status: 400 }
-    )
-  }
-
   try {
-    const { id, ...updates } = parsedBody.data
+    // Validate body against schema
+    const bodyResult = await validateBody<any>(request, KanbanItemSchema)
+    if (!bodyResult.success) {
+      return bodyResult.response
+    }
+
+    const { title, status } = bodyResult.data
+
+    // Extract task ID from query parameter
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      logger.warn('Update task request missing ID', {
+        ...logContext,
+        statusCode: 400,
+      })
+      return NextResponse.json(
+        { success: false, error: 'ID required' },
+        { status: 400 }
+      )
+    }
+
+    const updates: any = {}
+    if (title !== undefined) updates.title = title
+    if (status !== undefined) updates.status = status
 
     // Atomic operation: load → find → update → save in single critical section
     const result = await atomicUpdate<Task[], Task>(DATA_FILE, async (tasks) => {
