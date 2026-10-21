@@ -15,9 +15,9 @@ function getLogger() {
     } catch {
       // Fallback if logger cannot be loaded - create minimal structured logger
       logger = {
-        warn: (message: string, context?: any) => {
+        warn: (message: string, context?: Record<string, unknown>) => {
           const timestamp = new Date().toISOString()
-          const logEntry = { timestamp, level: 'WARN', module: 'uuid', message, ...context }
+          const logEntry = { timestamp, level: 'WARN', module: 'uuid', message, ...(context || {}) }
           // Write to stderr to avoid mixing with stdout
           if (typeof process !== 'undefined' && process.stderr) {
             process.stderr.write(JSON.stringify(logEntry) + '\n')

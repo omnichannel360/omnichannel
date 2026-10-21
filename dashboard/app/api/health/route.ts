@@ -182,7 +182,12 @@ async function getSkillRegistryStats(correlationId: string): Promise<number> {
 }
 
 // Alert severity levels - extracted to constants to enable consistent detection
-const ALERT_LEVELS = {
+interface AlertMessage {
+  level: 'info' | 'warning' | 'error'
+  message: string
+}
+
+const ALERT_PREFIXES = {
   INFO: '[INFO]',
   WARNING: '[WARNING]',
   ERROR: '[ERROR]',
@@ -194,25 +199,37 @@ function generateAlerts(
   brainLogCount: number,
   skillCount: number
 ): string[] {
-  const alerts: string[] = []
+  const alerts: AlertMessage[] = []
 
   if (successRate < 0.8) {
-    alerts.push(`${ALERT_LEVELS.WARNING} Keyword dispatch success rate low: ${(successRate * 100).toFixed(1)}%`)
+    alerts.push({
+      level: 'warning',
+      message: `Keyword dispatch success rate low: ${(successRate * 100).toFixed(1)}%`
+    })
   }
 
   if (meetingsProcessed === 0) {
-    alerts.push(`${ALERT_LEVELS.INFO} No meetings processed yet`)
+    alerts.push({
+      level: 'info',
+      message: 'No meetings processed yet'
+    })
   }
 
   if (brainLogCount === 0) {
-    alerts.push(`${ALERT_LEVELS.WARNING} Company-brain not logging outcomes`)
+    alerts.push({
+      level: 'warning',
+      message: 'Company-brain not logging outcomes'
+    })
   }
 
   if (skillCount === 0) {
-    alerts.push(`${ALERT_LEVELS.ERROR} Skill registry not found or empty`)
+    alerts.push({
+      level: 'error',
+      message: 'Skill registry not found or empty'
+    })
   }
 
-  return alerts
+  return alerts.map(alert => `${ALERT_PREFIXES[alert.level.toUpperCase() as keyof typeof ALERT_PREFIXES]} ${alert.message}`)
 }
 
 export async function GET(request: NextRequest) {
@@ -260,10 +277,11 @@ export async function GET(request: NextRequest) {
 
     const successRate = meetingsStats.count > 0 ? meetingsStats.success_count / meetingsStats.count : 0
     const alerts = generateAlerts(meetingsStats.count, successRate, brainStats.count, skillCount)
+    const hasErrorAlert = alerts.some(a => a.startsWith(ALERT_PREFIXES.ERROR))
 
     const status: HealthStatus = {
       status:
-        alerts.length === 0 ? 'healthy' : alerts.some(a => a.startsWith(ALERT_LEVELS.ERROR)) ? 'unhealthy' : 'degraded',
+        alerts.length === 0 ? 'healthy' : hasErrorAlert ? 'unhealthy' : 'degraded',
       timestamp: new Date().toISOString(),
       components: {
         meetings_api: {
