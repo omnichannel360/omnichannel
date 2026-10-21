@@ -95,12 +95,14 @@ export async function validateCsrfMiddleware(
   }
 
   try {
-    // SECURITY: Validate origin header matches allowed origins
+    // SECURITY: Validate origin header matches allowed origins (exact match)
     const origin = request.headers.get('origin')
     const referer = request.headers.get('referer')
 
     if (allowedOrigins && origin) {
-      const isAllowedOrigin = allowedOrigins.some(ao => origin.includes(ao))
+      // Use exact match instead of substring - prevents origin spoofing
+      // Example: "attacker.com" should NOT match "evil.attacker.com"
+      const isAllowedOrigin = allowedOrigins.includes(origin)
       if (!isAllowedOrigin) {
         return {
           valid: false,
