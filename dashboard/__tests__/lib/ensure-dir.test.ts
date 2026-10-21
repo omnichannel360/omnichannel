@@ -37,6 +37,10 @@ describe('ensureDataDir', () => {
         // Ignore cleanup errors
       }
     }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
   })
 
   it('should not throw if directory already exists', async () => {

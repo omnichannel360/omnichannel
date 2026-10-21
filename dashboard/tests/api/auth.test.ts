@@ -157,6 +157,10 @@ describe('Authentication Middleware', () => {
         // Allow 1 second tolerance
         expect(Math.abs(expirationTime - expectedTime)).toBeLessThan(1000)
       }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
     })
   })
 })

@@ -312,7 +312,8 @@ describe('Error Handler Middleware', () => {
 
       expect(context.correlationId).toBeDefined()
       expect(typeof context.correlationId).toBe('string')
-      expect(context.correlationId.length).toBeGreaterThan(0)
+      expect(context.correlationId.length).toBeGreaterThanOrEqual(16) // UUID-like minimum
+      expect(context.correlationId.length).toBeLessThanOrEqual(256)    // reasonable maximum
     })
   })
 

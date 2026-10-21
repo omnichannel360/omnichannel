@@ -70,6 +70,10 @@ describe('Error Logging Wrapper', () => {
           'user-agent': 'TestAgent/1.0',
           'x-forwarded-for': '192.168.1.1'
         }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
       })
 
       await wrapped(request)

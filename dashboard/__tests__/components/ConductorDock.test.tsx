@@ -23,7 +23,11 @@ describe('ConductorDock UUID Integration', () => {
     const input = screen.getByPlaceholderText('Dispatch task...')
     const sendButton = screen.getByText('Send')
 
-    fireEvent.change(input, { target: { value: 'Test message' } })
+    fireEvent.change(input, { target: { value: 'Test message' }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  }) })
     fireEvent.click(sendButton)
 
     await waitFor(() => {

@@ -17,6 +17,10 @@ describe('withRateLimit middleware', () => {
         headers: { 'Content-Type': 'application/json' },
       })
     }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
   })
 
   describe('Rate limiting enforcement', () => {

@@ -127,12 +127,16 @@ describe('Path Traversal Vulnerability Fix - Comprehensive Suite', () => {
   describe('Layer 4: safeJoin Containment Validation', () => {
     const testDir = path.join(process.cwd(), 'data', 'test-security-fix')
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       try {
         await fs.mkdir(testDir, { recursive: true })
       } catch {
         // Already exists
       }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
     })
 
     afterAll(async () => {

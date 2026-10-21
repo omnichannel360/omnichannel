@@ -70,7 +70,11 @@ describe('GalaxyGraph - XSS Vulnerability Prevention', () => {
 
     it('should display success state with node counts', async () => {
       ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-        json: async () => ({ success: true, meta: { total: 42 } })
+        json: async () => ({ success: true, meta: { total: 42 }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  }) })
       })
 
       render(<GalaxyGraph />)

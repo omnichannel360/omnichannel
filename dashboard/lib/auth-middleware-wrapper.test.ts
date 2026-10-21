@@ -28,6 +28,10 @@ describe('Auth Middleware Wrapper', () => {
       } as any,
       headers: new Headers(),
     }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
   })
 
   describe('withAuthProtection', () => {

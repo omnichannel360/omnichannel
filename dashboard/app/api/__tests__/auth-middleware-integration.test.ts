@@ -37,6 +37,10 @@ describe('Auth Middleware Integration Tests', () => {
         pathname: '/api/test',
       } as unknown as { pathname: string },
     }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
   })
 
   describe('Protected Routes - All Must Require Auth', () => {

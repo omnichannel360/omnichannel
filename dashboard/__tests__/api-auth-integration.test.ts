@@ -46,7 +46,7 @@ async function makeRequest(
 describe('API Authentication Integration', () => {
   let validToken: string
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     validToken = await generateToken(testUser.userId, testUser.email, testUser.role)
   })
 

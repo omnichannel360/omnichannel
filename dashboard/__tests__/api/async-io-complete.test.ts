@@ -15,7 +15,7 @@ const TEST_FILE = path.join(TEST_DIR, 'test.json')
 // SETUP / TEARDOWN
 // ============================================================================
 
-beforeAll(async () => {
+beforeEach(async () => {
   try {
     await fs.mkdir(TEST_DIR, { recursive: true })
   } catch {

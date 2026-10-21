@@ -14,7 +14,7 @@ describe('Auth Middleware', () => {
       const token = await generateToken('user-123', 'user@example.com', 'user')
       const request = new NextRequest('http://localhost:3000/api/test', {
         headers: { authorization: `Bearer ${token}` },
-      }) as unknown as NextRequest
+      }) as NextRequest
 
       // Act
       const handler = withAuth(mockHandler)
@@ -28,7 +28,7 @@ describe('Auth Middleware', () => {
 
     it('should reject requests without authentication token', async () => {
       // Arrange
-      const request = new NextRequest('http://localhost:3000/api/test') as unknown as NextRequest
+      const request = new NextRequest('http://localhost:3000/api/test') as NextRequest
 
       // Act
       const handler = withAuth(mockHandler)
@@ -42,7 +42,7 @@ describe('Auth Middleware', () => {
       // Arrange
       const request = new NextRequest('http://localhost:3000/api/test', {
         headers: { authorization: 'Bearer invalid.token.here' },
-      }) as unknown as NextRequest
+      }) as NextRequest
 
       // Act
       const handler = withAuth(mockHandler)
@@ -57,7 +57,7 @@ describe('Auth Middleware', () => {
       const userToken = await generateToken('user-123', 'user@example.com', 'user')
       const request = new NextRequest('http://localhost:3000/api/admin', {
         headers: { authorization: `Bearer ${userToken}` },
-      }) as unknown as NextRequest
+      }) as NextRequest
 
       // Act
       const handler = withAuth(mockHandler, { requiredRole: 'admin' })
@@ -72,7 +72,7 @@ describe('Auth Middleware', () => {
       const adminToken = await generateToken('admin-123', 'admin@example.com', 'admin')
       const request = new NextRequest('http://localhost:3000/api/admin', {
         headers: { authorization: `Bearer ${adminToken}` },
-      }) as unknown as NextRequest
+      }) as NextRequest
 
       // Act
       const handler = withAuth(mockHandler, { requiredRole: 'admin' })

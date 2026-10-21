@@ -24,6 +24,10 @@ describe('Protected Route Utilities', () => {
       } as any,
       headers: new Headers(),
     }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
   })
 
   describe('protectRoute', () => {

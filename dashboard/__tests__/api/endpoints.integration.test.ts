@@ -4,7 +4,7 @@ describe('Protected API Endpoints Integration Tests', () => {
   const apiUrl = 'http://localhost:3000'
   let authToken: string
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     // Create a test token
     authToken = await createToken({
       sub: 'test-user-123',

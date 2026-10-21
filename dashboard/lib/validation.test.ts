@@ -49,7 +49,8 @@ describe('validation.generateId', () => {
   it('maintains backwards compatibility with validateId calls', () => {
     const id = generateId('meeting')
     expect(typeof id).toBe('string')
-    expect(id.length).toBeGreaterThan(0)
+    expect(id.length).toBeGreaterThanOrEqual(20) // "meeting" + "_" + UUID minimum
+    expect(id.length).toBeLessThanOrEqual(100)   // reasonable maximum
     expect(id).toContain('_')
     expect(id).toContain('-')
   })

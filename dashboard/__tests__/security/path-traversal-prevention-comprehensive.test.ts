@@ -23,12 +23,16 @@ import { MeetingTypeSchema, SkillTypeSchema, safeJoin, generateId, VALID_MEETING
 describe('PATH TRAVERSAL PREVENTION - COMPREHENSIVE SECURITY SUITE', () => {
   const TEST_BASE_DIR = path.join(process.cwd(), 'data', 'test-comprehensive-security')
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     try {
       await fs.mkdir(TEST_BASE_DIR, { recursive: true })
     } catch (e) {
       // Already exists
     }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
   })
 
   afterAll(async () => {

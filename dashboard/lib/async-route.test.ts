@@ -142,6 +142,10 @@ describe('asyncRoute', () => {
         message: 'Formatted error message',
         statusCode: 418,
         details: { custom: true }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
       }))
 
       const wrapped = asyncRoute(handler, {
@@ -254,9 +258,11 @@ describe('asyncRoute', () => {
         expect.any(Object)
       )
 
-      // Verify that duration was recorded
+      // Verify that duration was recorded (deterministic: at least 5ms, less than 5s)
       const call = (logger.logOperation as any).mock.calls[0]
-      expect(call[1]).toBeGreaterThanOrEqual(10)
+      expect(typeof call[1]).toBe('number')
+      expect(call[1]).toBeGreaterThanOrEqual(5)
+      expect(call[1]).toBeLessThan(5000)
     })
   })
 

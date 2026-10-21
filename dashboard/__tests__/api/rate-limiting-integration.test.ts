@@ -330,6 +330,10 @@ describe('Rate Limiting Integration', () => {
         expect(response.headers.get('X-RateLimit-Remaining')).toBeTruthy()
         expect(response.headers.get('X-RateLimit-Reset')).toBeTruthy()
       }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
     })
 
     test('429 response includes Retry-After header', async () => {

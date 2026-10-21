@@ -312,10 +312,12 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
 
       const results = await Promise.all(operations)
 
-      // Final version should be consistent
+      // Final version should be consistent (deterministic: version should equal number of successful operations)
       const finalContent = await fs.readFile(testFile, 'utf-8')
       const finalData = JSON.parse(finalContent)
+      expect(typeof finalData.version).toBe('number')
       expect(finalData.version).toBeGreaterThanOrEqual(0)
+      expect(finalData.version).toBeLessThanOrEqual(10) // max 10 operations
     })
   })
 })

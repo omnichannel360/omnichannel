@@ -69,6 +69,10 @@ describe('RateLimiter', () => {
       const result = await limiter.check('192.168.1.1')
       expect(result.allowed).toBe(true)
     }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
   })
 
   test('blocks requests exceeding limit', async () => {

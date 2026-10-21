@@ -82,12 +82,16 @@ describe('Path Traversal Security - Meeting Type Validation', () => {
   describe('safeJoin Defense Mechanism', () => {
     const testDir = path.join(process.cwd(), 'data', 'test-meetings-security')
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       try {
         await fs.mkdir(testDir, { recursive: true })
       } catch {
         // Already exists
       }
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
     })
 
     afterAll(async () => {

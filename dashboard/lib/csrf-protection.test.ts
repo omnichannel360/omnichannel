@@ -76,7 +76,9 @@ describe('CSRF Protection', () => {
       const token = setCsrfTokenCookie(response)
 
       expect(token).toBeDefined()
-      expect(token.length).toBeGreaterThan(0)
+      expect(typeof token).toBe('string')
+      expect(token.length).toBeGreaterThanOrEqual(32) // min 32 chars for secure token
+      expect(token.length).toBeLessThanOrEqual(256)   // max reasonable length
     })
 
     it('should generate random tokens', () => {

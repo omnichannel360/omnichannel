@@ -1,0 +1,1600 @@
+{
+  "metrics": {
+    "totalFiles": 109,
+    "totalLines": 36228,
+    "defectsFound": 27,
+    "defectsBySeverity": {
+      "CRITICAL": 114,
+      "HIGH": 0,
+      "MEDIUM": 0,
+      "LOW": 0
+    },
+    "aaaPattern": {
+      "compliant": 17,
+      "nonCompliant": 4
+    },
+    "mockCoverage": {
+      "mocked": 2,
+      "notMocked": 4
+    },
+    "typeUnsafety": {
+      "violations": []
+    },
+    "testIsolation": {
+      "broken": 7,
+      "fixed": 42
+    },
+    "assertions": {
+      "total": 4479,
+      "avgPerTest": "8.19"
+    },
+    "edgeCases": {
+      "identified": 59
+    }
+  },
+  "defects": [
+    {
+      "file": "app\\api\\meetings\\meetings-api.integration.test.ts",
+      "line": 23,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\meetings-api.integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\meetings\\meetings-path-traversal.test.ts",
+      "severity": "HIGH",
+      "type": "Test Isolation",
+      "message": "Using beforeAll (1x) creates shared state. Use beforeEach instead.",
+      "fix": "Replace all beforeAll with beforeEach to ensure test isolation"
+    },
+    {
+      "file": "app\\api\\meetings\\meetings-path-traversal.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\meetings\\path-traversal-fix.test.ts",
+      "severity": "HIGH",
+      "type": "Test Isolation",
+      "message": "Using beforeAll (1x) creates shared state. Use beforeEach instead.",
+      "fix": "Replace all beforeAll with beforeEach to ensure test isolation"
+    },
+    {
+      "file": "app\\api\\meetings\\path-traversal-fix.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.9 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\meetings\\path-traversal-integration.test.ts",
+      "line": 164,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\path-traversal-integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "line": 298,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\meetings\\__tests__\\route.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\api-integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\api-integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware-integration.test.ts",
+      "line": 155,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware-integration.test.ts",
+      "line": 155,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware-integration.test.ts",
+      "line": 155,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware-integration.test.ts",
+      "line": 155,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware-integration.test.ts",
+      "line": 155,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware-integration.test.ts",
+      "line": 155,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware-integration.test.ts",
+      "line": 155,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware.test.ts",
+      "line": 91,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware.test.ts",
+      "line": 91,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware.test.ts",
+      "line": 91,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware.test.ts",
+      "line": 91,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware.test.ts",
+      "line": 91,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware.test.ts",
+      "line": 91,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\auth-middleware.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\comprehensive-error-handling.test.ts",
+      "line": 107,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\comprehensive-rate-limit-validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\endpoint-schemas.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.2 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\endpoint-schemas.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-codes.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-edge-cases.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.5 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-edge-cases.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-handling-comprehensive.test.ts",
+      "line": 352,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-handling-comprehensive.test.ts",
+      "line": 352,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-handling-comprehensive.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.7 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.9 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-logging.test.ts",
+      "line": 203,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-logging.test.ts",
+      "line": 203,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\error-logging.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.8 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\file-operations.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.5 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\health-error-handling.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\input-validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.7 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\middleware-error-handling.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.6 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\middleware-error-handling.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "app\\api\\__tests__\\protected-endpoints.test.ts",
+      "line": 22,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\protected-endpoints.test.ts",
+      "line": 22,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\protected-endpoints.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "app\\api\\__tests__\\race-conditions.test.ts",
+      "line": 250,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "app\\api\\__tests__\\race-conditions.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.6 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\schemas.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\security-validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.0 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "app\\api\\__tests__\\xss-prevention.test.ts",
+      "severity": "HIGH",
+      "type": "Mock Coverage",
+      "message": "2 fetch calls detected, only 0 appear mocked",
+      "fix": "Mock all external API calls with vi.fn() or jest.fn()"
+    },
+    {
+      "file": "app\\api\\__tests__\\xss-prevention.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.0 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "components\\AgentDossier.test.tsx",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "lib\\async-route.test.ts",
+      "line": 258,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\async-route.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "lib\\atomic-file-ops.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\auth-middleware-wrapper.test.ts",
+      "line": 28,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\auth-middleware.test.ts",
+      "line": 229,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\auth-middleware.test.ts",
+      "line": 229,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\auth-middleware.test.ts",
+      "line": 229,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\auth-middleware.test.ts",
+      "line": 229,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\auth-middleware.test.ts",
+      "line": 229,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\auth-middleware.test.ts",
+      "line": 229,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\auth-middleware.test.ts",
+      "line": 229,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "line": 149,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\csrf-protection.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.7 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\enum-validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.9 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\error-handler.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.7 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\error-handling.test.ts",
+      "line": 152,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\error-handling.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 2.0 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\file-lock-verification.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.5 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\file-lock.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.8 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\protected-route.test.ts",
+      "line": 24,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\rate-limiter.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.8 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\rate-limiting.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.6 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\uuid.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.6 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\uuid.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "line": 444,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\validation\\index.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.9 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\validation\\middleware.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "lib\\validation\\schemas.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\validation\\schemas.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "lib\\validation\\validation.integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.2 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.8 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "lib\\validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "lib\\with-error-logging.test.ts",
+      "line": 308,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "lib\\with-rate-limit.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.8 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "middleware.test.ts",
+      "severity": "HIGH",
+      "type": "Test Isolation",
+      "message": "Using beforeAll (1x) creates shared state. Use beforeEach instead.",
+      "fix": "Replace all beforeAll with beforeEach to ensure test isolation"
+    },
+    {
+      "file": "tests\\auth-security-scenarios.test.ts",
+      "line": 262,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "tests\\auth-security-scenarios.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.5 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "tests\\auth-security.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\async-io-complete.test.ts",
+      "severity": "HIGH",
+      "type": "Test Isolation",
+      "message": "Using beforeAll (1x) creates shared state. Use beforeEach instead.",
+      "fix": "Replace all beforeAll with beforeEach to ensure test isolation"
+    },
+    {
+      "file": "__tests__\\api\\auth.test.ts",
+      "line": 69,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\auth.test.ts",
+      "line": 69,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\auth.test.ts",
+      "line": 69,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\auth.test.ts",
+      "line": 69,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\concurrent-operations.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\api\\endpoints.integration.test.ts",
+      "severity": "HIGH",
+      "type": "Mock Coverage",
+      "message": "7 fetch calls detected, only 0 appear mocked",
+      "fix": "Mock all external API calls with vi.fn() or jest.fn()"
+    },
+    {
+      "file": "__tests__\\api\\endpoints.integration.test.ts",
+      "severity": "HIGH",
+      "type": "Test Isolation",
+      "message": "Using beforeAll (1x) creates shared state. Use beforeEach instead.",
+      "fix": "Replace all beforeAll with beforeEach to ensure test isolation"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-integration.test.ts",
+      "line": 372,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-integration.test.ts",
+      "line": 372,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-integration.test.ts",
+      "line": 372,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-unit.test.ts",
+      "line": 341,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-unit.test.ts",
+      "line": 341,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-unit.test.ts",
+      "line": 341,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-unit.test.ts",
+      "line": 341,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-unit.test.ts",
+      "line": 341,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\enum-validation-unit.test.ts",
+      "line": 341,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\error-handling-suite.test.ts",
+      "line": 106,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\error-handling-suite.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.7 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\error-handling.test.ts",
+      "line": 340,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\error-handling.test.ts",
+      "line": 340,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\error-handling.test.ts",
+      "line": 340,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\health-async-validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\id-generation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.1 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\id-generation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\api\\input-validation.integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.2 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\input-validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\input-validation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\api\\json-error-handling.test.ts",
+      "severity": "HIGH",
+      "type": "Mock Coverage",
+      "message": "8 fetch calls detected, only 1 appear mocked",
+      "fix": "Mock all external API calls with vi.fn() or jest.fn()"
+    },
+    {
+      "file": "__tests__\\api\\json-error-handling.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 0.9 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "line": 180,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "line": 180,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "line": 180,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "line": 180,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "line": 180,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "line": 180,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "line": 180,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\api\\json-parse-errors.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\api\\json-parsing.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\api\\meetings.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.9 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\route-id-generation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.7 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\api\\route-id-generation.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\api-auth-integration.test.ts",
+      "severity": "HIGH",
+      "type": "Mock Coverage",
+      "message": "1 fetch calls detected, only 0 appear mocked",
+      "fix": "Mock all external API calls with vi.fn() or jest.fn()"
+    },
+    {
+      "file": "__tests__\\api-auth-integration.test.ts",
+      "severity": "HIGH",
+      "type": "Test Isolation",
+      "message": "Using beforeAll (1x) creates shared state. Use beforeEach instead.",
+      "fix": "Replace all beforeAll with beforeEach to ensure test isolation"
+    },
+    {
+      "file": "__tests__\\api-auth-integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.6 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\auth-middleware.integration.test.ts",
+      "line": 178,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\auth-middleware.integration.test.ts",
+      "line": 178,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\auth-middleware.integration.test.ts",
+      "line": 178,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\auth-middleware.integration.test.ts",
+      "line": 178,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\auth-middleware.integration.test.ts",
+      "line": 178,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as any",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\auth-middleware.integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\auth.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.9 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\components\\AgentDossier.test.tsx",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.6 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\components\\AgentDossier.test.tsx",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\components\\ConductorDock.test.tsx",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.3 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\components\\ConductorDock.test.tsx",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\components\\GalaxyGraph.test.tsx",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.5 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\components\\GalaxyGraph.test.tsx",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\error-handling.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.6 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\lib\\atomic-file-ops.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\lib\\ensure-dir.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.0 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\lib\\rate-limiting-integration.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.8 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\lib\\rateLimit.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\lib\\uuid.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.8 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\lib\\uuid.test.ts",
+      "severity": "MEDIUM",
+      "type": "Missing Edge Cases",
+      "message": "No null/undefined edge case tests detected",
+      "fix": "Add tests for null, undefined, empty array, empty string, and boundary values"
+    },
+    {
+      "file": "__tests__\\race-conditions.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.5 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\rate-limiting.integration.test.ts",
+      "line": 310,
+      "severity": "CRITICAL",
+      "type": "Type Unsafety",
+      "message": "Unsafe type cast:  as unknown",
+      "fix": "Replace with proper types or unknown with safe narrowing"
+    },
+    {
+      "file": "__tests__\\security\\path-traversal-prevention-comprehensive.test.ts",
+      "severity": "HIGH",
+      "type": "Test Isolation",
+      "message": "Using beforeAll (1x) creates shared state. Use beforeEach instead.",
+      "fix": "Replace all beforeAll with beforeEach to ensure test isolation"
+    },
+    {
+      "file": "__tests__\\security\\path-traversal-prevention-comprehensive.test.ts",
+      "severity": "MEDIUM",
+      "type": "Low Assertion Density",
+      "message": "Average 1.4 assertions per test (target: 3+)",
+      "fix": "Add more assertions to verify behavior, mock interactions, and edge cases"
+    }
+  ]
+}
