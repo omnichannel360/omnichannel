@@ -199,8 +199,14 @@ export class Logger {
       context: entry.context ? (sanitizeContext(entry.context) as LogContext) : undefined
     }
 
-    const method = entry.level === 'error' ? 'error' : entry.level === 'warn' ? 'warn' : 'log'
-    console[method as 'log' | 'warn' | 'error'](JSON.stringify(output))
+    const logOutput = JSON.stringify(output)
+    if (entry.level === 'error') {
+      console.error(logOutput)
+    } else if (entry.level === 'warn') {
+      console.warn(logOutput)
+    } else {
+      console.log(logOutput)
+    }
   }
 
   /**
