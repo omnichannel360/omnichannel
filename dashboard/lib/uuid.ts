@@ -87,14 +87,10 @@ export function generateUUIDv4(): string {
   const isProduction = process.env.NODE_ENV === 'production'
 
   if (isProduction) {
-    // SECURITY VIOLATION in production
-    const securityError = new Error('generateUUIDv4: Using non-secure Math.random() in production! This environment lacks crypto.randomUUID() (Node.js 15.7+) and crypto.getRandomValues(). All generated UUIDs are predictable.')
-    fallbackLogger.error('[SECURITY VIOLATION] Cryptographically insecure UUID generation in production', securityError, {
-      component: 'uuid',
-      nodeVersion: process.version
-    })
+    // SECURITY: Throw error in production - don't silently fail
+    throw new Error('[CRITICAL] generateUUIDv4: Cryptographically insecure UUID generation blocked in production. This environment lacks crypto.randomUUID() (Node.js 15.7+) and crypto.getRandomValues(). Ensure Node.js 15+ is deployed.')
   } else {
-    // Development environment - just a warning
+    // Development environment - just a warning, then use fallback
     fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. For production, ensure Node.js 15+ or modern browser crypto APIs are available.', {
       component: 'uuid',
       nodeVersion: process.version
