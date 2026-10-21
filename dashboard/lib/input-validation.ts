@@ -212,9 +212,23 @@ export function validateBody<T>(
 }
 
 /**
- * Sanitizes string input to prevent XSS attacks
+ * Sanitizes string input to prevent XSS attacks and injection patterns
+ *
+ * SECURITY NOTE: This function performs TWO critical sanitizations:
+ * 1. Removes null bytes and control characters (prevents binary injection)
+ * 2. Escapes HTML entities (prevents XSS attacks)
+ *
+ * Both steps are REQUIRED for complete protection.
+ *
+ * @param input - String to sanitize
+ * @returns Sanitized string safe for HTML context
  */
 export function sanitizeString(input: string): string {
+  // Step 1: Remove null bytes and control characters
+  let sanitized = input.replace(/\0/g, '')
+  sanitized = sanitized.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]/g, '')
+
+  // Step 2: Escape HTML entities to prevent XSS
   const htmlEscapeMap: Record<string, string> = {
     '&': '&amp;',
     '<': '&lt;',
@@ -223,8 +237,9 @@ export function sanitizeString(input: string): string {
     "'": '&#39;',
     '/': '&#x2F;',
   }
+  sanitized = sanitized.replace(/[&<>"'\/]/g, (char) => htmlEscapeMap[char] || char)
 
-  return input.replace(/[&<>"'\/]/g, (char) => htmlEscapeMap[char] || char)
+  return sanitized.trim()
 }
 
 /**
@@ -389,20 +404,6 @@ export function createValidationErrorResponse(errors: ValidationError[]): NextRe
  * Input sanitization utilities
  */
 
-/**
- * Removes common injection attack patterns from strings
- * @param input - String to sanitize
- * @returns Sanitized string
- */
-export function sanitizeString(input: string): string {
-  // Remove null bytes
-  let sanitized = input.replace(/\0/g, '')
-
-  // Remove control characters (except whitespace)
-  sanitized = sanitized.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]/g, '')
-
-  return sanitized.trim()
-}
 
 /**
  * Validates that a value is a valid enum member
