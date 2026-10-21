@@ -215,13 +215,15 @@ export function withEnhancedAuth(
 /**
  * Extract auth context from request headers
  * Used to retrieve auth data injected by Next.js middleware
+ * Safely handles missing or malformed headers, returns unauthenticated context on error
  */
 export function extractEnhancedAuthFromHeaders(request: NextRequest): EnhancedAuthContext {
   const userId = request.headers.get('x-user-id')
   const email = request.headers.get('x-user-email')
   const role = request.headers.get('x-user-role')
 
-  // Validate that userId is a non-empty string
+  // Validate that userId is present and non-empty after trimming
+  // Headers can be null or empty strings from malformed requests
   if (!userId || userId.trim().length === 0) {
     return {
       authenticated: false,
