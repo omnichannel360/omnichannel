@@ -366,8 +366,8 @@ export class CircuitBreaker {
   ) {}
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
-    // Atomically check and transition state
-    const currentState = this.getStateWithTransition()
+    // FIXED: Renamed method to indicate it has side effects (state mutation)
+    const currentState = this.transitionStateIfNeeded()
 
     if (currentState === 'OPEN') {
       throw new Error('Circuit breaker is OPEN - service unavailable')
@@ -383,7 +383,11 @@ export class CircuitBreaker {
     }
   }
 
-  private getStateWithTransition(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
+  /**
+   * Transition state from OPEN to HALF_OPEN if timeout has passed.
+   * SIDE EFFECT: Mutates internal state - do not call this as a simple getter
+   */
+  private transitionStateIfNeeded(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
     if (this.state === 'OPEN') {
       const now = Date.now()
       if (now - this.lastFailureTime > this.resetTimeoutMs) {

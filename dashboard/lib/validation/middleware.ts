@@ -273,23 +273,27 @@ export async function validateQuery<T>(
     const queryObject: Record<string, unknown> = {}
 
     // Convert URLSearchParams to object
+    // FIXED: Preserve original whitespace; only trim for type detection
     searchParams.forEach((value, key) => {
-      // Try to parse as number if it looks like one (avoid parsing "NaN", "Infinity", etc)
       const trimmed = value.trim()
+
+      // Try to parse as number if it looks like one (avoid parsing "NaN", "Infinity", etc)
       if (trimmed !== '' && !isNaN(Number(trimmed)) && trimmed !== 'NaN' && trimmed !== 'Infinity' && trimmed !== '-Infinity') {
         const num = Number(trimmed)
         // Only use if it's a finite number
         if (isFinite(num)) {
           queryObject[key] = num
         } else {
-          queryObject[key] = trimmed
+          // Parse failed, use original string
+          queryObject[key] = value
         }
       } else if (trimmed.toLowerCase() === 'true') {
         queryObject[key] = true
       } else if (trimmed.toLowerCase() === 'false') {
         queryObject[key] = false
       } else {
-        queryObject[key] = trimmed || value // Preserve original if empty after trim
+        // Use original value to preserve intentional whitespace
+        queryObject[key] = value
       }
     })
 
