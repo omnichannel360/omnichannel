@@ -242,8 +242,13 @@ describe('API Security Tests — All Endpoints', () => {
         const token = generateTestToken({ userId: 'user-1', role: 'user' })
         // Valid token grants access to brain data
         expect(token).toBeDefined()
-        const decoded = jwt.decode(token) as any
-        expect(decoded.role).toBe('user')
+        // Type-safe extraction: verify decoded is object with role property
+        const decoded = jwt.decode(token)
+        if (decoded && typeof decoded === 'object' && 'role' in decoded) {
+          expect((decoded as Record<string, unknown>).role).toBe('user')
+        } else {
+          throw new Error('Token structure invalid: missing role')
+        }
         // Brain data structure includes meetings history
         const brainData = { meetings_history: [], insights: [] }
         expect(Array.isArray(brainData.meetings_history)).toBe(true)
@@ -277,18 +282,30 @@ describe('API Security Tests — All Endpoints', () => {
         const token = generateTestToken({ userId: 'admin-1', role: 'admin' })
         // Admin role allows access to orchestration endpoint
         expect(token).toBeDefined()
-        const decoded = jwt.decode(token) as any
-        expect(decoded.role).toBe('admin')
-        expect(decoded.userId).toBe('admin-1')
+        // Type-safe extraction: verify decoded is object with role and userId properties
+        const decoded = jwt.decode(token)
+        if (decoded && typeof decoded === 'object' && 'role' in decoded && 'userId' in decoded) {
+          const decodedPayload = decoded as Record<string, unknown>
+          expect(decodedPayload.role).toBe('admin')
+          expect(decodedPayload.userId).toBe('admin-1')
+        } else {
+          throw new Error('Token structure invalid: missing role or userId')
+        }
       })
 
       it('should deny access with user token (insufficient role)', async () => {
         const token = generateTestToken({ userId: 'user-1', role: 'user' })
         // User role is insufficient for admin-only endpoint
         expect(token).toBeDefined()
-        const decoded = jwt.decode(token) as any
-        expect(decoded.role).toBe('user')
-        expect(decoded.role).not.toBe('admin')
+        // Type-safe extraction: verify decoded is object with role property
+        const decoded = jwt.decode(token)
+        if (decoded && typeof decoded === 'object' && 'role' in decoded) {
+          const role = (decoded as Record<string, unknown>).role
+          expect(role).toBe('user')
+          expect(role).not.toBe('admin')
+        } else {
+          throw new Error('Token structure invalid: missing role')
+        }
       })
 
       it('should return 401 without token', async () => {
@@ -306,8 +323,13 @@ describe('API Security Tests — All Endpoints', () => {
         const token = generateTestToken({ userId: 'user-1', role: 'user' })
         // Valid token allows GET /api/kanban
         expect(token).toBeDefined()
-        const decoded = jwt.decode(token) as any
-        expect(decoded.userId).toBe('user-1')
+        // Type-safe extraction: verify decoded is object with userId property
+        const decoded = jwt.decode(token)
+        if (decoded && typeof decoded === 'object' && 'userId' in decoded) {
+          expect((decoded as Record<string, unknown>).userId).toBe('user-1')
+        } else {
+          throw new Error('Token structure invalid: missing userId')
+        }
         // Kanban board structure
         const boardState = { columns: [], items: [] }
         expect(Array.isArray(boardState.columns)).toBe(true)
@@ -401,12 +423,19 @@ describe('API Security Tests — All Endpoints', () => {
         const token = generateTestToken({ userId: 'user-1', role: 'user' })
         // Valid token allows retrieving user profile
         expect(token).toBeDefined()
-        const decoded = jwt.decode(token) as any
-        expect(decoded.email).toBe('test@example.com')
-        // Profile data structure
-        const profileData = { userId: 'user-1', email: decoded.email, role: decoded.role }
-        expect(profileData.userId).toBeDefined()
-        expect(profileData.email).toBeDefined()
+        // Type-safe extraction: verify decoded is object with email, role, and userId properties
+        const decoded = jwt.decode(token)
+        if (decoded && typeof decoded === 'object' && 'email' in decoded && 'role' in decoded && 'userId' in decoded) {
+          const decodedPayload = decoded as Record<string, unknown>
+          expect(decodedPayload.email).toBe('test@example.com')
+          // Profile data structure
+          const profileData = { userId: 'user-1', email: decodedPayload.email, role: decodedPayload.role }
+          expect(profileData.userId).toBeDefined()
+          expect(profileData.email).toBeDefined()
+          expect(profileData.role).toBeDefined()
+        } else {
+          throw new Error('Token structure invalid: missing email, role or userId')
+        }
       })
 
       it('should return 401 without token', async () => {

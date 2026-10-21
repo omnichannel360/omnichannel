@@ -11,27 +11,11 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import type { Metrics } from '@/app/api/metrics/route'
+import { getConfigValue } from '@/app/api/metrics/route'
 
 // ============================================================================
 // TEST UTILITIES
 // ============================================================================
-
-/**
- * Helper to safely parse numeric config values
- * Replicates getConfigValue() from metrics route
- */
-const getConfigValue = (envKey: string, defaultValue: number): number => {
-  const value = process.env[envKey]
-  if (!value) return defaultValue
-
-  const parsed = parseInt(value, 10)
-  if (isNaN(parsed)) {
-    console.warn(`Invalid numeric value for ${envKey}: "${value}", using default: ${defaultValue}`)
-    return defaultValue
-  }
-
-  return parsed
-}
 
 /**
  * Validate metrics object structure and ranges

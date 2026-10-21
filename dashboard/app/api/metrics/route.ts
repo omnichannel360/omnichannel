@@ -12,7 +12,7 @@ import { atomicRead } from '@/lib/atomic-file-ops'
 const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.metrics)
 const logger = createLogger('metrics-api')
 
-interface Metrics {
+export interface Metrics {
   finance: {
     revenue: number
     costs: number
@@ -38,8 +38,9 @@ interface Metrics {
 /**
  * Get configuration value from environment with safe defaults and validation.
  * Handles env var parsing with NaN detection and error logging.
+ * Exported for use in tests.
  */
-const getConfigValue = (envKey: string, defaultValue: number): number => {
+export const getConfigValue = (envKey: string, defaultValue: number): number => {
   const value = process.env[envKey]
   if (!value) return defaultValue
 
@@ -133,8 +134,9 @@ async function calculateActualMetrics(): Promise<Metrics> {
         avg_task_completion_time_minutes: avgTaskCompletionMinutes > 0 ? avgTaskCompletionMinutes : 12.5,
       },
     }
-  } catch (error) {
-    logger.error('Failed to calculate actual metrics, using defaults', error, {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    logger.error('Failed to calculate actual metrics, using defaults', { message: errorMessage }, {
       operation: 'calculate_actual_metrics',
     })
 
@@ -221,8 +223,9 @@ export const GET = protectRoute(
       )
 
       return response
-    } catch (error) {
-      logger.error('Metrics retrieval failed', error, {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logger.error('Metrics retrieval failed', { message: errorMessage }, {
         ...logContext,
         userId,
         statusCode: 500,
