@@ -31,9 +31,9 @@ function loadAlerts(): Alert[] {
   }
 }
 
-function saveAlerts(alerts: Alert[]) {
-  ensureAlertsFile()
-  fs.writeFileSync(ALERTS_LOG, JSON.stringify(alerts, null, 2))
+async function saveAlerts(alerts: Alert[]) {
+  await ensureAlertsFile()
+  await fs.writeFile(ALERTS_LOG, JSON.stringify(alerts, null, 2))
 }
 
 function createAlert(level: Alert['level'], component: string, message: string): Alert {

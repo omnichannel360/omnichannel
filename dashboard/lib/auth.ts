@@ -1,7 +1,14 @@
 import { NextRequest } from 'next/server'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production'
+// CRITICAL: JWT_SECRET must be set in environment - do not use fallback in production
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+  throw new Error(
+    'JWT_SECRET environment variable is not set. ' +
+    'This is required for authentication to function securely.'
+  )
+}
 
 export interface TokenPayload extends JwtPayload {
   sub: string

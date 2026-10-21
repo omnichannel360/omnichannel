@@ -58,13 +58,13 @@ describe('JWT Authentication', () => {
     test('should reject expired token', async () => {
       // Create a token that expired 1 second ago
       const token = await generateToken('user-1', 'user@example.com', 'user', -1)
-      
+
       const request = new NextRequest(new URL('http://localhost:3000/api/test'), {
         headers: {
-          'Authorization': Bearer \,
+          'Authorization': `Bearer ${token}`,
         },
       })
-      
+
       const payload = await verifyToken(request)
       expect(payload).toBeNull()
     })
@@ -73,13 +73,13 @@ describe('JWT Authentication', () => {
       const token = await generateToken('user-1', 'user@example.com', 'user', 3600)
       // Tamper with the token by changing the last character
       const tamperedToken = token.slice(0, -1) + 'X'
-      
+
       const request = new NextRequest(new URL('http://localhost:3000/api/test'), {
         headers: {
-          'Authorization': Bearer \,
+          'Authorization': `Bearer ${tamperedToken}`,
         },
       })
-      
+
       const payload = await verifyToken(request)
       expect(payload).toBeNull()
     })
