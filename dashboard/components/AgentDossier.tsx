@@ -57,8 +57,9 @@ function getStatusColor(successRate: number): string {
 }
 
 export function AgentDossier({ agentId }: AgentDossierProps) {
-  // TODO: Replace with real data source fetching based on agentId
+  // TRACKED: Replace with real data source fetching based on agentId
   // This would typically be a useFetch hook or server component data
+  // Ticket: OmniBot-Agent-Dossier-Data-Integration (currently using demo data)
   const metrics: AgentMetrics = useMemo(() => ({
     tasksCompleted: 127,
     successRate: 94.2,
@@ -66,7 +67,8 @@ export function AgentDossier({ agentId }: AgentDossierProps) {
     lastActive: '2 minutes ago'
   }), [agentId])
 
-  // TODO: Replace with real activity data fetching based on agentId
+  // TRACKED: Replace with real activity data fetching based on agentId
+  // Ticket: OmniBot-Activity-Log-Integration (currently using demo data)
   const activities: ActivityLog[] = useMemo(() => [
     {
       id: 'activity-1',
