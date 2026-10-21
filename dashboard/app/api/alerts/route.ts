@@ -37,7 +37,7 @@ function saveAlerts(alerts: Alert[]) {
 
 function createAlert(level: Alert['level'], component: string, message: string): Alert {
   return {
-    id: `alert_${crypto.randomUUID()}`,
+    id: `alert_${Date.now()}`,
     timestamp: new Date().toISOString(),
     level,
     component,
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const alerts = await loadAlerts()
+  const alerts = loadAlerts()
   const activeOnly = request.nextUrl.searchParams.get('active') === 'true'
 
   return NextResponse.json({
@@ -68,26 +68,19 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  try {
-    const { level, component, message } = await request.json()
+  const { level, component, message } = await request.json()
 
-    if (!level || !component || !message) {
-      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
-    }
-
-    const alert = createAlert(level, component, message)
-    const alerts = await loadAlerts()
-
-    alerts.push(alert)
-    await saveAlerts(alerts)
-
-    return NextResponse.json({ success: true, alert }, { status: 201 })
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
-    }
-    return NextResponse.json({ success: false, error: 'Failed to create alert' }, { status: 500 })
+  if (!level || !component || !message) {
+    return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
   }
+
+  const alert = createAlert(level, component, message)
+  const alerts = loadAlerts()
+
+  alerts.push(alert)
+  saveAlerts(alerts)
+
+  return NextResponse.json({ success: true, alert }, { status: 201 })
 }
 
 export async function PATCH(request: NextRequest) {
@@ -96,33 +89,21 @@ export async function PATCH(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  try {
-    const { alert_id, status } = await request.json()
+  const { alert_id, status } = await request.json()
 
-    if (!alert_id || !status) {
-      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
-    }
-
-    const validStatuses = ['active', 'resolved']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({ success: false, error: 'Invalid status' }, { status: 400 })
-    }
-
-    const alerts = await loadAlerts()
-    const alert = alerts.find(a => a.id === alert_id)
-
-    if (!alert) {
-      return NextResponse.json({ success: false, error: 'Alert not found' }, { status: 404 })
-    }
-
-    alert.status = status
-    await saveAlerts(alerts)
-
-    return NextResponse.json({ success: true, alert })
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
-    }
-    return NextResponse.json({ success: false, error: 'Failed to update alert' }, { status: 500 })
+  if (!alert_id || !status) {
+    return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
   }
+
+  const alerts = loadAlerts()
+  const alert = alerts.find(a => a.id === alert_id)
+
+  if (!alert) {
+    return NextResponse.json({ success: false, error: 'Alert not found' }, { status: 404 })
+  }
+
+  alert.status = status
+  saveAlerts(alerts)
+
+  return NextResponse.json({ success: true, alert })
 }

@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
-import { NextRequest } from 'next/server'
 import fs from 'fs'
 import path from 'path'
-import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy'
@@ -97,12 +95,7 @@ function generateAlerts(
   return alerts
 }
 
-export async function GET(request: NextRequest) {
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    return createUnauthorizedResponse(auth.error || 'Authentication required')
-  }
-
+export async function GET() {
   const startTime = Date.now()
 
   try {
