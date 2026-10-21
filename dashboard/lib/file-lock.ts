@@ -2,47 +2,58 @@ import { createLogger } from '@/lib/logger'
 
 const logger = createLogger('file-lock')
 
+// Default timeout for lock acquisition (prevents indefinite locks)
+const DEFAULT_LOCK_TIMEOUT_MS = 30000 // 30 seconds
+
 interface FileLock {
   queue: Array<() => Promise<void>>
   locked: boolean
+  lastAccessTime: number
 }
 
 const locks = new Map<string, FileLock>()
 
-export async function withFileLock<T>(filePath: string, callback: () => Promise<T>): Promise<T> {
+export async function withFileLock<T>(filePath: string, callback: () => Promise<T>, timeoutMs: number = DEFAULT_LOCK_TIMEOUT_MS): Promise<T> {
   let lock = locks.get(filePath)
 
   if (!lock) {
-    lock = { queue: [], locked: false }
+    lock = { queue: [], locked: false, lastAccessTime: Date.now() }
     locks.set(filePath, lock)
   }
 
   return new Promise<T>((resolve, reject) => {
+    // Set timeout to prevent indefinite lock waiting
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Lock acquisition timeout after ${timeoutMs}ms for file: ${filePath}`))
+    }, timeoutMs)
+
     const executeCallback = async (): Promise<void> => {
+      clearTimeout(timeoutId)
+
       try {
         const result = await callback()
         resolve(result)
       } catch (error) {
         reject(error)
       } finally {
-        // Lock is guaranteed to exist: it was either retrieved or just created above
+        // Lock is guaranteed to exist: created above or retrieved from map
         const fileLock = locks.get(filePath)
+
         if (!fileLock) {
-          // Safety check: should never happen, but log if lock was deleted unexpectedly
+          // Should never happen, but log if it does - indicates internal error
           logger.error('Lock was deleted during execution', new Error('Lock deleted'), { filePath })
           return
         }
 
+        fileLock.lastAccessTime = Date.now()
         const nextCallback = fileLock.queue.shift()
+
         if (nextCallback) {
-          // Execute next queued callback asynchronously.
-          // Note: Errors in subsequent queued callbacks are not propagated to the original caller.
-          // The executor for the current callback has already resolved/rejected.
-          // Queued callback errors are logged but don't prevent remaining callbacks from executing.
+          // Execute next queued callback asynchronously
+          // Errors in queued callbacks are logged but don't prevent remaining callbacks
           void nextCallback().catch((error) => {
             logger.error('Error executing queued callback', error, { filePath })
-            // Continue to next callback instead of stopping - do not re-throw
-            return Promise.resolve()
+            // Continue to next callback - do not re-throw
           })
         } else {
           fileLock.locked = false

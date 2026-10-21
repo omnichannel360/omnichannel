@@ -24,6 +24,19 @@ export async function GET(request: NextRequest): Promise<NextResponse<VerifyResp
     operation: 'verify_auth',
   })
 
+  // SECURITY: Enforce HTTPS in production
+  if (process.env.NODE_ENV === 'production' && request.nextUrl.protocol !== 'https:') {
+    logger.warn('Non-HTTPS request rejected in production', {
+      ...logContext,
+      protocol: request.nextUrl.protocol,
+      statusCode: 400,
+    })
+    return NextResponse.json(
+      { success: false, authenticated: false, error: 'HTTPS required' },
+      { status: 400 }
+    )
+  }
+
   // Apply rate limiting
   const rateLimitError = await applyRateLimit(request, 'verify')
   if (rateLimitError) {
@@ -32,7 +45,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<VerifyResp
       statusCode: 429,
       responseTimeMs: Date.now() - startTime,
     })
-    return rateLimitError as NextResponse<VerifyResponse>
+    if (rateLimitError instanceof NextResponse) {
+      return rateLimitError as NextResponse<VerifyResponse>
+    }
+    return NextResponse.json({ success: false, authenticated: false, error: 'Rate limit exceeded' }, { status: 429 })
   }
 
   try {
@@ -56,26 +72,45 @@ export async function GET(request: NextRequest): Promise<NextResponse<VerifyResp
     }
 
     const { payload } = authResult
+
+    // Type guard: authResult.authenticated is true, so payload is guaranteed to exist
+    // If payload is somehow missing, this is a contract violation in verifyAuth
+    if (!payload) {
+      const err = new Error('Contract violation: Token payload missing after authentication verification')
+      logger.error('Auth verification contract violation', err, {
+        ...logContext,
+        statusCode: 500,
+      })
+      throw err
+    }
+
     logger.info('Token verification successful', {
       ...logContext,
-      email: payload!.email,
-      role: payload!.role,
+      email: payload.email,
+      role: payload.role,
       statusCode: 200,
       responseTimeMs: Date.now() - startTime,
     })
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         authenticated: true,
         user: {
-          email: payload!.email,
-          role: payload!.role,
-          sub: payload!.sub,
+          email: payload.email,
+          role: payload.role,
+          sub: payload.sub,
         },
       },
       { status: 200 }
     )
+
+    // SECURITY: Add security headers
+    response.headers.set('X-Content-Type-Options', 'nosniff')
+    response.headers.set('X-Frame-Options', 'DENY')
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+
+    return response
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Token verification failed'
     logger.error('Token verification error - exception during verification', error, {

@@ -19,6 +19,7 @@ const limiters: Map<string, ReturnType<typeof createRateLimiter>> = new Map()
 
 /**
  * Get or create a rate limiter for the given config
+ * @returns Rate limiter instance (guaranteed to exist due to set/get pattern)
  */
 function getLimiter(config: RateLimitConfig): ReturnType<typeof createRateLimiter> {
   const key = `${config.keyPrefix}:${config.maxTokens}:${config.refillRate}`
@@ -27,6 +28,7 @@ function getLimiter(config: RateLimitConfig): ReturnType<typeof createRateLimite
     limiters.set(key, createRateLimiter(config))
   }
 
+  // Safe to use non-null assertion: we just ensured the key exists above
   return limiters.get(key)!
 }
 
@@ -79,11 +81,12 @@ export function withRateLimit(
 
       // Add rate limit headers to response
       const headers = new Headers(response.headers)
-      Object.entries(createRateLimitHeaders(remaining)).forEach(
-        ([key, value]) => {
-          headers.set(key, value)
-        }
-      )
+      const rateLimitHeaders = createRateLimitHeaders(remaining)
+
+      // Set each rate limit header explicitly
+      for (const [headerKey, headerValue] of Object.entries(rateLimitHeaders)) {
+        headers.set(headerKey, String(headerValue))
+      }
 
       // Return response with headers
       return new Response(response.body, {
@@ -92,8 +95,14 @@ export function withRateLimit(
         headers,
       })
     } catch (error) {
-      logger.error('[Rate Limit] Error:', error)
-      // On error, allow request but log it
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      logger.error('Rate limit check failed - allowing request', error, {
+        path: pathname,
+        errorMsg,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+      })
+      // On error in rate limiter, allow request to proceed
+      // (fail-open to prevent blocking valid traffic)
       return handler(request, context)
     }
   }
@@ -101,8 +110,12 @@ export function withRateLimit(
 
 /**
  * Extract user ID from JWT token in request
+ * WARNING: This function does NOT verify the JWT signature.
+ * It should only be used for rate limiting key generation, not for authentication.
+ * For actual authentication, use verifyToken() from @/lib/auth instead.
+ *
  * @param request - The request object
- * @returns User ID if authenticated, undefined otherwise
+ * @returns User ID if token payload is decodable, undefined otherwise
  */
 export function extractUserId(request: Request): string | undefined {
   try {
@@ -111,12 +124,42 @@ export function extractUserId(request: Request): string | undefined {
       return undefined
     }
 
-    // This is a simple extraction - in production, verify the JWT
     const token = authHeader.slice(7)
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    const parts = token.split('.')
 
-    return payload.userId || payload.sub
-  } catch {
+    // JWT must have 3 parts: header.payload.signature
+    if (parts.length !== 3) {
+      return undefined
+    }
+
+    // Safely decode and parse payload (does NOT verify signature - for rate limiting only)
+    let payload: unknown
+    try {
+      const decodedPayload = Buffer.from(parts[1], 'base64').toString()
+      payload = JSON.parse(decodedPayload)
+    } catch (parseError) {
+      // Invalid base64 or JSON - not a valid JWT structure
+      return undefined
+    }
+
+    // Type guard: payload must be an object
+    if (typeof payload !== 'object' || payload === null) {
+      return undefined
+    }
+
+    // Return userId or sub, with explicit type safety
+    const payloadObj = payload as Record<string, unknown>
+    if (typeof payloadObj.userId === 'string') {
+      return payloadObj.userId
+    }
+    if (typeof payloadObj.sub === 'string') {
+      return payloadObj.sub
+    }
+
+    return undefined
+  } catch (error) {
+    // Silently return undefined on any unexpected error
+    // (e.g., Buffer.from failure, unexpected exception)
     return undefined
   }
 }
