@@ -49,11 +49,11 @@ const MAX_HEADER_SIZE = 8 * 1024 // 8KB
  */
 export const EmailSchema = z
   .string()
-  .min(1, 'Email is required')
-  .max(EMAIL_MAX_LENGTH, `Email must be less than ${EMAIL_MAX_LENGTH} characters`)
-  .regex(EMAIL_REGEX, 'Invalid email format')
-  .toLowerCase()
   .trim()
+  .toLowerCase()
+  .email('Invalid email format')
+  .min(3, 'Email must be at least 3 characters')
+  .max(EMAIL_MAX_LENGTH, `Email must be less than ${EMAIL_MAX_LENGTH} characters`)
 
 export const PasswordSchema = z
   .string()

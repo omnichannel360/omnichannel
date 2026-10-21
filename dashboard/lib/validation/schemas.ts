@@ -5,6 +5,10 @@
 
 import { z } from 'zod'
 import { PASSWORD_VALIDATION } from './password-validation-constants'
+import { PasswordSchema as InputValidationPasswordSchema } from '../input-validation'
+
+// Re-export for backward compatibility
+export const PasswordSchema = InputValidationPasswordSchema
 
 // Email validation - RFC 5322 compliant
 export const EmailSchema = z
@@ -15,19 +19,8 @@ export const EmailSchema = z
   .min(3, 'Email must be at least 3 characters')
   .max(254, 'Email must not exceed 254 characters')
 
-// Password validation - strong password requirements
-// CONSOLIDATED: Single source of truth for password rules - imports from shared config
-
-export const PasswordSchema = z
-  .string()
-  .min(PASSWORD_VALIDATION.minLength, `Password must be at least ${PASSWORD_VALIDATION.minLength} characters`)
-  .max(PASSWORD_VALIDATION.maxLength, `Password must not exceed ${PASSWORD_VALIDATION.maxLength} characters`)
-  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number')
-  .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
-  .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
-  .refine((pwd) => !PASSWORD_VALIDATION.regex.test(pwd), PASSWORD_VALIDATION.description)
+// DEPRECATED: PasswordSchema defined here - use import from input-validation.ts instead
+// Imported for backward compatibility
 
 // Weak password for development/testing (optional override)
 export const PasswordSchemaWeak = z
@@ -287,8 +280,8 @@ export const MeetingSchema = z.object({
     .optional(),
   attendees: z
     .array(EmailSchema)
-    .min(1, 'At least one attendee is required')
-    .optional(),
+    .optional()
+    .default([]),
 })
 
 export type Meeting = z.infer<typeof MeetingSchema>
