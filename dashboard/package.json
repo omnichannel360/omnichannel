@@ -19,7 +19,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-force-graph-2d": "^1.25.0",
-    "recharts": "^2.10.0",
+    "recharts": "^2.15.4",
     "zod": "^3.25.76"
   },
   "devDependencies": {

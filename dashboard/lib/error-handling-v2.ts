@@ -221,7 +221,7 @@ export function getHttpStatus(code: ExtendedErrorCode): number {
  */
 export function generateCorrelationId(): string {
   const timestamp = Date.now()
-  // Use the full UUID for better uniqueness guarantee
+  // Use first 8 characters of UUID (32 hex chars after removing dashes)
   const uuid = uuidv4().replace(/-/g, '').substring(0, 8)
   return `${timestamp}-${uuid}`
 }
@@ -341,9 +341,9 @@ export function getErrorDetails(error: unknown): {
     const message = error.message || 'Unknown error'
     const stack = error.stack
     const name = error.name
-    // Safely extract code property if it exists
+    // Safely extract code property if it exists (already verified as string type)
     const code = 'code' in error && typeof (error as Record<string, unknown>).code === 'string'
-      ? String((error as Record<string, unknown>).code)
+      ? (error as Record<string, unknown>).code as string
       : undefined
 
     return {
@@ -360,9 +360,11 @@ export function getErrorDetails(error: unknown): {
 
   if (error && typeof error === 'object') {
     const errorObj = error as Record<string, unknown>
-    const message = String(errorObj.message || 'Unknown error')
+    const message = errorObj.message && typeof errorObj.message === 'string'
+      ? errorObj.message
+      : 'Unknown error'
     const code = errorObj.code && typeof errorObj.code === 'string'
-      ? String(errorObj.code)
+      ? errorObj.code as string
       : undefined
 
     return {

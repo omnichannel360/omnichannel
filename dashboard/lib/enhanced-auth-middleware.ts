@@ -222,7 +222,7 @@ export function extractEnhancedAuthFromHeaders(request: NextRequest): EnhancedAu
   const role = request.headers.get('x-user-role')
 
   // Validate that userId is a non-empty string
-  if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+  if (!userId || userId.trim().length === 0) {
     return {
       authenticated: false,
       error: 'Missing authentication headers',
@@ -230,11 +230,16 @@ export function extractEnhancedAuthFromHeaders(request: NextRequest): EnhancedAu
     }
   }
 
+  // Helper to safely trim optional header values
+  const trimIfValid = (value: string | null): string | undefined => {
+    return value && value.trim().length > 0 ? value.trim() : undefined
+  }
+
   return {
     authenticated: true,
     userId: userId.trim(),
-    email: email && typeof email === 'string' && email.trim().length > 0 ? email.trim() : undefined,
-    role: role && typeof role === 'string' && role.trim().length > 0 ? role.trim() : undefined,
+    email: trimIfValid(email),
+    role: trimIfValid(role),
   }
 }
 

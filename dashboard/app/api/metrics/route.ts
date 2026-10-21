@@ -36,6 +36,28 @@ interface Metrics {
 }
 
 /**
+ * Get configuration value from environment with safe defaults and validation.
+ * Handles env var parsing with NaN detection and error logging.
+ */
+const getConfigValue = (envKey: string, defaultValue: number): number => {
+  const value = process.env[envKey]
+  if (!value) return defaultValue
+
+  const parsed = parseInt(value, 10)
+  // Validate that parseInt succeeded (returns NaN on failure)
+  if (isNaN(parsed)) {
+    logger.warn(`Invalid numeric value for ${envKey}: "${value}", using default: ${defaultValue}`, {
+      envKey,
+      invalidValue: value,
+      defaultValue,
+    })
+    return defaultValue
+  }
+
+  return parsed
+}
+
+/**
  * Calculate metrics with actual data where available, defaults for others.
  *
  * ACTUAL DATA SOURCES:
@@ -68,7 +90,9 @@ async function calculateActualMetrics(): Promise<Metrics> {
     )
 
     // Calculate operations metrics from actual data
+    // skillsRegistry.skills is optional, defaults to empty array for safe length access
     const skillCount = skillsRegistry.skills?.length ?? 0
+    // avgProcessingTime: safely handles missing duration_ms (defaults to 0)
     const avgProcessingTime = meetingsLog.length > 0
       ? meetingsLog.reduce((sum, m) => sum + (m.duration_ms ?? 0), 0) / meetingsLog.length
       : 0
@@ -85,25 +109,6 @@ async function calculateActualMetrics(): Promise<Metrics> {
       ? completedMeetings.reduce((sum, m) => sum + (m.duration_ms ?? 0), 0) / completedMeetings.length
       : 0
     const avgTaskCompletionMinutes = Math.round(avgTaskCompletionMs / 60000 * 10) / 10
-
-    // Get configuration values with safe defaults and validation
-    const getConfigValue = (envKey: string, defaultValue: number): number => {
-      const value = process.env[envKey]
-      if (!value) return defaultValue
-
-      const parsed = parseInt(value, 10)
-      // Validate that parseInt succeeded (returns NaN on failure)
-      if (isNaN(parsed)) {
-        logger.warn(`Invalid numeric value for ${envKey}: "${value}", using default: ${defaultValue}`, {
-          envKey,
-          invalidValue: value,
-          defaultValue,
-        })
-        return defaultValue
-      }
-
-      return parsed
-    }
 
     // Return calculated metrics
     return {
@@ -133,12 +138,7 @@ async function calculateActualMetrics(): Promise<Metrics> {
       operation: 'calculate_actual_metrics',
     })
 
-    // Return safe defaults if calculation fails (using env vars with fallbacks)
-    const getConfigValue = (envKey: string, defaultValue: number): number => {
-      const value = process.env[envKey]
-      return value ? parseInt(value, 10) : defaultValue
-    }
-
+    // Return safe defaults if calculation fails (using shared getConfigValue function)
     return {
       finance: {
         revenue: getConfigValue('METRICS_REVENUE', 125000),
