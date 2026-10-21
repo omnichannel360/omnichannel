@@ -280,8 +280,7 @@ export const MeetingSchema = z.object({
     .optional(),
   attendees: z
     .array(EmailSchema)
-    .optional()
-    .default([]),
+    .min(1, 'At least one attendee required'),
 })
 
 export type Meeting = z.infer<typeof MeetingSchema>

@@ -238,11 +238,12 @@ function isValidApiKey(key: string): boolean {
   // Maximum 256 characters
   if (key.length > 256) return false
 
-  // Strict whitelist: only alphanumeric, underscore, hyphen, dot
+  // Strict whitelist: only alphanumeric, underscore, hyphen, dot, colon
   // Explicitly does NOT allow: space, newline, tab, quotes, brackets, etc.
-  // Regex: ^[a-zA-Z0-9._-]{12,256}$
+  // Colon is required for API keys like 'project:key'
+  // Regex: ^[a-zA-Z0-9._:-]{12,256}$
   // This regex enforces the exact character set and length requirements
-  return /^[a-zA-Z0-9._-]{12,256}$/.test(key)
+  return /^[a-zA-Z0-9._:-]{12,256}$/.test(key)
 }
 
 /**
