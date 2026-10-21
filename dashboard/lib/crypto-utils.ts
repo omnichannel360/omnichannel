@@ -4,6 +4,10 @@
  * NOTE: Fallback to Math.random is NOT cryptographically secure
  */
 
+import { createLogger } from './logger'
+
+const logger = createLogger('crypto-utils')
+
 /**
  * Generate a cryptographically secure random ID
  *
@@ -29,10 +33,7 @@ export function generateSecureRandomId(): string {
 
   // FALLBACK: This is NOT cryptographically secure
   // Use only as last resort; prefer upgrading to Node.js 15+ or using browser APIs
-  console.warn(
-    '[SECURITY] generateSecureRandomId: Using non-secure Math.random() fallback. ' +
-    'Consider upgrading Node.js to 15+ or using browser crypto APIs.'
-  )
+  logger.warn('[SECURITY] generateSecureRandomId: Using non-secure Math.random() fallback. Consider upgrading Node.js to 15+ or using browser crypto APIs.')
   return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 }
 

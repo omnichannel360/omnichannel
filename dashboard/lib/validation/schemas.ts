@@ -356,17 +356,19 @@ export type AlertsQuery = z.infer<typeof AlertsQuerySchema>
 
 // Alerts: Create alert body (used in alerts route)
 export const AlertCreateBodySchema = z.object({
-  level: z.enum(['info', 'warning', 'critical'], {
-    errorMap: () => ({ message: 'Level must be one of: info, warning, critical' }),
-  }),
-  component: z
-    .string()
-    .min(1, 'Component is required')
-    .max(100, 'Component must not exceed 100 characters'),
-  message: z
-    .string()
-    .min(1, 'Message is required')
-    .max(2000, 'Message must not exceed 2000 characters'),
+  title: SafeStringSchema.min(1, 'Title is required'),
+  message: SafeStringSchema.min(1, 'Message is required'),
+  severity: z
+    .enum(['info', 'warning', 'error', 'critical'], {
+      errorMap: () => ({ message: 'Severity must be one of: info, warning, error, critical' }),
+    })
+    .optional()
+    .default('info'),
+  tags: z
+    .array(SafeStringSchema)
+    .max(10, 'Maximum 10 tags allowed')
+    .optional()
+    .default([]),
 })
 
 export type AlertCreateBody = z.infer<typeof AlertCreateBodySchema>
