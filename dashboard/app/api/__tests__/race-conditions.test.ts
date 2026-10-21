@@ -46,9 +46,8 @@ describe('API Route Race Condition Integration Tests', () => {
                 message: `Alert ${index}`,
                 status: 'active',
               }
-              const updated = [...alerts, newAlert]
-              return { updated, result: newAlert }
-            })
+              return [...alerts, newAlert]
+            }, [])
             return result
           })
       )
@@ -72,10 +71,7 @@ describe('API Route Race Condition Integration Tests', () => {
           status: 'active',
         }))
 
-      await atomicUpdate(alertsFile, async () => ({
-        updated: initialAlerts,
-        result: undefined,
-      }))
+      await atomicUpdate(alertsFile, async () => initialAlerts, [])
 
       // Simulate 5 GET + 5 PATCH requests concurrently
       const operations = await Promise.all([
@@ -90,14 +86,13 @@ describe('API Route Race Condition Integration Tests', () => {
           .map((_, i) =>
             atomicUpdate(alertsFile, async (current) => {
               const alerts = Array.isArray(current) ? current : []
-              const updated = alerts.map((a, idx) => {
+              return alerts.map((a, idx) => {
                 if (idx === i) {
                   return { ...a, status: 'resolved' }
                 }
                 return a
               })
-              return { updated, result: undefined }
-            })
+            }, [])
           ),
       ])
 
@@ -121,10 +116,7 @@ describe('API Route Race Condition Integration Tests', () => {
           status: 'todo',
         }))
 
-      await atomicUpdate(tasksFile, async () => ({
-        updated: initialTasks,
-        result: undefined,
-      }))
+      await atomicUpdate(tasksFile, async () => initialTasks, [])
 
       // Simulate 5 concurrent PATCH requests updating task statuses
       const updates = await Promise.all(
@@ -133,14 +125,13 @@ describe('API Route Race Condition Integration Tests', () => {
           .map((_, i) =>
             atomicUpdate(tasksFile, async (current) => {
               const tasks = Array.isArray(current) ? current : []
-              const updated = tasks.map((t, idx) => {
+              return tasks.map((t, idx) => {
                 if (idx === i) {
                   return { ...t, status: 'in-progress' }
                 }
                 return t
               })
-              return { updated, result: undefined }
-            })
+            }, [])
           )
       )
 
@@ -155,10 +146,7 @@ describe('API Route Race Condition Integration Tests', () => {
 
       // Counter file to track updates
       const counter = { value: 0 }
-      await atomicUpdate(tasksFile, async () => ({
-        updated: counter,
-        result: undefined,
-      }))
+      await atomicUpdate(tasksFile, async () => counter, { value: 0 })
 
       // Simulate 20 concurrent increment operations
       const results = await Promise.all(
