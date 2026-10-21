@@ -1,157 +1,218 @@
-/**
- * Atomic file operations for safe concurrent data access
- * Ensures read-modify-write cycles are protected as a single atomic unit
- * No time gap between load and save where other requests can interfere
- */
-
-import { promises as fs } from 'fs'
+﻿import { promises as fs } from 'fs'
 import path from 'path'
-import { withFileLock } from './file-lock'
+import { withLock, Lock } from './file-lock'
+
+interface AtomicUpdateResult<T, R> {
+  updated: T
+  result: R
+}
+
+const ATOMIC_LOCK_TIMEOUT = 30000 // 30 seconds
 
 /**
- * Atomically read, modify, and write a JSON file in a single critical section
- * The entire operation (read → modify → write) holds the lock for the file
+ * Read a JSON file atomically.
+ * Acquires a lock to ensure consistent read and prevent partial reads.
+ */
+export async function atomicRead<T>(filePath: string): Promise<T> {
+  return withLock(
+    filePath,
+    async () => {
+      try {
+        const content = await fs.readFile(filePath, 'utf-8')
+        return JSON.parse(content) as T
+      } catch (error) {
+        // File doesn't exist, return empty array or object
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          // Determine default based on file path hints
+          if (filePath.includes('alerts') || filePath.includes('tasks') || filePath.includes('logs')) {
+            return [] as T
+          }
+          return {} as T
+        }
+        throw error
+      }
+    },
+    { timeout: ATOMIC_LOCK_TIMEOUT }
+  )
+}
+
+/**
+ * Write a JSON file atomically.
+ * Acquires a lock, writes to a temporary file, then atomically renames it.
+ * This ensures the file is never in a partially-written state.
+ */
+export async function atomicWrite<T>(filePath: string, data: T): Promise<void> {
+  // Ensure directory exists
+  const dir = path.dirname(filePath)
+  await fs.mkdir(dir, { recursive: true })
+
+  return withLock(
+    filePath,
+    async () => {
+      // Write to temporary file first
+      const tempPath = `${filePath}.tmp`
+
+      try {
+        const content = JSON.stringify(data, null, 2)
+        await fs.writeFile(tempPath, content, 'utf-8')
+
+        // Atomic rename: move temp file to actual location
+        // On POSIX systems, rename is atomic
+        await fs.rename(tempPath, filePath)
+      } catch (error) {
+        // Clean up temp file on error
+        try {
+          await fs.rm(tempPath, { force: true })
+        } catch {
+          // Ignore cleanup errors
+        }
+        throw error
+      }
+    },
+    { timeout: ATOMIC_LOCK_TIMEOUT }
+  )
+}
+
+/**
+ * Atomically update a JSON file.
+ * Acquires a lock, reads the current content, applies the update function,
+ * writes the new content, and releases the lock. All in one critical section.
  *
- * @param filePath - Path to JSON file
- * @param transform - Function that reads current data and returns updated data
- * @returns The value returned by transform function
+ * The update function receives the current data and must return an object with:
+ * - updated: The new data to write
+ * - result: The value to return from atomicUpdate
  */
 export async function atomicUpdate<T, R>(
   filePath: string,
-  transform: (current: T) => Promise<{ updated: T; result: R }> | { updated: T; result: R }
+  updateFn: (current: T) => Promise<AtomicUpdateResult<T, R>> | AtomicUpdateResult<T, R>
 ): Promise<R> {
-  return withFileLock(filePath, async () => {
-    // Ensure directory exists
-    const dir = path.dirname(filePath)
-    try {
-      await fs.mkdir(dir, { recursive: true })
-    } catch {
-      // Ignore if already exists
-    }
+  // Ensure directory exists
+  const dir = path.dirname(filePath)
+  await fs.mkdir(dir, { recursive: true })
 
-    // Read current data
-    let current: T
-    try {
-      const content = await fs.readFile(filePath, 'utf-8')
+  return withLock(
+    filePath,
+    async () => {
+      // Read current content
+      let current: T
       try {
-        current = JSON.parse(content)
-      } catch (parseError) {
-        throw new Error(`File is corrupted or contains invalid JSON: ${filePath}`)
+        const content = await fs.readFile(filePath, 'utf-8')
+        current = JSON.parse(content) as T
+      } catch (error) {
+        // File doesn't exist, start with empty array or object
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          if (filePath.includes('alerts') || filePath.includes('tasks') || filePath.includes('logs')) {
+            current = [] as T
+          } else {
+            current = {} as T
+          }
+        } else {
+          throw error
+        }
       }
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code === 'ENOENT') {
-        // File doesn't exist - use empty array as default
-        current = [] as unknown as T
-      } else {
+
+      // Apply update function
+      const result = await Promise.resolve(updateFn(current))
+
+      // Write new content atomically
+      const tempPath = `${filePath}.tmp`
+
+      try {
+        const content = JSON.stringify(result.updated, null, 2)
+        await fs.writeFile(tempPath, content, 'utf-8')
+
+        // Atomic rename
+        await fs.rename(tempPath, filePath)
+      } catch (error) {
+        // Clean up temp file on error
+        try {
+          await fs.rm(tempPath, { force: true })
+        } catch {
+          // Ignore cleanup errors
+        }
         throw error
       }
-    }
 
-    // Transform (modify) and get result
-    const { updated, result } = await Promise.resolve(transform(current))
-
-    // Write atomically (this is now protected by the lock held for the entire operation)
-    await fs.writeFile(filePath, JSON.stringify(updated, null, 2), 'utf-8')
-
-    return result
-  })
+      return result.result
+    },
+    { timeout: ATOMIC_LOCK_TIMEOUT }
+  )
 }
 
 /**
- * Atomically read and conditionally update a JSON file
- * Allows inspection and selective updates in a single critical section
- *
- * @param filePath - Path to JSON file
- * @param inspector - Function that inspects current data and decides whether to update
- * @returns Object with the data and whether it was updated
+ * Atomically read-modify-write a JSON file with a callback.
+ * Similar to atomicUpdate but with different callback signature.
  */
-export async function atomicConditionalUpdate<T>(
+export async function atomicReadModifyWrite<T>(
   filePath: string,
-  inspector: (current: T) => Promise<{ updated?: T; shouldUpdate: boolean }> | { updated?: T; shouldUpdate: boolean }
-): Promise<{ data: T; updated: boolean }> {
-  return withFileLock(filePath, async () => {
-    // Ensure directory exists
-    const dir = path.dirname(filePath)
-    try {
-      await fs.mkdir(dir, { recursive: true })
-    } catch {
-      // Ignore if already exists
-    }
-
-    // Read current data
-    let current: T
-    try {
-      const content = await fs.readFile(filePath, 'utf-8')
-      try {
-        current = JSON.parse(content)
-      } catch (parseError) {
-        throw new Error(`File is corrupted or contains invalid JSON: ${filePath}`)
-      }
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code === 'ENOENT') {
-        current = [] as unknown as T
-      } else {
-        throw error
-      }
-    }
-
-    // Inspect and determine if update is needed
-    const decision = await Promise.resolve(inspector(current))
-
-    if (decision.shouldUpdate && decision.updated !== undefined) {
-      // Write atomically
-      await fs.writeFile(filePath, JSON.stringify(decision.updated, null, 2), 'utf-8')
-      return { data: decision.updated, updated: true }
-    }
-
-    return { data: current, updated: false }
+  modifyFn: (current: T) => Promise<T> | T
+): Promise<T> {
+  return atomicUpdate<T, T>(filePath, async (current) => {
+    const updated = await Promise.resolve(modifyFn(current))
+    return { updated, result: updated }
   })
 }
 
 /**
- * Atomically read a JSON file safely
- * Ensures consistent view of data during read
- *
- * @param filePath - Path to JSON file
- * @returns Parsed JSON data
+ * Atomically perform multiple operations on a file.
+ * Useful when you need to read multiple times or perform complex operations.
  */
-export async function atomicRead<T>(filePath: string): Promise<T> {
-  return withFileLock(filePath, async () => {
-    try {
-      const content = await fs.readFile(filePath, 'utf-8')
-      try {
-        return JSON.parse(content) as T
-      } catch (parseError) {
-        throw new Error(`File is corrupted or contains invalid JSON: ${filePath}`)
-      }
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code === 'ENOENT') {
-        return [] as unknown as T
-      }
-      throw error
-    }
-  })
-}
+export async function atomicTransaction<T, R>(
+  filePath: string,
+  fn: (read: () => Promise<T>, write: (data: T) => Promise<void>) => Promise<R>
+): Promise<R> {
+  // Ensure directory exists
+  const dir = path.dirname(filePath)
+  await fs.mkdir(dir, { recursive: true })
 
-/**
- * Atomically write a JSON file
- * Ensures consistent write with lock
- *
- * @param filePath - Path to JSON file
- * @param data - Data to write
- */
-export async function atomicWrite<T>(filePath: string, data: T): Promise<void> {
-  return withFileLock(filePath, async () => {
-    const dir = path.dirname(filePath)
-    try {
-      await fs.mkdir(dir, { recursive: true })
-    } catch {
-      // Ignore if already exists
-    }
+  return withLock(
+    filePath,
+    async () => {
+      let cachedData: T | undefined
 
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-  })
+      const read = async (): Promise<T> => {
+        if (cachedData !== undefined) {
+          return cachedData
+        }
+
+        try {
+          const content = await fs.readFile(filePath, 'utf-8')
+          cachedData = JSON.parse(content) as T
+          return cachedData
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            if (filePath.includes('alerts') || filePath.includes('tasks') || filePath.includes('logs')) {
+              cachedData = [] as T
+            } else {
+              cachedData = {} as T
+            }
+            return cachedData
+          }
+          throw error
+        }
+      }
+
+      const write = async (data: T): Promise<void> => {
+        cachedData = data
+
+        const tempPath = `${filePath}.tmp`
+
+        try {
+          const content = JSON.stringify(data, null, 2)
+          await fs.writeFile(tempPath, content, 'utf-8')
+          await fs.rename(tempPath, filePath)
+        } catch (error) {
+          try {
+            await fs.rm(tempPath, { force: true })
+          } catch {
+            // Ignore cleanup errors
+          }
+          throw error
+        }
+      }
+
+      return fn(read, write)
+    },
+    { timeout: ATOMIC_LOCK_TIMEOUT }
+  )
 }

@@ -196,4 +196,143 @@ describe('File Operations - Async I/O', () => {
       expect(results.every(r => r.shared === true)).toBe(true)
     })
   })
+
+  describe('Race Condition Prevention', () => {
+    it('should prevent lost updates with high concurrency', async () => {
+      // Initialize file with empty array
+      await fs.writeFile(testFile, JSON.stringify([]), 'utf-8')
+
+      // Simulate 100 concurrent increment-and-append operations
+      const operations = Array.from({ length: 100 }, (_, i) =>
+        withFileLock(testFile, async () => {
+          const data = JSON.parse(await fs.readFile(testFile, 'utf-8'))
+          const updated = [...data, i]
+          await fs.writeFile(testFile, JSON.stringify(updated, null, 2), 'utf-8')
+        })
+      )
+
+      await Promise.all(operations)
+
+      const final = JSON.parse(await fs.readFile(testFile, 'utf-8'))
+      // All values should be present, no lost writes
+      expect(final).toHaveLength(100)
+      expect(final.sort((a: number, b: number) => a - b)).toEqual(
+        Array.from({ length: 100 }, (_, i) => i)
+      )
+    })
+
+    it('should serialize reads and writes correctly', async () => {
+      let readValue = 0
+
+      // Write initial value
+      await fs.writeFile(testFile, JSON.stringify({ counter: 0 }), 'utf-8')
+
+      const operations = [
+        // Multiple writers incrementing
+        ...Array.from({ length: 10 }, () =>
+          withFileLock(testFile, async () => {
+            const data = JSON.parse(await fs.readFile(testFile, 'utf-8'))
+            data.counter += 1
+            await fs.writeFile(testFile, JSON.stringify(data), 'utf-8')
+          })
+        ),
+        // Multiple readers checking value
+        ...Array.from({ length: 5 }, async () =>
+          withFileLock(testFile, async () => {
+            const data = JSON.parse(await fs.readFile(testFile, 'utf-8'))
+            readValue = Math.max(readValue, data.counter)
+          })
+        ),
+      ]
+
+      await Promise.all(operations)
+
+      const final = JSON.parse(await fs.readFile(testFile, 'utf-8'))
+      expect(final.counter).toBe(10)
+      expect(readValue).toBeLessThanOrEqual(10)
+    })
+
+    it('should maintain order under rapid-fire requests', async () => {
+      const order: number[] = []
+      const numRequests = 50
+
+      const requests = Array.from({ length: numRequests }, (_, i) =>
+        withFileLock(testFile, async () => {
+          order.push(i)
+          // Simulate work
+          await new Promise(resolve => setTimeout(resolve, Math.random() * 5))
+        })
+      )
+
+      await Promise.all(requests)
+
+      // All requests should complete in their original order due to locking
+      expect(order).toEqual(Array.from({ length: numRequests }, (_, i) => i))
+    })
+
+    it('should handle interleaved reads and writes without data corruption', async () => {
+      interface DataItem {
+        id: number
+        value: string
+      }
+      const items: DataItem[] = []
+
+      await fs.writeFile(testFile, JSON.stringify(items), 'utf-8')
+
+      const operations = [
+        // Writers
+        ...Array.from({ length: 20 }, (_, i) =>
+          withFileLock(testFile, async () => {
+            const data = JSON.parse(await fs.readFile(testFile, 'utf-8')) as DataItem[]
+            const updated: DataItem[] = [...data, { id: i, value: `item-${i}` }]
+            await fs.writeFile(testFile, JSON.stringify(updated), 'utf-8')
+          })
+        ),
+        // Readers
+        ...Array.from({ length: 10 }, async () =>
+          withFileLock(testFile, async () => {
+            const data = JSON.parse(await fs.readFile(testFile, 'utf-8')) as DataItem[]
+            expect(Array.isArray(data)).toBe(true)
+            // Validate all items have required fields
+            for (const item of data) {
+              expect(typeof item.id).toBe('number')
+              expect(typeof item.value).toBe('string')
+            }
+          })
+        ),
+      ]
+
+      await Promise.all(operations)
+
+      const final = JSON.parse(await fs.readFile(testFile, 'utf-8')) as DataItem[]
+      expect(final).toHaveLength(20)
+      expect(final.every(item => typeof item.id === 'number')).toBe(true)
+    })
+
+    it('should prevent race conditions in read-modify-write cycles', async () => {
+      interface Counter {
+        value: number
+      }
+
+      const counter: Counter = { value: 0 }
+      await fs.writeFile(testFile, JSON.stringify(counter), 'utf-8')
+
+      // Simulate: read counter, increment, write back
+      // Without proper locking, this would lose updates
+      const operations = Array.from({ length: 50 }, async () =>
+        withFileLock(testFile, async () => {
+          const data = JSON.parse(await fs.readFile(testFile, 'utf-8')) as Counter
+          // Small delay to increase chance of race condition if not locked
+          await new Promise(resolve => setTimeout(resolve, 1))
+          data.value += 1
+          await fs.writeFile(testFile, JSON.stringify(data), 'utf-8')
+        })
+      )
+
+      await Promise.all(operations)
+
+      const final = JSON.parse(await fs.readFile(testFile, 'utf-8')) as Counter
+      expect(final.value).toBe(50) // All increments should be preserved
+    })
+  })
 })

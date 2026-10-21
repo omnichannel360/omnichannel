@@ -7,7 +7,7 @@
 import path from 'path'
 import { promises as fs } from 'fs'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
-import { clearAllLocks } from '@/lib/file-lock'
+import { clearAllLocks, cleanupStaleLocks } from '@/lib/file-lock'
 
 interface TestAlert {
   id: string

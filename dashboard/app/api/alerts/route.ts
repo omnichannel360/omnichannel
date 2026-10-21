@@ -27,17 +27,6 @@ function createAlert(level: Alert['level'], component: string, message: string):
   }
 }
 
-function createAlert(level: Alert['level'], component: string, message: string): Alert {
-  return {
-    id: generateId('alert'),
-    timestamp: new Date().toISOString(),
-    level,
-    component,
-    message,
-    status: 'active',
-  }
-}
-
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {

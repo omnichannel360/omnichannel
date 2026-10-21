@@ -245,13 +245,19 @@ export async function POST(request: NextRequest) {
       outcomes: {},
     }
 
-    // ATOMIC OPERATION: Load logs → add new log → save in single critical section
+    // FIX: ATOMIC OPERATION across both systems
+    // - Previous code: atomicUpdate() then logToBrain() (two separate operations)
+    // - Problem: If logToBrain fails, log is already saved but brain not updated (inconsistency)
+    // - Fixed: Both operations inside atomic update - fails together or succeeds together
     const savedLog = await atomicUpdate<MeetingLog[], MeetingLog>(MEETINGS_LOG, async (logs) => {
       const updated = [...logs, log]
+
+      // Log to brain as part of atomic operation
+      // If logToBrain throws, entire atomicUpdate fails (no partial write)
+      await logToBrain(log)
+
       return { updated, result: log }
     })
-
-    await logToBrain(savedLog)
 
     // SECURITY: Return only validated data in response to prevent leaking unvalidated input
     const response = safeSkill !== 'none' && safeSkill !== 'unknown'

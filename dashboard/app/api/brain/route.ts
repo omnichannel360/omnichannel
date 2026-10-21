@@ -3,7 +3,8 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
-import { withFileLock } from '@/lib/file-lock'
+import { atomicRead } from '@/lib/atomic-file-ops'
+import { atomicReaddir } from '@/lib/atomic-dir-ops'
 
 interface Memory {
   id: string
@@ -40,10 +41,13 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category')
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100)
 
+    // FIX: Use atomicReaddir to prevent race condition
+    // - Previous code: fs.stat() → fs.readdir() (race with mkdir/delete)
+    // - Fixed code: atomicReaddir() holds lock during mkdir + readdir
     let files: string[] = []
     try {
-      await fs.stat(BRAIN_DIR)
-      files = (await fs.readdir(BRAIN_DIR)).filter(f => f.endsWith('.json'))
+      const allFiles = await atomicReaddir(BRAIN_DIR)
+      files = allFiles.filter(f => f.endsWith('.json'))
     } catch {
       return NextResponse.json({
         success: true,
@@ -57,37 +61,40 @@ export async function GET(request: NextRequest) {
 
     const memories: Memory[] = []
     const categoryCount: Record<string, number> = {}
+    const seenIds = new Set<string>()
 
-    await Promise.all(
-      files.map(file =>
-        withFileLock(path.join(BRAIN_DIR, file), async () => {
-          try {
-            const content = await fs.readFile(path.join(BRAIN_DIR, file), 'utf-8')
-            const data = JSON.parse(content)
+    // Read files sequentially with atomic locks to prevent race conditions
+    // and ensure consistent snapshots of individual memory records
+    for (const file of files) {
+      try {
+        const data = await atomicRead<MemoryData[] | Record<string, unknown>>(path.join(BRAIN_DIR, file))
+        if (Array.isArray(data)) {
+          data.forEach((mem: MemoryData) => {
+            const id = mem.id || crypto.randomUUID()
+            const cat = mem.category || 'general'
 
-            if (Array.isArray(data)) {
-              data.forEach((mem: MemoryData) => {
-                const cat = mem.category || 'general'
-                categoryCount[cat] = (categoryCount[cat] || 0) + 1
+            // Prevent duplicate IDs from being counted twice
+            if (!seenIds.has(id)) {
+              seenIds.add(id)
+              categoryCount[cat] = (categoryCount[cat] || 0) + 1
 
-                if (!category || mem.category === category) {
-                  memories.push({
-                    id: mem.id || crypto.randomUUID(),
-                    timestamp: mem.timestamp || new Date().toISOString(),
-                    action: mem.action || '',
-                    result: mem.result || '',
-                    category: cat,
-                  })
-                }
-              })
+              if (!category || mem.category === category) {
+                memories.push({
+                  id,
+                  timestamp: mem.timestamp || new Date().toISOString(),
+                  action: mem.action || '',
+                  result: mem.result || '',
+                  category: cat,
+                })
+              }
             }
-          } catch (e) {
-            const error = e instanceof Error ? e.message : String(e)
-            console.error(`Failed to parse memory file ${file}:`, error)
-          }
-        })
-      )
-    )
+          })
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error.message : String(error)
+        console.error(`Failed to parse memory file ${file}:`, err)
+      }
+    }
 
     const recent = memories.sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
