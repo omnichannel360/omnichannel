@@ -239,7 +239,7 @@ const meetingHandlers = protectRouteMulti(
           await logToBrain(log)
 
           return updated
-        })
+        }, [])
 
         // SECURITY: Return only validated data in response to prevent leaking unvalidated input
         const response = safeSkill !== 'none' && safeSkill !== 'unknown'

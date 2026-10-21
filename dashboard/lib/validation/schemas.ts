@@ -23,6 +23,8 @@ export const PasswordSchema = z
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
+  .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
+  .refine((pwd) => !/^(.{3,}).*\1$/.test(pwd), 'Password should not start and end with the same 3+ character pattern')
 
 // Weak password for development/testing (optional override)
 export const PasswordSchemaWeak = z

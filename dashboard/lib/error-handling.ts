@@ -385,7 +385,8 @@ export class CircuitBreaker {
 
   /**
    * Transition state from OPEN to HALF_OPEN if timeout has passed.
-   * SIDE EFFECT: Mutates internal state - do not call this as a simple getter
+   * CRITICAL SIDE EFFECT: This method MUTATES internal state (this.state, this.successCount).
+   * Must NOT be called as a pure getter. Always intended as part of execute() flow.
    */
   private transitionStateIfNeeded(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
     if (this.state === 'OPEN') {

@@ -1,6 +1,6 @@
 /**
- * Rate Limiting Middleware for Next.js API Routes (FIXED)
- * - Fixes type safety issues
+ * Rate Limiting Middleware for Next.js API Routes
+ * - Type-safe rate limiter integration
  * - Proper error handling and logging
  * - Cleanup on shutdown
  * - Per-endpoint configuration
@@ -40,7 +40,9 @@ export interface RateLimitMiddlewareOptions {
  * Usage:
  * ```typescript
  * export const GET = withRateLimit(
- *   async (req) => { /* handler */ },
+ *   async (req) => {
+ *     return NextResponse.json({ success: true })
+ *   },
  *   { config: RateLimitPresets.api }
  * )
  * ```

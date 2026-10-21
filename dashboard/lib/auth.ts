@@ -3,6 +3,9 @@ import jwt, { JwtPayload } from 'jsonwebtoken'
 
 export type UserRole = 'admin' | 'user' | 'viewer'
 
+// SECURITY: Extract valid roles as constant to prevent duplication and maintenance bugs
+export const VALID_ROLES: readonly UserRole[] = ['admin', 'user', 'viewer']
+
 // CRITICAL: JWT_SECRET must be set in environment - do not use fallback in production
 const getJWTSecret = (): string => {
   const secret = process.env.JWT_SECRET
@@ -104,8 +107,8 @@ export async function generateToken(
   expiresIn: number = 24 * 60 * 60 // 24 hours default
 ): Promise<string> {
   // Type-safe validation: role must be one of the defined UserRole values
-  if (!['admin', 'user', 'viewer'].includes(role)) {
-    throw new Error(`Invalid role: "${role}". Must be one of: admin, user, viewer`)
+  if (!VALID_ROLES.includes(role)) {
+    throw new Error(`Invalid role: "${role}". Must be one of: ${VALID_ROLES.join(', ')}`)
   }
 
   const token = jwt.sign(
@@ -203,9 +206,9 @@ export function isValidTokenPayload(payload: unknown): payload is TokenPayload {
   if (typeof p.iat !== 'number' || p.iat <= 0) return false
   if (typeof p.exp !== 'number' || p.exp <= 0) return false
 
-  // Validate role is one of the allowed values
-  const validRoles: UserRole[] = ['admin', 'user', 'viewer']
-  if (!validRoles.includes(p.role as UserRole)) return false
+  // Validate role is one of the allowed values - type-safe check
+  if (typeof p.role !== 'string') return false
+  if (!VALID_ROLES.includes(p.role as UserRole)) return false
 
   // Validate token is not expired
   const now = Math.floor(Date.now() / 1000)

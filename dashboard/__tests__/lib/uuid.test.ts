@@ -74,7 +74,7 @@ describe('UUID Generation', () => {
 
     it('includes prefix in generated ID', () => {
       const id = generatePrefixedId('user')
-      expect(id).toStartWith('user_')
+      expect(id.startsWith('user_')).toBe(true)
     })
 
     it('generates unique prefixed IDs', () => {
@@ -93,9 +93,9 @@ describe('UUID Generation', () => {
       const assistantMsg = generatePrefixedId('assistant')
       const errorMsg = generatePrefixedId('error')
 
-      expect(userMsg).toStartWith('user_')
-      expect(assistantMsg).toStartWith('assistant_')
-      expect(errorMsg).toStartWith('error_')
+      expect(userMsg.startsWith('user_')).toBe(true)
+      expect(assistantMsg.startsWith('assistant_')).toBe(true)
+      expect(errorMsg.startsWith('error_')).toBe(true)
     })
 
     it('allows empty prefix', () => {
@@ -106,15 +106,15 @@ describe('UUID Generation', () => {
     it('preserves prefix exactly', () => {
       const prefix = 'special-prefix-123'
       const id = generatePrefixedId(prefix)
-      expect(id).toStartWith(`${prefix}_`)
+      expect(id.startsWith(`${prefix}_`)).toBe(true)
     })
 
     it('generates same prefix with different UUIDs', () => {
       const msg1 = generatePrefixedId('msg')
       const msg2 = generatePrefixedId('msg')
 
-      expect(msg1).toStartWith('msg_')
-      expect(msg2).toStartWith('msg_')
+      expect(msg1.startsWith('msg_')).toBe(true)
+      expect(msg2.startsWith('msg_')).toBe(true)
       expect(msg1).not.toBe(msg2) // UUIDs should be different
     })
   })

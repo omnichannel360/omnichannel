@@ -60,8 +60,10 @@ export const PasswordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
   .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
-  // FIXED: Removed confusing length-based exception. Reject all patterns where password starts and ends with same substring
-  .refine((pwd) => !/^(.+?).*\1$/.test(pwd), 'Password should not start and end with the same pattern (e.g., "testXYZtest")')
+  // IMPROVED: Check for weak pattern repetition where same substring appears at start and end
+  // with minimal variation in between (0-9 digits). This rejects "test123test" but accepts
+  // legitimate passwords like "TestEnvironmentTest" where middle content is substantial
+  .refine((pwd) => !/^(.{3,})(\d{0,9})?\1$/.test(pwd), 'Password should not have obvious repeated patterns (e.g., "test123test")')
 
 export const StringSchema = z
   .string()
@@ -227,9 +229,8 @@ export function validateBody<T>(
  * @returns Sanitized string safe for HTML context
  */
 export function sanitizeString(input: string): string {
-  // Step 1: Remove null bytes and control characters
-  let sanitized = input.replace(/\0/g, '')
-  sanitized = sanitized.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]/g, '')
+  // Step 1: Remove null bytes and control characters (consolidated into single regex)
+  let sanitized = input.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]/g, '')
 
   // Step 2: Escape HTML entities to prevent XSS
   const htmlEscapeMap: Record<string, string> = {

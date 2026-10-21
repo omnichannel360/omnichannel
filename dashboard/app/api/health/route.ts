@@ -182,15 +182,16 @@ async function getSkillRegistryStats(correlationId: string): Promise<number> {
 }
 
 // Alert severity levels - extracted to constants to enable consistent detection
+type AlertLevel = 'info' | 'warning' | 'error'
 interface AlertMessage {
-  level: 'info' | 'warning' | 'error'
+  level: AlertLevel
   message: string
 }
 
-const ALERT_PREFIXES = {
-  INFO: '[INFO]',
-  WARNING: '[WARNING]',
-  ERROR: '[ERROR]',
+const ALERT_PREFIXES: Record<AlertLevel, string> = {
+  info: '[INFO]',
+  warning: '[WARNING]',
+  error: '[ERROR]',
 } as const
 
 function generateAlerts(
@@ -229,7 +230,7 @@ function generateAlerts(
     })
   }
 
-  return alerts.map(alert => `${ALERT_PREFIXES[alert.level.toUpperCase() as keyof typeof ALERT_PREFIXES]} ${alert.message}`)
+  return alerts.map(alert => `${ALERT_PREFIXES[alert.level]} ${alert.message}`)
 }
 
 export async function GET(request: NextRequest) {

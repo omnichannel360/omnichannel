@@ -278,7 +278,7 @@ export async function validateQuery<T>(
       const trimmed = value.trim()
 
       // Try to parse as number if it looks like one (avoid parsing "NaN", "Infinity", etc)
-      if (trimmed !== '' && !isNaN(Number(trimmed)) && trimmed !== 'NaN' && trimmed !== 'Infinity' && trimmed !== '-Infinity') {
+      if (trimmed !== '' && !isNaN(Number(trimmed)) && !['NaN', 'Infinity', '-Infinity'].includes(trimmed)) {
         const num = Number(trimmed)
         // Only use if it's a finite number
         if (isFinite(num)) {

@@ -4,7 +4,8 @@
  * stack traces, and contextual information.
  */
 
-import { generateSecureRandomId } from './crypto-utils'
+// FIXED: Moved inline to avoid circular dependency with crypto-utils
+import { randomUUID } from 'crypto'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -310,11 +311,33 @@ export const logger = createLogger('default')
  * Uses crypto.randomUUID when available, falls back to secure random bytes
  */
 /**
- * Generate a secure ID using shared crypto utilities
- * @deprecated Use generateSecureRandomId from crypto-utils instead
+ * Generate a secure ID using Node.js crypto module
+ * FIXED: Uses randomUUID directly to avoid circular dependency
  */
 function generateSecureId(): string {
-  return generateSecureRandomId()
+  try {
+    // Node.js 15+ has built-in randomUUID
+    return randomUUID()
+  } catch {
+    // Fallback for environments without randomUUID
+    // Generate a v4 UUID manually
+    const bytes = new Uint8Array(16)
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256)
+    }
+    // Set version (4) and variant bits
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+    return [
+      hex.substring(0, 8),
+      hex.substring(8, 12),
+      hex.substring(12, 16),
+      hex.substring(16, 20),
+      hex.substring(20, 32),
+    ].join('-')
+  }
 }
 
 /**

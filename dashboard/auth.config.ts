@@ -159,9 +159,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id
         token.email = user.email
-        token.role = (user as unknown as { role?: string }).role || 'user'
-        token.accessToken = (user as unknown as { accessToken?: string }).accessToken || ''
-        token.refreshToken = (user as unknown as { refreshToken?: string }).refreshToken
+        // Extract optional fields with type-safe property access
+        const userData = user as Record<string, unknown>
+        token.role = (userData.role as string) || 'user'
+        token.accessToken = (userData.accessToken as string) || ''
+        token.refreshToken = userData.refreshToken as string | undefined
         token.expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60
       }
 

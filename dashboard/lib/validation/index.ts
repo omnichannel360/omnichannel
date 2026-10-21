@@ -382,3 +382,125 @@ export function safeJsonParse<T>(json: string, fallback: T): T {
     return fallback
   }
 }
+
+/**
+ * Meeting Type Validation
+ * Whitelist of allowed meeting types - prevents path traversal attacks
+ */
+export const VALID_MEETING_TYPES = ['standup', 'review', 'planning', 'retrospective', 'sync'] as const
+export type ValidMeetingType = typeof VALID_MEETING_TYPES[number]
+
+export const MeetingTypeSchema = z
+  .string()
+  .min(1, 'Meeting type is required')
+  .max(50, 'Meeting type must not exceed 50 characters')
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Meeting type must contain only alphanumeric characters, underscores, and hyphens')
+  .refine(
+    (val): val is ValidMeetingType => VALID_MEETING_TYPES.includes(val as ValidMeetingType),
+    'Meeting type must be one of: ' + VALID_MEETING_TYPES.join(', ')
+  )
+
+/**
+ * Skill Type Validation
+ * Whitelist of allowed skill types - prevents path traversal attacks
+ */
+export const VALID_SKILL_TYPES = ['meeting_scheduler', 'brain_logger', 'notification_service', 'data_processor'] as const
+export type ValidSkillType = typeof VALID_SKILL_TYPES[number]
+
+export const SkillTypeSchema = z
+  .string()
+  .min(1, 'Skill type is required')
+  .max(50, 'Skill type must not exceed 50 characters')
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Skill type must contain only alphanumeric characters, underscores, and hyphens')
+  .refine(
+    (val): val is ValidSkillType => VALID_SKILL_TYPES.includes(val as ValidSkillType),
+    'Skill type must be one of: ' + VALID_SKILL_TYPES.join(', ')
+  )
+
+/**
+ * Meeting Status Validation
+ */
+export const VALID_MEETING_STATUSES = ['scheduled', 'completed', 'failed', 'cancelled'] as const
+export type ValidMeetingStatus = typeof VALID_MEETING_STATUSES[number]
+
+export const MeetingStatusSchema = z
+  .string()
+  .min(1, 'Meeting status is required')
+  .max(50, 'Meeting status must not exceed 50 characters')
+  .refine(
+    (val): val is ValidMeetingStatus => VALID_MEETING_STATUSES.includes(val as ValidMeetingStatus),
+    'Meeting status must be one of: ' + VALID_MEETING_STATUSES.join(', ')
+  )
+
+/**
+ * Meeting Request Schema
+ */
+export const MeetingRequestSchema = z.object({
+  meeting_type: MeetingTypeSchema,
+  skill_triggered: SkillTypeSchema.optional(),
+  status: MeetingStatusSchema.optional(),
+})
+
+export type MeetingRequest = z.infer<typeof MeetingRequestSchema>
+
+/**
+ * Safe path joining with containment validation
+ * Prevents directory traversal attacks by:
+ * 1. Resolving paths to absolute
+ * 2. Checking that result is within base directory
+ * 3. Rejecting absolute paths and traversal attempts
+ *
+ * @param baseDir - Base directory that all paths must be contained within
+ * @param filePath - File path to join with base directory
+ * @returns Safe joined path
+ * @throws Error if path escapes base directory or is absolute
+ */
+export function safeJoin(baseDir: string, filePath: string): string {
+  const path = require('path')
+
+  // Reject empty paths
+  if (!filePath || filePath.trim() === '') {
+    throw new Error('Invalid file path')
+  }
+
+  // Reject absolute paths (check with isAbsolute)
+  if (path.isAbsolute(filePath)) {
+    throw new Error('Invalid file path')
+  }
+
+  // Also reject paths that start with / or \ (for both Unix and Windows)
+  if (filePath.startsWith('/') || filePath.startsWith('\\')) {
+    throw new Error('Invalid file path')
+  }
+
+  // Reject paths containing .. to prevent traversal
+  if (filePath.includes('..')) {
+    throw new Error('Invalid file path')
+  }
+
+  // Resolve the joined path to handle . and normalize
+  const resolvedBase = path.resolve(baseDir)
+  const joinedPath = path.resolve(path.join(resolvedBase, filePath))
+
+  // Final containment check: ensure the joined path starts with base directory
+  const normalizedBase = resolvedBase.endsWith(path.sep) ? resolvedBase : resolvedBase + path.sep
+  if (!joinedPath.startsWith(normalizedBase) && joinedPath !== resolvedBase) {
+    throw new Error('Invalid file path')
+  }
+
+  return joinedPath
+}
+
+/**
+ * Generate a secure random ID
+ * Uses UUID v4 for cryptographic strength
+ *
+ * @param prefix - Optional prefix for the ID
+ * @returns Secure random ID
+ */
+export function generateId(prefix?: string): string {
+  // Import here to avoid circular dependency
+  const { generateUUIDv4 } = require('@/lib/uuid')
+  const id = generateUUIDv4()
+  return prefix ? `${prefix}_${id}` : id
+}

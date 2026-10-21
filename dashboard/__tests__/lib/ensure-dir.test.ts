@@ -8,6 +8,8 @@ jest.mock('fs', () => {
   return {
     promises: {
       mkdir: jest.fn(actual.promises.mkdir),
+      stat: jest.fn(actual.promises.stat),
+      rm: jest.fn(actual.promises.rm),
     },
   }
 })

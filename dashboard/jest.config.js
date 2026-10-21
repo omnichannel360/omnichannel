@@ -12,7 +12,7 @@ module.exports = {
       useESM: true,
     },
   },
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   collectCoverageFrom: [
     'lib/**/*.ts',
     'app/api/**/*.ts',
