@@ -125,15 +125,16 @@ export async function applyAuthMiddleware(
 
   // Check role-based access control
   const requiredRoles = routeConfig.allowedRoles || []
-  if (requiredRoles.length > 0 && authContext.role) {
-    if (!requiredRoles.includes(authContext.role)) {
+  if (requiredRoles.length > 0) {
+    // If roles are required but user has no role, deny access
+    if (!authContext.role || !requiredRoles.includes(authContext.role)) {
       if (auditLog) {
         logger.warn('Auth middleware: insufficient permissions', {
           method: request.method,
           path: pathname,
           userId: authContext.userId,
           requiredRoles,
-          userRole: authContext.role,
+          userRole: authContext.role || 'none',
         })
       }
 
@@ -159,10 +160,10 @@ export async function applyAuthMiddleware(
  * This function uses unsafe type casting. The protectRoute() function provides
  * a properly typed alternative that passes auth context as a separate argument.
  */
-export function withEnhancedAuth<T extends (...args: unknown[]) => Promise<Response>>(
-  handler: T,
+export function withEnhancedAuth(
+  handler: (request: NextRequest, ...args: unknown[]) => Promise<Response>,
   options: EnhancedAuthOptions = {}
-): (...args: unknown[]) => Promise<Response> {
+): (request: NextRequest, ...args: unknown[]) => Promise<Response> {
   return async (request: NextRequest, ...args: unknown[]) => {
     const authResult = await applyAuthMiddleware(request, options)
 
@@ -173,17 +174,22 @@ export function withEnhancedAuth<T extends (...args: unknown[]) => Promise<Respo
 
     try {
       // Pass auth context as middleware context via request headers
-      // This allows the handler to access auth without casting
-      const requestWithHeaders = request.clone()
+      // Clone and add headers - use a new request object to avoid mutations
+      const requestHeaders = new Headers(request.headers)
       if (authResult.userId) {
-        requestWithHeaders.headers.set('x-user-id', authResult.userId)
+        requestHeaders.set('x-user-id', authResult.userId)
       }
       if (authResult.email) {
-        requestWithHeaders.headers.set('x-user-email', authResult.email)
+        requestHeaders.set('x-user-email', authResult.email)
       }
       if (authResult.role) {
-        requestWithHeaders.headers.set('x-user-role', authResult.role)
+        requestHeaders.set('x-user-role', authResult.role)
       }
+
+      // Create a new NextRequest with updated headers
+      const requestWithHeaders = new NextRequest(request, {
+        headers: requestHeaders,
+      })
 
       return await handler(requestWithHeaders, ...args)
     } catch (error) {
@@ -215,7 +221,8 @@ export function extractEnhancedAuthFromHeaders(request: NextRequest): EnhancedAu
   const email = request.headers.get('x-user-email')
   const role = request.headers.get('x-user-role')
 
-  if (!userId) {
+  // Validate that userId is a non-empty string
+  if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
     return {
       authenticated: false,
       error: 'Missing authentication headers',
@@ -225,9 +232,9 @@ export function extractEnhancedAuthFromHeaders(request: NextRequest): EnhancedAu
 
   return {
     authenticated: true,
-    userId,
-    email: email || undefined,
-    role: role || undefined,
+    userId: userId.trim(),
+    email: email && typeof email === 'string' && email.trim().length > 0 ? email.trim() : undefined,
+    role: role && typeof role === 'string' && role.trim().length > 0 ? role.trim() : undefined,
   }
 }
 

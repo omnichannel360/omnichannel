@@ -38,20 +38,33 @@ export function protectRoute(
 
       // If auth failed but no response (shouldn't happen), return 401
       if (!result.authenticated) {
-        const errorMessage = typeof result.context === 'object' && result.context !== null && 'error' in result.context
-          ? (result.context as Record<string, unknown>).error
-          : 'Unauthorized'
+        let errorMessage = 'Unauthorized'
+
+        // Safely extract error message from context
+        if (result.context && typeof result.context === 'object') {
+          const contextObj = result.context as Record<string, unknown>
+          if ('error' in contextObj && typeof contextObj.error === 'string') {
+            errorMessage = contextObj.error
+          }
+        }
+
         return NextResponse.json(
-          { success: false, error: String(errorMessage || 'Unauthorized') },
+          { success: false, error: errorMessage },
           { status: 401 }
         )
       }
 
       // Call the handler with authenticated context
+      // Safely extract context properties with type checks
+      const contextObj = result.context ? (result.context as Record<string, unknown>) : {}
+      const userId = contextObj && typeof contextObj.userId === 'string' ? contextObj.userId : undefined
+      const email = contextObj && typeof contextObj.email === 'string' ? contextObj.email : undefined
+      const role = contextObj && typeof contextObj.role === 'string' ? contextObj.role : undefined
+
       return await handler(request, {
-        userId: result.context.userId,
-        email: result.context.email,
-        role: result.context.role,
+        userId,
+        email,
+        role,
       })
     } catch (error) {
       logger.error('Protected route handler error', error, {

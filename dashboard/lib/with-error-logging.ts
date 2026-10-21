@@ -35,7 +35,25 @@ export function withErrorLogging(
     serviceName = 'api-route',
     logStackTrace = true,
     logRequestBody = false,
-    sensitiveFields = ['password', 'token', 'apiKey', 'secret']
+    sensitiveFields = [
+      'password',
+      'token',
+      'apiKey',
+      'secret',
+      'jwt',
+      'authorization',
+      'bearer',
+      'session',
+      'sessionId',
+      'refreshToken',
+      'accessToken',
+      'privkey',
+      'private_key',
+      'api_key',
+      'api_secret',
+      'auth_token',
+      'x-api-key',
+    ]
   } = options
 
   return async (request: NextRequest) => {
@@ -44,13 +62,19 @@ export function withErrorLogging(
 
     try {
       // Extract request context before execution
+      // Get first IP from x-forwarded-for header (can be comma-separated list)
+      const xForwardedFor = request.headers.get('x-forwarded-for')
+      const ipAddress = xForwardedFor
+        ? xForwardedFor.split(',')[0].trim()
+        : 'unknown'
+
       const requestContext: LogContext = {
         ...extractRequestContext(request),
         correlationId,
         path: request.nextUrl.pathname,
         method: request.method,
         userAgent: request.headers.get('user-agent') || undefined,
-        ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
+        ipAddress
       }
 
       // Log request start
@@ -79,20 +103,30 @@ export function withErrorLogging(
     } catch (error) {
       const duration = Date.now() - startTime
 
-      // Extract error details
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Extract error details safely
+      const errorMessage = error instanceof Error
+        ? error.message
+        : (typeof error === 'string' ? error : 'Unknown error')
       const errorStack = error instanceof Error ? error.stack : undefined
-      const errorWithCode = error as Error & { code?: string }
-      const errorCode = errorWithCode.code || 'UNKNOWN'
+      const errorWithCode = error instanceof Error
+        ? (error as Error & { code?: string })
+        : null
+      const errorCode = errorWithCode?.code || 'UNKNOWN'
 
       // Build request context
+      // Get first IP from x-forwarded-for header (can be comma-separated list)
+      const xForwardedForError = request.headers.get('x-forwarded-for')
+      const ipAddressError = xForwardedForError
+        ? xForwardedForError.split(',')[0].trim()
+        : 'unknown'
+
       const requestContext: LogContext = {
         ...extractRequestContext(request),
         correlationId,
         path: request.nextUrl.pathname,
         method: request.method,
         userAgent: request.headers.get('user-agent') || undefined,
-        ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+        ipAddress: ipAddressError,
         duration,
         statusCode: 500
       }

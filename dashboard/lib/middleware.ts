@@ -8,8 +8,14 @@ const logger = createLogger('auth-middleware')
 const AUTH_TIMEOUT_MS = 5000 // 5 seconds
 
 // Handler callback type - accepts TokenPayload or compatible user object
-type AuthHandler = (req: NextRequest, user: TokenPayload | Record<string, unknown>) => Promise<NextResponse>
-type OptionalAuthHandler = (req: NextRequest, user?: TokenPayload | Record<string, unknown>) => Promise<NextResponse>
+type AuthHandler = (
+  req: NextRequest,
+  user: TokenPayload | Record<string, unknown>
+) => Promise<NextResponse>
+type OptionalAuthHandler = (
+  req: NextRequest,
+  user?: TokenPayload | Record<string, unknown>
+) => Promise<NextResponse>
 
 /**
  * Middleware to protect API routes with JWT authentication
@@ -21,32 +27,27 @@ export async function protectRoute(
   request: NextRequest,
   handler: AuthHandler
 ): Promise<NextResponse> {
+  let timeoutId: NodeJS.Timeout | null = null
+
   try {
     // Wrap token verification in timeout to prevent hanging requests
-    // Use Promise.race with proper timeout cleanup to prevent unhandled rejections
-    let timeoutId: NodeJS.Timeout | null = null
     const verifyPromise = verifyToken(request)
+
+    // Create timeout promise with proper cleanup
     const timeoutPromise = new Promise<null>((_, reject) => {
       timeoutId = setTimeout(() => {
         reject(new Error('Auth verification timeout'))
       }, AUTH_TIMEOUT_MS)
     })
 
-    const user = await Promise.race([verifyPromise, timeoutPromise])
-      .then((result) => {
-        // Clear timeout when race completes successfully
-        if (timeoutId) clearTimeout(timeoutId)
-        return result
-      })
-      .catch((error) => {
-        // Clear timeout on error
-        if (timeoutId) clearTimeout(timeoutId)
-        // If timeout or verification error, return null
-        if (error instanceof Error && error.message === 'Auth verification timeout') {
-          logger.warn('Token verification timeout', { path: request.nextUrl.pathname })
-        }
-        return null
-      })
+    // Race with immediate cleanup
+    let user: TokenPayload | Record<string, unknown> | null = null
+    try {
+      user = await Promise.race([verifyPromise, timeoutPromise])
+    } finally {
+      // Always clear timeout, whether race succeeded or failed
+      if (timeoutId) clearTimeout(timeoutId)
+    }
 
     if (!user) {
       return NextResponse.json(
@@ -57,6 +58,18 @@ export async function protectRoute(
 
     return await handler(request, user)
   } catch (error) {
+    // Ensure timeout is cleaned up in all error cases
+    if (timeoutId) clearTimeout(timeoutId)
+
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    if (errorMessage === 'Auth verification timeout') {
+      logger.warn('Token verification timeout', { path: request.nextUrl.pathname })
+      return NextResponse.json(
+        { error: 'Authentication timeout' },
+        { status: 408 } // Request Timeout
+      )
+    }
+
     logger.error('Auth middleware error during request processing', error, {
       path: request.nextUrl.pathname,
       errorType: error instanceof Error ? error.constructor.name : typeof error,
@@ -78,9 +91,10 @@ export async function protectRouteOptional(
   request: NextRequest,
   handler: OptionalAuthHandler
 ): Promise<NextResponse> {
+  let timeoutId: NodeJS.Timeout | null = null
+
   try {
-    // Wrap token verification in timeout with proper cleanup to prevent unhandled rejections
-    let timeoutId: NodeJS.Timeout | null = null
+    // Wrap token verification in timeout with proper cleanup
     const verifyPromise = verifyToken(request)
     const timeoutPromise = new Promise<null>((_, reject) => {
       timeoutId = setTimeout(() => {
@@ -88,22 +102,23 @@ export async function protectRouteOptional(
       }, AUTH_TIMEOUT_MS)
     })
 
-    const user = await Promise.race([verifyPromise, timeoutPromise])
-      .then((result) => {
-        // Clear timeout when race completes successfully
-        if (timeoutId) clearTimeout(timeoutId)
-        return result
-      })
-      .catch(() => {
-        // Clear timeout on error
-        if (timeoutId) clearTimeout(timeoutId)
-        // Treat timeout as unauthenticated
-        return null
-      })
+    let user: TokenPayload | Record<string, unknown> | null = null
+    try {
+      user = await Promise.race([verifyPromise, timeoutPromise])
+    } catch {
+      // Treat timeout and auth errors as unauthenticated for optional routes
+      user = null
+    } finally {
+      // Always clear timeout
+      if (timeoutId) clearTimeout(timeoutId)
+    }
 
     // Pass user to handler if valid, otherwise pass undefined (not error state)
     return await handler(request, user || undefined)
   } catch (error) {
+    // Ensure timeout is cleaned up in all error cases
+    if (timeoutId) clearTimeout(timeoutId)
+
     // For optional auth, treat verification failure as unauthenticated (not error)
     logger.warn('Optional auth verification failed - continuing unauthenticated', {
       path: request.nextUrl.pathname,

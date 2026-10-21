@@ -221,7 +221,8 @@ export function getHttpStatus(code: ExtendedErrorCode): number {
  */
 export function generateCorrelationId(): string {
   const timestamp = Date.now()
-  const uuid = uuidv4().split('-')[0]
+  // Use the full UUID for better uniqueness guarantee
+  const uuid = uuidv4().replace(/-/g, '').substring(0, 8)
   return `${timestamp}-${uuid}`
 }
 
@@ -337,12 +338,19 @@ export function getErrorDetails(error: unknown): {
   code?: string
 } {
   if (error instanceof Error) {
-    const errorWithCode = error as Error & { code?: string }
+    const message = error.message || 'Unknown error'
+    const stack = error.stack
+    const name = error.name
+    // Safely extract code property if it exists
+    const code = 'code' in error && typeof (error as Record<string, unknown>).code === 'string'
+      ? String((error as Record<string, unknown>).code)
+      : undefined
+
     return {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      code: errorWithCode.code,
+      message,
+      stack,
+      name,
+      ...(code && { code }),
     }
   }
 
@@ -352,9 +360,14 @@ export function getErrorDetails(error: unknown): {
 
   if (error && typeof error === 'object') {
     const errorObj = error as Record<string, unknown>
+    const message = String(errorObj.message || 'Unknown error')
+    const code = errorObj.code && typeof errorObj.code === 'string'
+      ? String(errorObj.code)
+      : undefined
+
     return {
-      message: String(errorObj.message || 'Unknown error'),
-      ...(errorObj.code && { code: String(errorObj.code) }),
+      message,
+      ...(code && { code }),
     }
   }
 
@@ -540,13 +553,29 @@ export function parseValidationErrors(
 ): ValidationErrorDetail[] {
   const details: ValidationErrorDetail[] = []
 
+  // Safety check: ensure error is an object before proceeding
+  if (!error || typeof error !== 'object') {
+    return details
+  }
+
   // Handle Zod errors
   const errorObj = error as Record<string, unknown>
   if (errorObj.issues && Array.isArray(errorObj.issues)) {
     errorObj.issues.forEach((issue: unknown) => {
       const issueObj = issue as Record<string, unknown>
+
+      // Safely construct field path from path array
+      let fieldPath = 'unknown'
+      if (Array.isArray(issueObj.path) && issueObj.path.length > 0) {
+        // Convert all path elements to strings safely
+        const pathParts = issueObj.path
+          .map(p => String(p || ''))
+          .filter(p => p.length > 0)
+        fieldPath = pathParts.length > 0 ? pathParts.join('.') : 'unknown'
+      }
+
       details.push({
-        field: (Array.isArray(issueObj.path) ? issueObj.path.join('.') : 'unknown') || 'unknown',
+        field: fieldPath,
         message: String(issueObj.message || 'Validation error'),
         constraint: String(issueObj.code || ''),
       })
@@ -578,7 +607,7 @@ export function createBulkOperationResponse<T>(
         timestamp: new Date().toISOString(),
         data: { successful: [], failed, total },
       },
-      { status: 400 }
+      { status: 500 } // Server error when all operations fail
     )
   }
 
@@ -592,7 +621,7 @@ export function createBulkOperationResponse<T>(
         timestamp: new Date().toISOString(),
         data: { successful, failed, total },
       },
-      { status: 207 } // Multi-status
+      { status: 207 } // Multi-status for mixed results
     )
   }
 
