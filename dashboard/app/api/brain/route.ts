@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
+import crypto from 'crypto'
 import { atomicRead } from '@/lib/atomic-file-ops'
 import { atomicReaddir } from '@/lib/atomic-dir-ops'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
