@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { withFileLock } from '@/lib/file-lock'
 import { logger, createLogContext } from '@/lib/logger'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { validateBody } from '@/lib/validation/middleware'
@@ -54,28 +55,26 @@ export const GET = protectRoute(
     }
 
     try {
-      try {
-        await fs.stat(PROFILES_DIR)
-      } catch (error) {
-        logger.debug('Profiles directory not found, returning empty list', {
-          ...logContext,
-          error: 'PROFILES_DIR_NOT_FOUND',
-        })
-        const response = NextResponse.json(
-          createSuccessResponse([], requestId)
-        )
-        response.headers.set('x-correlation-id', requestId)
-        return response
-      }
+      const profiles = await withFileLock(PROFILES_DIR, async () => {
+        try {
+          await fs.stat(PROFILES_DIR)
+        } catch (error) {
+          logger.debug('Profiles directory not found, returning empty list', {
+            ...logContext,
+            error: 'PROFILES_DIR_NOT_FOUND',
+          })
+          return []
+        }
 
-      const entries = await fs.readdir(PROFILES_DIR, { withFileTypes: true })
-      const profiles: AgentProfile[] = entries
-        .filter(entry => entry.isDirectory())
-        .map(entry => ({
-          name: entry.name,
-          role: inferRoleFromName(entry.name),
-          status: 'active',
-        }))
+        const entries = await fs.readdir(PROFILES_DIR, { withFileTypes: true })
+        return entries
+          .filter(entry => entry.isDirectory())
+          .map(entry => ({
+            name: entry.name,
+            role: inferRoleFromName(entry.name),
+            status: 'active',
+          }))
+      })
 
       logger.info('Profiles loaded successfully', {
         ...logContext,

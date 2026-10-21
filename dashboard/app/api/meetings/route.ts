@@ -50,8 +50,10 @@ async function loadMeetingLogs(): Promise<MeetingLog[]> {
 
 async function loadSkillRegistry(): Promise<SkillRegistry | null> {
   try {
-    const content = await fs.readFile(SKILL_REGISTRY_PATH, 'utf-8')
-    return JSON.parse(content)
+    return await withFileLock(SKILL_REGISTRY_PATH, async () => {
+      const content = await fs.readFile(SKILL_REGISTRY_PATH, 'utf-8')
+      return JSON.parse(content)
+    })
   } catch {
     return null
   }

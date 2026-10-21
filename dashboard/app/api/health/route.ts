@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { withFileLock } from '@/lib/file-lock'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { HealthStatusResponseSchema, HealthComponentSchema, HealthQuerySchema } from '@/lib/validation'
@@ -36,44 +37,45 @@ interface HealthStatus {
   alerts: string[]
 }
 
-async function getCompanyBrainStats(): Promise<{ count: number; latest: string | null }> {
-  // IMPORTANT: correlationId parameter is required for all logging calls
+async function getCompanyBrainStats(correlationId: string): Promise<{ count: number; latest: string | null }> {
   try {
     const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
-    try {
-      await fs.stat(brainDir)
-    } catch (error) {
-      logger.warn('Company brain directory not found', {
-        requestId: correlationId,
-        component: 'company_brain',
-        operation: 'stat_directory',
-        path: brainDir,
-      })
-      return { count: 0, latest: null }
-    }
-
-    const files = (await fs.readdir(brainDir)).filter(f => f.endsWith('.json'))
-    if (files.length === 0) return { count: 0, latest: null }
-
-    const latest = files.sort().pop()
-    let latestTimestamp = null
-    if (latest) {
+    return await withFileLock(brainDir, async () => {
       try {
-        const content = await fs.readFile(path.join(brainDir, latest), 'utf-8')
-        const parsed = JSON.parse(content)
-        latestTimestamp = parsed.timestamp
+        await fs.stat(brainDir)
       } catch (error) {
-        logger.warn('Failed to parse company brain latest file', {
+        logger.warn('Company brain directory not found', {
           requestId: correlationId,
           component: 'company_brain',
-          operation: 'parse_latest_timestamp',
-          file: latest,
-          error: error instanceof Error ? error.message : String(error),
+          operation: 'stat_directory',
+          path: brainDir,
         })
+        return { count: 0, latest: null }
       }
-    }
 
-    return { count: files.length, latest: latestTimestamp }
+      const files = (await fs.readdir(brainDir)).filter(f => f.endsWith('.json'))
+      if (files.length === 0) return { count: 0, latest: null }
+
+      const latest = files.sort().pop()
+      let latestTimestamp = null
+      if (latest) {
+        try {
+          const content = await fs.readFile(path.join(brainDir, latest), 'utf-8')
+          const parsed = JSON.parse(content)
+          latestTimestamp = parsed.timestamp
+        } catch (error) {
+          logger.warn('Failed to parse company brain latest file', {
+            requestId: correlationId,
+            component: 'company_brain',
+            operation: 'parse_latest_timestamp',
+            file: latest,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+
+      return { count: files.length, latest: latestTimestamp }
+    })
   } catch (error) {
     logger.error('Failed to get company brain stats', error, {
       requestId: correlationId,
@@ -85,34 +87,36 @@ async function getCompanyBrainStats(): Promise<{ count: number; latest: string |
 }
 
 async function getMeetingsLogStats(correlationId: string): Promise<{ count: number; success_count: number }> {
+  const logPath = path.join(process.cwd(), 'data', 'meetings-log.json')
   try {
-    const logPath = path.join(process.cwd(), 'data', 'meetings-log.json')
-    try {
-      await fs.stat(logPath)
-    } catch (error) {
-      logger.warn('Meetings log file not found', {
-        requestId: correlationId,
-        component: 'meetings_api',
-        operation: 'stat_file',
-        path: logPath,
-      })
-      return { count: 0, success_count: 0 }
-    }
+    return await withFileLock(logPath, async () => {
+      try {
+        await fs.stat(logPath)
+      } catch (error) {
+        logger.warn('Meetings log file not found', {
+          requestId: correlationId,
+          component: 'meetings_api',
+          operation: 'stat_file',
+          path: logPath,
+        })
+        return { count: 0, success_count: 0 }
+      }
 
-    const content = await fs.readFile(logPath, 'utf-8')
-    const logs = JSON.parse(content)
-    if (!Array.isArray(logs)) {
-      logger.warn('Meetings log is not an array', {
-        requestId: correlationId,
-        component: 'meetings_api',
-        operation: 'parse_log',
-        actualType: typeof logs,
-      })
-      return { count: 0, success_count: 0 }
-    }
+      const content = await fs.readFile(logPath, 'utf-8')
+      const logs = JSON.parse(content)
+      if (!Array.isArray(logs)) {
+        logger.warn('Meetings log is not an array', {
+          requestId: correlationId,
+          component: 'meetings_api',
+          operation: 'parse_log',
+          actualType: typeof logs,
+        })
+        return { count: 0, success_count: 0 }
+      }
 
-    const successCount = logs.filter((l: any) => l.status === 'scheduled').length
-    return { count: logs.length, success_count: successCount }
+      const successCount = logs.filter((l: any) => l.status === 'scheduled').length
+      return { count: logs.length, success_count: successCount }
+    })
   } catch (error) {
     logger.error('Failed to get meetings log stats', error, {
       requestId: correlationId,
@@ -125,11 +129,13 @@ async function getMeetingsLogStats(correlationId: string): Promise<{ count: numb
 }
 
 async function getSkillRegistryStats(correlationId: string): Promise<number> {
+  const regPath = path.join(process.cwd(), '..', 'skills', 'registry.json')
   try {
-    const regPath = path.join(process.cwd(), '..', 'skills', 'registry.json')
-    const content = await fs.readFile(regPath, 'utf-8')
-    const registry = JSON.parse(content)
-    return registry.meeting_skills?.length || 0
+    return await withFileLock(regPath, async () => {
+      const content = await fs.readFile(regPath, 'utf-8')
+      const registry = JSON.parse(content)
+      return registry.meeting_skills?.length || 0
+    })
   } catch (error) {
     logger.error('Failed to load skill registry', error, {
       requestId: correlationId,

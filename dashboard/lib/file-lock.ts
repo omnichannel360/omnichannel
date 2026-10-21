@@ -7,7 +7,7 @@ const locks = new Map<string, FileLock>()
 
 export async function withFileLock<T>(filePath: string, callback: () => Promise<T>): Promise<T> {
   let lock = locks.get(filePath)
-  
+
   if (!lock) {
     lock = { queue: [], locked: false }
     locks.set(filePath, lock)
@@ -38,3 +38,6 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
     }
   })
 }
+
+// Alias for backwards compatibility with atomic-dir-ops
+export const withLock = withFileLock

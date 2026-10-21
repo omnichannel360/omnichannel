@@ -32,6 +32,7 @@ interface ValidationError {
 interface ValidationErrorResponse {
   success: false
   error: string
+  code?: string
   validationErrors?: ValidationError[]
   timestamp: string
 }
@@ -148,7 +149,36 @@ export async function validateBody<T>(
       }
     }
 
-    const body = await request.json()
+    let body: unknown
+
+    // Explicit try-catch for JSON parsing
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      const errorMessage = parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      const errorType = parseError instanceof SyntaxError ? 'SyntaxError' : 'JSONParseError'
+
+      logger.error('JSON parse error in request body', parseError, {
+        path: request.nextUrl.pathname,
+        method: request.method,
+        errorType,
+        errorMessage,
+        errorStack: parseError instanceof Error ? parseError.stack : undefined,
+      })
+
+      return {
+        success: false,
+        response: NextResponse.json(
+          {
+            success: false,
+            error: `Invalid JSON in request body: ${errorMessage}`,
+            code: 'INVALID_JSON',
+            timestamp: new Date().toISOString(),
+          } as ValidationErrorResponse,
+          { status: 400 }
+        ),
+      }
+    }
 
     try {
       const validatedData = schema.parse(body)

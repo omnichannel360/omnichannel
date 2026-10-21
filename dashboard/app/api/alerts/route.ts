@@ -149,6 +149,9 @@ const alertHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
+        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create alert'
+
         const { response, statusCode } = handleRouteError(error, requestId, {
           method: request.method,
           path: request.nextUrl.pathname,
@@ -160,6 +163,8 @@ const alertHandlers = protectRouteMulti(
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
+          errorType,
+          errorMessage,
         }))
 
         response.headers.set('x-correlation-id', requestId)
@@ -227,6 +232,9 @@ const alertHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
+        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
+        const errorMessage = error instanceof Error ? error.message : 'Failed to update alert'
+
         const { response, statusCode } = handleRouteError(error, requestId, {
           method: request.method,
           path: request.nextUrl.pathname,
@@ -238,6 +246,8 @@ const alertHandlers = protectRouteMulti(
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
+          errorType,
+          errorMessage,
         }))
 
         response.headers.set('x-correlation-id', requestId)

@@ -131,6 +131,9 @@ const kanbanHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
+        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create task'
+
         const { response, statusCode } = handleRouteError(error, requestId, {
           method: request.method,
           path: request.nextUrl.pathname,
@@ -141,6 +144,8 @@ const kanbanHandlers = protectRouteMulti(
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
+          errorType,
+          errorMessage,
         })
         response.headers.set('x-correlation-id', requestId)
         return response
@@ -250,10 +255,15 @@ const kanbanHandlers = protectRouteMulti(
           userId,
           operation: 'update_task',
         })
+        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
+        const errorMsg = error instanceof Error ? error.message : 'Failed to update task'
+
         logger.error('Failed to update task', error, {
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
+          errorType,
+          errorMessage: errorMsg,
         })
         response.headers.set('x-correlation-id', requestId)
         return response
