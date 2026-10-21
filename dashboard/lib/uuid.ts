@@ -15,10 +15,17 @@ function getLogger() {
     } catch {
       // Fallback if logger cannot be loaded - no-op to avoid console pollution
       logger = {
-        warn: () => {
-          // Silently skip logging in fallback mode
-        }
-      } as Logger
+        serviceName: 'uuid',
+        enableDebug: false,
+        minLevel: 'info',
+        levels: { debug: 0, info: 1, warn: 2, error: 3 },
+        setMinLevel: () => {},
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        logOperation: () => {}
+      } as unknown as Logger
     }
   }
   return logger
@@ -64,10 +71,17 @@ export function generateUUIDv4(): string {
 
   if (isProduction) {
     // SECURITY VIOLATION in production
-    fallbackLogger.error('[SECURITY VIOLATION] generateUUIDv4: Using non-secure Math.random() in production! This environment lacks crypto.randomUUID() (Node.js 15.7+) and crypto.getRandomValues(). All generated UUIDs are predictable. This is unacceptable for production. Please upgrade Node.js to 15.7+ or use a modern runtime.')
+    const securityError = new Error('generateUUIDv4: Using non-secure Math.random() in production! This environment lacks crypto.randomUUID() (Node.js 15.7+) and crypto.getRandomValues(). All generated UUIDs are predictable.')
+    fallbackLogger.error('[SECURITY VIOLATION] Cryptographically insecure UUID generation in production', securityError, {
+      component: 'uuid',
+      nodeVersion: process.version
+    })
   } else {
     // Development environment - just a warning
-    fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. For production, ensure Node.js 15+ or modern browser crypto APIs are available.')
+    fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. For production, ensure Node.js 15+ or modern browser crypto APIs are available.', {
+      component: 'uuid',
+      nodeVersion: process.version
+    })
   }
 
   const placeholder = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'

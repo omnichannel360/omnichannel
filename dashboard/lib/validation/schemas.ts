@@ -50,16 +50,41 @@ function createSafeString(minLength = 0, maxLength = 1000): z.ZodTypeAny {
   return schema.refine(
     (val) => {
       const lowerVal = val.toLowerCase()
-      // SECURITY: Block execution vectors only - rendering safety handled elsewhere
-      // Blocked patterns: <script>, javascript:, data:text/html, eval(
-      // Note: Event handler text (e.g., 'onclick="..."') is safe as stored content
-      return (
-        !lowerVal.includes('<script') &&
-        !lowerVal.includes('</script>') &&
-        !lowerVal.includes('javascript:') &&
-        !lowerVal.includes('data:text/html') &&
-        !/eval\s*\(/i.test(val)
-      )
+      // SECURITY: Block execution vectors - rendering safety handled elsewhere
+      // Remove whitespace from potentially dangerous patterns to catch obfuscation
+      const noWhitespace = lowerVal.replace(/\s/g, '')
+      const decoded = decodeURIComponent(lowerVal)
+
+      // Check script tags (literal and obfuscated with whitespace)
+      if (lowerVal.includes('<script') || noWhitespace.includes('<script')) {
+        return false
+      }
+      if (lowerVal.includes('</script>') || noWhitespace.includes('</script>')) {
+        return false
+      }
+
+      // Check javascript: protocol (literal, spaces, and URL-encoded)
+      if (lowerVal.includes('javascript:')) {
+        return false
+      }
+      if (noWhitespace.includes('javascript:')) {
+        return false
+      }
+      if (lowerVal.includes('javascript%20:') || lowerVal.includes('javascript%3a')) {
+        return false
+      }
+
+      // Check data: URIs
+      if (lowerVal.includes('data:text/html')) {
+        return false
+      }
+
+      // Check eval() calls
+      if (/eval\s*\(/i.test(val)) {
+        return false
+      }
+
+      return true
     },
     'String contains forbidden XSS patterns'
   )
