@@ -53,7 +53,6 @@ function createSafeString(minLength = 0, maxLength = 1000): z.ZodTypeAny {
       // SECURITY: Block execution vectors - rendering safety handled elsewhere
       // Remove whitespace from potentially dangerous patterns to catch obfuscation
       const noWhitespace = lowerVal.replace(/\s/g, '')
-      const decoded = decodeURIComponent(lowerVal)
 
       // Check script tags (literal and obfuscated with whitespace)
       if (lowerVal.includes('<script') || noWhitespace.includes('<script')) {

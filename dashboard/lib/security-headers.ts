@@ -13,29 +13,38 @@ const SECURITY_HEADERS = {
   // Prevent MIME type sniffing
   'X-Content-Type-Options': 'nosniff',
 
-  // Prevent clickjacking attacks
+  // Prevent clickjacking attacks - use frame-ancestors in CSP instead
   'X-Frame-Options': 'DENY',
 
-  // Enable XSS protection in older browsers
+  // Enable XSS protection in older browsers (modern CSP is primary)
   'X-XSS-Protection': '1; mode=block',
 
   // Prevent referrer leakage
   'Referrer-Policy': 'strict-no-referrer',
 
-  // Content Security Policy - allows self + CDN resources for typical dashboards
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' https:; font-src 'self' data: https:; img-src 'self' data: https:",
+  // Content Security Policy - OWASP recommended comprehensive directives
+  // FIXED: Added missing directives: frame-ancestors, sandbox, upgrade-insecure-requests, form-action, base-uri
+  'Content-Security-Policy': "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' https:; " +
+    "font-src 'self' data: https:; " +
+    "img-src 'self' data: https:; " +
+    "frame-ancestors 'none'; " +  // Block embedding in iframes (clickjacking prevention)
+    "form-action 'self'; " +       // Restrict form submissions to same-origin
+    "base-uri 'self'; " +          // Restrict base tag URL
+    "upgrade-insecure-requests; " + // Auto-upgrade HTTP to HTTPS
+    "block-all-mixed-content",      // Block all mixed HTTP/HTTPS content
 
   // Disable caching for sensitive endpoints
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-
-  // HSTS for HTTPS enforcement (production only)
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
 } as const
 
 /**
  * Production-only headers
+ * FIXED: Removed duplicate HSTS (already in SECURITY_HEADERS)
  */
 const PRODUCTION_HEADERS = {
+  // HSTS for HTTPS enforcement (production only)
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
 } as const
 

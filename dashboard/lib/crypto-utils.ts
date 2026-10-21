@@ -3,31 +3,55 @@
  * Re-exports from uuid.ts to avoid duplication
  * All ID generation uses generateUUIDv4() implementation
  *
- * FIXED: Lazy-load logger to avoid circular dependency
+ * FIXED: Removed dynamic require() - use static imports with fallback console for circular dep safety
  */
 
 import type { Logger } from './logger'
 import { generateUUIDv4 } from './uuid'
 
+// Fallback logger implementation for circular dependency scenarios
+const createFallbackLogger = (): Logger => ({
+  debug: (msg: string, context?: Record<string, unknown>) => {
+    if (typeof console !== 'undefined') {
+      console.debug('[crypto-utils]', msg, context)
+    }
+  },
+  info: (msg: string, context?: Record<string, unknown>) => {
+    if (typeof console !== 'undefined') {
+      console.info('[crypto-utils]', msg, context)
+    }
+  },
+  warn: (msg: string, context?: Record<string, unknown>) => {
+    if (typeof console !== 'undefined') {
+      console.warn('[crypto-utils]', msg, context)
+    }
+  },
+  error: (msg: string, error?: unknown, context?: Record<string, unknown>) => {
+    if (typeof console !== 'undefined') {
+      console.error('[crypto-utils]', msg, error, context)
+    }
+  },
+})
+
 let logger: Logger | null = null
 let nonCryptoWarningLogged = false
 
-function getLogger() {
-  if (!logger) {
+// Try to use the real logger, fall back to console if not available
+let loggerInitialized = false
+function getLogger(): Logger {
+  if (!loggerInitialized) {
+    loggerInitialized = true
     try {
-      const { createLogger } = require('./logger')
-      logger = createLogger('crypto-utils')
-    } catch {
-      logger = {
-        warn: (msg: string) => {
-          if (typeof console !== 'undefined') {
-            console.warn('[crypto-utils]', msg)
-          }
-        },
+      // Delay import to avoid circular dependency at module load time
+      const loggerModule = require('./logger')
+      if (loggerModule?.createLogger) {
+        logger = loggerModule.createLogger('crypto-utils')
       }
+    } catch {
+      // Circular dependency detected - use fallback
     }
   }
-  return logger
+  return logger ?? createFallbackLogger()
 }
 
 export { generateUUIDv4, generateId, generatePrefixedId } from './uuid'

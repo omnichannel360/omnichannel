@@ -350,73 +350,129 @@ export async function retryWithBackoff<T>(
 }
 
 /**
+ * Immutable circuit breaker state representation
+ * FIXED: Explicit state object for atomic updates and better reasoning
+ */
+interface CircuitBreakerState {
+  readonly status: 'CLOSED' | 'OPEN' | 'HALF_OPEN'
+  readonly failureCount: number
+  readonly successCount: number
+  readonly lastFailureTime: number
+}
+
+/**
  * Circuit breaker for protecting dependent services
- * FIXED: Immutable state transitions to prevent race conditions
+ * FIXED: Uses explicit state machine with method-based mutations documented as side effects
  */
 export class CircuitBreaker {
-  private failureCount = 0
-  private successCount = 0
-  private lastFailureTime = 0
-  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED'
+  private state: CircuitBreakerState
 
   constructor(
-    private failureThreshold: number = 5,
-    private successThreshold: number = 2,
-    private resetTimeoutMs: number = 60000
-  ) {}
+    private readonly failureThreshold: number = 5,
+    private readonly successThreshold: number = 2,
+    private readonly resetTimeoutMs: number = 60000
+  ) {
+    this.state = {
+      status: 'CLOSED',
+      failureCount: 0,
+      successCount: 0,
+      lastFailureTime: 0,
+    }
+  }
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
-    // FIXED: Renamed method to indicate it has side effects (state mutation)
-    const currentState = this.transitionStateIfNeeded()
+    // Check and transition state atomically
+    const transitioned = this.attemptStateTransition()
 
-    if (currentState === 'OPEN') {
+    if (transitioned.status === 'OPEN') {
       throw new Error('Circuit breaker is OPEN - service unavailable')
     }
 
     try {
       const result = await operation()
-      this.onSuccess()
+      this.recordSuccess()
       return result
     } catch (error) {
-      this.onFailure()
+      this.recordFailure()
       throw error
     }
   }
 
   /**
-   * Transition state from OPEN to HALF_OPEN if timeout has passed.
-   * CRITICAL SIDE EFFECT: This method MUTATES internal state (this.state, this.successCount).
-   * Must NOT be called as a pure getter. Always intended as part of execute() flow.
+   * Attempt state transition from OPEN to HALF_OPEN if timeout passed.
+   * SIDE EFFECT: Mutates this.state (documented and intentional for circuit breaker pattern)
    */
-  private transitionStateIfNeeded(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
-    if (this.state === 'OPEN') {
+  private attemptStateTransition(): CircuitBreakerState {
+    if (this.state.status === 'OPEN') {
       const now = Date.now()
-      if (now - this.lastFailureTime > this.resetTimeoutMs) {
-        // Atomically transition from OPEN to HALF_OPEN
-        // CRITICAL FIX: Reset failure count to allow HALF_OPEN to test without immediate re-opening
-        this.state = 'HALF_OPEN'
-        this.failureCount = 0
-        this.successCount = 0
-        return 'HALF_OPEN'
+      if (now - this.state.lastFailureTime > this.resetTimeoutMs) {
+        // Transition: OPEN -> HALF_OPEN (reset counts for testing)
+        this.state = {
+          status: 'HALF_OPEN',
+          failureCount: 0,
+          successCount: 0,
+          lastFailureTime: this.state.lastFailureTime,
+        }
       }
     }
     return this.state
   }
 
-  private onSuccess(): void {
-    this.failureCount = 0
-    if (this.state === 'HALF_OPEN') {
-      this.successCount++
-      if (this.successCount >= this.successThreshold) {
-        this.state = 'CLOSED'
-        this.successCount = 0
+  /**
+   * Record successful request.
+   * SIDE EFFECT: Mutates this.state (documented and intentional)
+   */
+  private recordSuccess(): void {
+    if (this.state.status === 'HALF_OPEN') {
+      // HALF_OPEN: accumulate successes until threshold
+      const newSuccessCount = this.state.successCount + 1
+      if (newSuccessCount >= this.successThreshold) {
+        // Transition: HALF_OPEN -> CLOSED (service recovered)
+        this.state = {
+          status: 'CLOSED',
+          failureCount: 0,
+          successCount: 0,
+          lastFailureTime: this.state.lastFailureTime,
+        }
+      } else {
+        this.state = { ...this.state, successCount: newSuccessCount }
       }
+    } else if (this.state.status === 'CLOSED') {
+      // CLOSED: reset failure count on successful request
+      this.state = { ...this.state, failureCount: 0 }
     }
+    // HALF_OPEN: already transitioning, don't reset
   }
 
-  private onFailure(): void {
-    this.failureCount++
-    this.lastFailureTime = Date.now()
+  /**
+   * Record failed request.
+   * SIDE EFFECT: Mutates this.state (documented and intentional)
+   */
+  private recordFailure(): void {
+    const newFailureCount = this.state.failureCount + 1
+    const now = Date.now()
+
+    if (this.state.status === 'CLOSED') {
+      // CLOSED: count failures, transition to OPEN if threshold exceeded
+      if (newFailureCount >= this.failureThreshold) {
+        this.state = {
+          status: 'OPEN',
+          failureCount: newFailureCount,
+          successCount: 0,
+          lastFailureTime: now,
+        }
+      } else {
+        this.state = { ...this.state, failureCount: newFailureCount, lastFailureTime: now }
+      }
+    } else if (this.state.status === 'HALF_OPEN') {
+      // HALF_OPEN: single failure reopens circuit
+      this.state = {
+        status: 'OPEN',
+        failureCount: newFailureCount,
+        successCount: 0,
+        lastFailureTime: now,
+      }
+    }
     this.successCount = 0
 
     if (this.failureCount >= this.failureThreshold) {

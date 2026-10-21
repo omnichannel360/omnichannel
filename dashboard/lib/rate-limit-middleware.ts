@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
+import * as jwt from 'jsonwebtoken'
 import {
   RateLimiter,
   RateLimitConfig,
