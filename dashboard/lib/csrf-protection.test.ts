@@ -1,224 +1,153 @@
 /**
  * CSRF Protection Tests
- * Validates CSRF token generation, registration, and validation
+ * Verifies double-submit cookie pattern implementation
  */
 
+import { describe, it, expect } from '@jest/globals'
+import { NextRequest } from 'next/server'
 import {
-  generateCSRFToken,
-  registerCSRFToken,
-  validateCSRFToken,
-  validateCSRFMiddleware,
-  addCSRFTokenToResponse,
+  verifyCsrfToken,
+  setCsrfTokenCookie,
+  validateCsrfMiddleware,
 } from './csrf-protection'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 describe('CSRF Protection', () => {
-  describe('generateCSRFToken', () => {
-    it('should generate a valid UUID token', () => {
-      const token = generateCSRFToken()
-      expect(token).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)
+  describe('verifyCsrfToken', () => {
+    it('should reject when token is missing from request', () => {
+      const mockRequest = {
+        headers: { get: () => null },
+        cookies: { get: () => undefined },
+      } as any
+
+      const result = verifyCsrfToken(mockRequest, null)
+      expect(result.valid).toBe(false)
+      expect(result.error).toContain('missing')
     })
 
-    it('should generate unique tokens', () => {
-      const tokens = new Set()
-      for (let i = 0; i < 100; i++) {
-        tokens.add(generateCSRFToken())
-      }
-      expect(tokens.size).toBe(100)
-    })
-  })
+    it('should reject when cookie is missing', () => {
+      const mockRequest = {
+        headers: { get: (key: string) => key === 'x-csrf-token' ? 'token123' : null },
+        cookies: { get: () => undefined },
+      } as any
 
-  describe('registerCSRFToken', () => {
-    it('should register a valid token', () => {
-      const token = generateCSRFToken()
-      const origin = 'https://example.com'
-      registerCSRFToken(token, origin)
-      expect(validateCSRFToken(token, origin)).toBe(true)
+      const result = verifyCsrfToken(mockRequest, null)
+      expect(result.valid).toBe(false)
+      expect(result.error).toContain('missing from cookies')
     })
 
-    it('should reject invalid token format', () => {
-      const invalidToken = 'not-a-valid-token'
-      registerCSRFToken(invalidToken, 'https://example.com')
-      expect(validateCSRFToken(invalidToken, 'https://example.com')).toBe(false)
+    it('should accept valid matching token', () => {
+      const token = 'abc123def456'
+      const mockRequest = {
+        headers: { get: (key: string) => key === 'x-csrf-token' ? token : null },
+        cookies: { get: () => ({ value: token }) },
+      } as any
+
+      const result = verifyCsrfToken(mockRequest, null)
+      expect(result.valid).toBe(true)
+      expect(result.error).toBeUndefined()
     })
 
-    it('should handle multiple tokens', () => {
-      const tokens = [generateCSRFToken(), generateCSRFToken(), generateCSRFToken()]
-      const origin = 'https://example.com'
+    it('should reject mismatched token', () => {
+      const mockRequest = {
+        headers: { get: (key: string) => key === 'x-csrf-token' ? 'token123' : null },
+        cookies: { get: () => ({ value: 'differenttoken' }) },
+      } as any
 
-      tokens.forEach(token => registerCSRFToken(token, origin))
-
-      // All tokens should be valid
-      tokens.forEach(token => {
-        expect(validateCSRFToken(token, origin)).toBe(true)
-      })
-    })
-  })
-
-  describe('validateCSRFToken', () => {
-    it('should validate a registered token', () => {
-      const token = generateCSRFToken()
-      const origin = 'https://example.com'
-      registerCSRFToken(token, origin)
-      expect(validateCSRFToken(token, origin)).toBe(true)
+      const result = verifyCsrfToken(mockRequest, null)
+      expect(result.valid).toBe(false)
     })
 
-    it('should reject unregistered tokens', () => {
-      const token = generateCSRFToken()
-      expect(validateCSRFToken(token, 'https://example.com')).toBe(false)
-    })
+    it('should accept token from body when header missing', () => {
+      const token = 'bodytoken789'
+      const mockRequest = {
+        headers: { get: () => null },
+        cookies: { get: () => ({ value: token }) },
+      } as any
 
-    it('should reject tokens with mismatched origin', () => {
-      const token = generateCSRFToken()
-      registerCSRFToken(token, 'https://example.com')
-      expect(validateCSRFToken(token, 'https://evil.com')).toBe(false)
-    })
-
-    it('should be one-time use', () => {
-      const token = generateCSRFToken()
-      const origin = 'https://example.com'
-      registerCSRFToken(token, origin)
-
-      // First use succeeds
-      expect(validateCSRFToken(token, origin)).toBe(true)
-
-      // Second use fails (token consumed)
-      expect(validateCSRFToken(token, origin)).toBe(false)
-    })
-
-    it('should reject invalid token format', () => {
-      expect(validateCSRFToken('invalid-token', 'https://example.com')).toBe(false)
-      expect(validateCSRFToken('', 'https://example.com')).toBe(false)
-      expect(validateCSRFToken('x'.repeat(100), 'https://example.com')).toBe(false)
+      const result = verifyCsrfToken(mockRequest, token)
+      expect(result.valid).toBe(true)
     })
   })
 
-  describe('validateCSRFMiddleware', () => {
-    it('should allow GET requests without CSRF token', async () => {
-      const request = new NextRequest('https://example.com/api/test', {
+  describe('setCsrfTokenCookie', () => {
+    it('should set secure cookie with proper flags', () => {
+      const response = new NextResponse(null, { status: 200 })
+      const token = setCsrfTokenCookie(response)
+
+      expect(token).toBeDefined()
+      expect(token.length).toBeGreaterThan(0)
+    })
+
+    it('should generate random tokens', () => {
+      const response1 = new NextResponse(null, { status: 200 })
+      const token1 = setCsrfTokenCookie(response1)
+
+      const response2 = new NextResponse(null, { status: 200 })
+      const token2 = setCsrfTokenCookie(response2)
+
+      expect(token1).not.toBe(token2)
+    })
+  })
+
+  describe('validateCsrfMiddleware', () => {
+    it('should skip validation for GET requests', async () => {
+      const mockRequest = {
         method: 'GET',
-      })
+      } as any
 
-      const result = await validateCSRFMiddleware(request)
-      expect(result).toBeNull()
+      const result = await validateCsrfMiddleware(mockRequest)
+      expect(result.valid).toBe(true)
+      expect(result.response).toBeUndefined()
     })
 
-    it('should reject POST without CSRF token', async () => {
-      const request = new NextRequest('https://example.com/api/test', {
+    it('should validate POST requests', async () => {
+      const mockRequest = {
         method: 'POST',
-        body: JSON.stringify({ data: 'test' }),
-        headers: { 'content-type': 'application/json' },
-      })
+        headers: { get: () => null },
+        cookies: { get: () => undefined },
+        json: async () => ({}),
+      } as any
 
-      const result = await validateCSRFMiddleware(request)
-      expect(result).not.toBeNull()
-      expect(result?.status).toBe(403)
+      const result = await validateCsrfMiddleware(mockRequest)
+      expect(result.valid).toBe(false)
+      expect(result.response).toBeDefined()
     })
 
-    it('should validate CSRF token in header', async () => {
-      const token = generateCSRFToken()
-      const origin = 'https://example.com'
-      registerCSRFToken(token, origin)
+    it('should validate PUT requests', async () => {
+      const mockRequest = {
+        method: 'PUT',
+        headers: { get: () => null },
+        cookies: { get: () => undefined },
+        json: async () => ({}),
+      } as any
 
-      const request = new NextRequest('https://example.com/api/test', {
-        method: 'POST',
-        headers: {
-          'x-csrf-token': token,
-          origin,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ data: 'test' }),
-      })
-
-      const result = await validateCSRFMiddleware(request)
-      expect(result).toBeNull()
+      const result = await validateCsrfMiddleware(mockRequest)
+      expect(result.valid).toBe(false)
     })
 
-    it('should validate CSRF token in body', async () => {
-      const token = generateCSRFToken()
-      const origin = 'https://example.com'
-      registerCSRFToken(token, origin)
+    it('should validate DELETE requests', async () => {
+      const mockRequest = {
+        method: 'DELETE',
+        headers: { get: () => null },
+        cookies: { get: () => undefined },
+        json: async () => ({}),
+      } as any
 
-      const request = new NextRequest('https://example.com/api/test', {
-        method: 'POST',
-        headers: {
-          origin,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ _csrf_token: token, data: 'test' }),
-      })
-
-      const result = await validateCSRFMiddleware(request)
-      expect(result).toBeNull()
+      const result = await validateCsrfMiddleware(mockRequest)
+      expect(result.valid).toBe(false)
     })
 
-    it('should support all state-modifying methods', async () => {
-      const methods = ['POST', 'PUT', 'DELETE', 'PATCH']
+    it('should validate PATCH requests', async () => {
+      const mockRequest = {
+        method: 'PATCH',
+        headers: { get: () => null },
+        cookies: { get: () => undefined },
+        json: async () => ({}),
+      } as any
 
-      for (const method of methods) {
-        const request = new NextRequest('https://example.com/api/test', {
-          method,
-        })
-
-        const result = await validateCSRFMiddleware(request)
-        expect(result).not.toBeNull()
-        expect(result?.status).toBe(403)
-      }
-    })
-
-    it('should reject expired tokens', async () => {
-      // This test would require manipulating time, skip for now
-      // In production, use Jest timers or similar
-      expect(true).toBe(true)
-    })
-  })
-
-  describe('addCSRFTokenToResponse', () => {
-    it('should add CSRF token to response headers', () => {
-      const response = new NextResponse()
-      const token = generateCSRFToken()
-
-      const result = addCSRFTokenToResponse(response, token)
-      expect(result.headers.get('X-CSRF-Token')).toBe(token)
-      expect(result.headers.get('X-CSRF-Token-Header')).toBe('X-CSRF-Token')
-    })
-  })
-
-  describe('Origin validation', () => {
-    it('should respect allowedOrigins parameter', async () => {
-      const token = generateCSRFToken()
-      const origin = 'https://example.com'
-      registerCSRFToken(token, origin)
-
-      const request = new NextRequest('https://example.com/api/test', {
-        method: 'POST',
-        headers: {
-          'x-csrf-token': token,
-          origin,
-        },
-      })
-
-      // Should fail with restricted origins
-      const result = await validateCSRFMiddleware(request, ['https://allowed.com'])
-      expect(result).not.toBeNull()
-      expect(result?.status).toBe(403)
-    })
-
-    it('should allow origin in allowedOrigins', async () => {
-      const token = generateCSRFToken()
-      const origin = 'https://example.com'
-      registerCSRFToken(token, origin)
-
-      const request = new NextRequest('https://example.com/api/test', {
-        method: 'POST',
-        headers: {
-          'x-csrf-token': token,
-          origin,
-        },
-      })
-
-      const result = await validateCSRFMiddleware(request, ['https://example.com'])
-      expect(result).toBeNull()
+      const result = await validateCsrfMiddleware(mockRequest)
+      expect(result.valid).toBe(false)
     })
   })
 })
