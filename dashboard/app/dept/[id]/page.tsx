@@ -1,11 +1,11 @@
 import { DeptDossier } from '@/components/DeptDossier'
 
 interface DeptPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default function DeptPage({ params }: DeptPageProps) {
-  const { id } = params
+export default async function DeptPage({ params }: DeptPageProps) {
+  const { id } = await params
 
   return (
     <div className="p-6">

@@ -1,11 +1,11 @@
 import { AgentDossier } from '@/components/AgentDossier'
 
 interface AgentPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default function AgentPage({ params }: AgentPageProps) {
-  const { id } = params
+export default async function AgentPage({ params }: AgentPageProps) {
+  const { id } = await params
 
   return (
     <div className="p-6">
