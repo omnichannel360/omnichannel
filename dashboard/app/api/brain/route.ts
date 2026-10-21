@@ -10,6 +10,7 @@ import { createLogger, createLogContext } from '@/lib/logger'
 import { validateQuery } from '@/lib/validation/middleware'
 import { BrainQuerySchema, type BrainQuery } from '@/lib/validation/schemas'
 import { protectRoute, type RouteHandler } from '@/lib/protected-route'
+import { applySecurityHeaders } from '@/lib/security-headers'
 import {
   extractCorrelationFromRequest,
   createErrorResponse,
@@ -106,7 +107,7 @@ export const GET = protectRoute(
           )
         )
         response.headers.set('x-correlation-id', requestId)
-        return response
+        return applySecurityHeaders(response)
       }
 
       const memories: Memory[] = []
@@ -177,7 +178,7 @@ export const GET = protectRoute(
         )
       )
       response.headers.set('x-correlation-id', requestId)
-      return response
+      return applySecurityHeaders(response)
     } catch (error) {
       const { response, statusCode } = handleRouteError(error, requestId, {
         method: request.method,

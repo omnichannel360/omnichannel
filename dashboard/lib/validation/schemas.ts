@@ -369,8 +369,8 @@ export type AlertsQuery = z.infer<typeof AlertsQuerySchema>
 
 // Alerts: Create alert body (used in alerts route)
 export const AlertCreateBodySchema = z.object({
-  title: createSafeString(1)'Title is required'),
-  message: createSafeString(1)'Message is required'),
+  title: createSafeString(1),
+  message: createSafeString(1),
   severity: z
     .enum(['info', 'warning', 'error', 'critical'], {
       errorMap: () => ({ message: 'Severity must be one of: info, warning, error, critical' }),
@@ -436,7 +436,7 @@ export type KanbanQuery = z.infer<typeof KanbanQuerySchema>
 
 // Kanban: Create/Update item body
 export const KanbanCreateSchema = z.object({
-  title: createSafeString(1)'Title is required'),
+  title: createSafeString(1),
   description: SafeStringSchema.optional(),
   status: z
     .enum(['todo', 'in_progress', 'done'], {
@@ -480,7 +480,7 @@ export type MeetingsQuery = z.infer<typeof MeetingsQuerySchema>
 
 // Meetings: Create/Update meeting body
 export const MeetingCreateSchema = z.object({
-  title: createSafeString(1)'Title is required'),
+  title: createSafeString(1),
   description: SafeStringSchema.optional(),
   startTime: z
     .string()
