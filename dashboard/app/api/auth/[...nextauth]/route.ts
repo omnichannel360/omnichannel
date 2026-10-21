@@ -11,6 +11,30 @@
  * Integrates with existing authentication infrastructure
  */
 
+import { NextRequest, NextResponse } from 'next/server'
 import { handlers } from '@/auth.config'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
-export const { GET, POST } = handlers
+const { GET: nextAuthGet, POST: nextAuthPost } = handlers
+
+/**
+ * Wrap GET handler with rate limiting
+ */
+export async function GET(request: NextRequest) {
+  // Apply rate limiting to NextAuth endpoints
+  const rateLimitError = await applyRateLimit(request, 'auth')
+  if (rateLimitError) return rateLimitError
+
+  return nextAuthGet(request)
+}
+
+/**
+ * Wrap POST handler with rate limiting
+ */
+export async function POST(request: NextRequest) {
+  // Apply rate limiting to NextAuth endpoints
+  const rateLimitError = await applyRateLimit(request, 'auth')
+  if (rateLimitError) return rateLimitError
+
+  return nextAuthPost(request)
+}

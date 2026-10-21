@@ -13,24 +13,16 @@ import { generateUUIDv4 } from './uuid'
 // Fallback logger implementation for circular dependency scenarios
 const createFallbackLogger = (): Logger => ({
   debug: (msg: string, context?: Record<string, unknown>) => {
-    if (typeof console !== 'undefined') {
-      console.debug('[crypto-utils]', msg, context)
-    }
+    // Silent fallback - avoid console in production
   },
   info: (msg: string, context?: Record<string, unknown>) => {
-    if (typeof console !== 'undefined') {
-      console.info('[crypto-utils]', msg, context)
-    }
+    // Silent fallback - avoid console in production
   },
   warn: (msg: string, context?: Record<string, unknown>) => {
-    if (typeof console !== 'undefined') {
-      console.warn('[crypto-utils]', msg, context)
-    }
+    // Silent fallback - avoid console in production
   },
   error: (msg: string, error?: unknown, context?: Record<string, unknown>) => {
-    if (typeof console !== 'undefined') {
-      console.error('[crypto-utils]', msg, error, context)
-    }
+    // Silent fallback - avoid console in production
   },
 })
 

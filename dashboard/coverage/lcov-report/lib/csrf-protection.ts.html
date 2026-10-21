@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">77.58% </span>
+                <span class="strong">83.01% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>45/58</span>
+                <span class='fraction'>44/53</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">61.53% </span>
+                <span class="strong">76.19% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/26</span>
+                <span class='fraction'>16/21</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">77.58% </span>
+                <span class="strong">83.01% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>45/58</span>
+                <span class='fraction'>44/53</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -235,8 +235,7 @@
 <a name='L170'></a><a href='#L170'>170</a>
 <a name='L171'></a><a href='#L171'>171</a>
 <a name='L172'></a><a href='#L172'>172</a>
-<a name='L173'></a><a href='#L173'>173</a>
-<a name='L174'></a><a href='#L174'>174</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L173'></a><a href='#L173'>173</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -322,6 +321,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -365,7 +368,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
@@ -380,6 +382,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -399,14 +404,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
@@ -494,11 +492,15 @@ export function setCsrfTokenCookie(response: NextResponse): string {
 /**
  * Middleware to validate CSRF token on state-changing requests
  * SECURITY: Also validates origin/referer to prevent cross-site attacks
+ *
+ * NOTE: Request body is consumed by this middleware. If you need the body
+ * in your route handler, use a separate request object or clone the request
+ * before calling this middleware. Next.js request bodies can only be read once.
  */
 export async function validateCsrfMiddleware(
   request: NextRequest,
   allowedOrigins?: string[]
-): Promise&lt;{ valid: boolean; response?: NextResponse }&gt; {
+): Promise&lt;{ valid: boolean; response?: NextResponse; tokenFromBody?: string | null }&gt; {
   // Only validate state-changing requests
   const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH']
   if (!stateChangingMethods.includes(request.method)) {
@@ -537,7 +539,6 @@ export async function validateCsrfMiddleware(
       }
     }
 &nbsp;
-    const tokenFromHeader = request.headers.get(CSRF_HEADER_NAME)
     const result = verifyCsrfToken(request, tokenFromBody)
 &nbsp;
     if (!result.valid) {
@@ -550,7 +551,7 @@ export async function validateCsrfMiddleware(
       }
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return { valid: true }</span>
+<span class="cstat-no" title="statement not covered" >    return { valid: true, tokenFromBody }</span>
   } catch (error) {
 <span class="cstat-no" title="statement not covered" >    return {</span>
       valid: false,
@@ -563,24 +564,20 @@ export async function validateCsrfMiddleware(
 }
 &nbsp;
 /**
- * Get current CSRF token from cookies (for responses)
- * SECURITY: Returns the CSRF token that should be sent by the client in future requests
- * This is typically called after setCsrfTokenCookie to provide token to client
+ * DEPRECATED: Use the return value from setCsrfTokenCookie instead.
+ * setCsrfTokenCookie already returns the generated token, so this function
+ * is unnecessary and fragile (parses Set-Cookie headers).
  *
- * @param response - Next.js response object
- * @returns CSRF token value to send to client, or null if not set
+ * Example instead:
+ * const token = setCsrfTokenCookie(response) // Returns token directly
+ * response.headers.set('X-CSRF-Token', token) // Send to client if needed
+ *
+ * @deprecated Use the return value from setCsrfTokenCookie() instead
  */
-export function <span class="fstat-no" title="function not covered" >getCsrfTokenFromResponse(</span>response: NextResponse): string | null {
-  // Extract the CSRF token from the Set-Cookie headers if it was just set
-  const setCookieHeader = <span class="cstat-no" title="statement not covered" >response.headers.get('set-cookie')</span>
-<span class="cstat-no" title="statement not covered" >  <span class="missing-if-branch" title="if path not taken" >I</span>if (!setCookieHeader || !setCookieHeader.includes(CSRF_COOKIE_NAME)) {</span>
-<span class="cstat-no" title="statement not covered" >    return null</span>
-  }
-&nbsp;
-  // Extract token value from cookie string
-  // Cookie format: __Host-csrf=&lt;token&gt;; HttpOnly; ...
-  const match = <span class="cstat-no" title="statement not covered" >setCookieHeader.match(new RegExp(`${CSRF_COOKIE_NAME}=([^;]+)`))</span>
-<span class="cstat-no" title="statement not covered" >  return match ? match[1] : null</span>
+export function <span class="fstat-no" title="function not covered" >getCsrfTokenFromResponse(</span>_response: NextResponse): string | null {
+  // This function is kept for backwards compatibility but returns null
+  // Use the return value from setCsrfTokenCookie() instead for simpler, safer code
+<span class="cstat-no" title="statement not covered" >  return null</span>
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -589,7 +586,7 @@ export function <span class="fstat-no" title="function not covered" >getCsrfToke
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-21T19:59:13.911Z
+                at 2026-10-21T20:04:10.263Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -17,6 +17,8 @@ import {
   createSuccessResponse,
 } from '@/lib/error-handling'
 import { generatePrefixedId } from '@/lib/uuid'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { validateCsrfMiddleware, setCsrfTokenCookie } from '@/lib/csrf-protection'
 
 /**
  * GET /api/protected-route-example
@@ -25,6 +27,10 @@ import { generatePrefixedId } from '@/lib/uuid'
 export async function GET(request: NextRequest) {
   const correlationId = extractCorrelationFromRequest(request.headers)
   const startTime = Date.now()
+
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'protected-route')
+  if (rateLimitError) return rateLimitError
 
   const logContext = createLogContext({
     method: request.method,
@@ -127,11 +133,24 @@ export async function GET(request: NextRequest) {
  * POST /api/protected-route-example
  * Creates a resource (admin only)
  *
- * @body { name: string, description: string }
+ * @body { name: string, description: string, _csrf?: string }
  */
 export async function POST(request: NextRequest) {
   const correlationId = extractCorrelationFromRequest(request.headers)
   const startTime = Date.now()
+
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'protected-route')
+  if (rateLimitError) return rateLimitError
+
+  // Validate CSRF token for state-changing request
+  const csrfCheck = await validateCsrfMiddleware(request)
+  if (!csrfCheck.valid) {
+    return csrfCheck.response || NextResponse.json(
+      { success: false, error: 'CSRF validation failed' },
+      { status: 403 }
+    )
+  }
 
   const logContext = createLogContext({
     method: request.method,
@@ -244,6 +263,19 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const correlationId = extractCorrelationFromRequest(request.headers)
   const startTime = Date.now()
+
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'protected-route')
+  if (rateLimitError) return rateLimitError
+
+  // Validate CSRF token for state-changing request
+  const csrfCheck = await validateCsrfMiddleware(request)
+  if (!csrfCheck.valid) {
+    return csrfCheck.response || NextResponse.json(
+      { success: false, error: 'CSRF validation failed' },
+      { status: 403 }
+    )
+  }
 
   const logContext = createLogContext({
     method: request.method,
