@@ -82,9 +82,11 @@ export function setCsrfTokenCookie(response: NextResponse): string {
 
 /**
  * Middleware to validate CSRF token on state-changing requests
+ * SECURITY: Also validates origin/referer to prevent cross-site attacks
  */
 export async function validateCsrfMiddleware(
-  request: NextRequest
+  request: NextRequest,
+  allowedOrigins?: string[]
 ): Promise<{ valid: boolean; response?: NextResponse }> {
   // Only validate state-changing requests
   const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH']
@@ -98,6 +100,23 @@ export async function validateCsrfMiddleware(
   }
 
   try {
+    // SECURITY: Validate origin header matches allowed origins
+    const origin = request.headers.get('origin')
+    const referer = request.headers.get('referer')
+
+    if (allowedOrigins && origin) {
+      const isAllowedOrigin = allowedOrigins.some(ao => origin.includes(ao))
+      if (!isAllowedOrigin) {
+        return {
+          valid: false,
+          response: NextResponse.json(
+            { success: false, error: 'Origin not allowed' },
+            { status: 403 }
+          ),
+        }
+      }
+    }
+
     // Try to get token from header or body
     let tokenFromBody: string | null = null
 
