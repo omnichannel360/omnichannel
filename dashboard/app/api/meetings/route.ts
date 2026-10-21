@@ -194,25 +194,12 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  let body: unknown
   try {
-    body = await request.json()
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON in request body' },
-      { status: 400 }
-    )
-  }
-
-  try {
-    const input = MeetingRequestSchema.safeParse(body)
-    if (!input.success) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid request', details: input.error.flatten().fieldErrors },
-        { status: 400 }
-      )
+    const bodyResult = await validateBody<any>(request, MeetingRequestSchema)
+    if (!bodyResult.success) {
+      return bodyResult.response
     }
-    const { message, meeting_type, participants } = input.data
+    const { message, meeting_type, participants } = bodyResult.data
 
     const registry = await loadSkillRegistry()
 
