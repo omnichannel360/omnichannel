@@ -4,6 +4,7 @@ import path from 'path'
 import { z } from 'zod'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { withFileLock } from '@/lib/file-lock'
+import { ensureDataDir } from '@/lib/ensure-dir'
 
 interface ConversationLog {
   timestamp: string
@@ -25,15 +26,6 @@ const ConductorMessageSchema = z.object({
   message: z.string().min(1).max(2000),
 })
 
-async function ensureDataDir() {
-  const dir = path.dirname(LOG_FILE)
-  try {
-    await fs.mkdir(dir, { recursive: true })
-  } catch {
-    // Already exists
-  }
-}
-
 async function loadSkillRegistry(): Promise<SkillRegistry | null> {
   try {
     const data = await fs.readFile(SKILL_REGISTRY_PATH, 'utf-8')
@@ -53,7 +45,7 @@ async function loadSkillRegistry(): Promise<SkillRegistry | null> {
 
 async function loadLogs(): Promise<ConversationLog[]> {
   return withFileLock(LOG_FILE, async () => {
-    await ensureDataDir()
+    await ensureDataDir(path.dirname(LOG_FILE))
     try {
       const data = await fs.readFile(LOG_FILE, 'utf-8')
       try {
