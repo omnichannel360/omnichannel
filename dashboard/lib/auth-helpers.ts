@@ -15,6 +15,12 @@ export type UserRole = 'admin' | 'user' | 'viewer'
 /**
  * Get authenticated user from request headers (set by middleware)
  * Returns user context injected by authentication middleware
+ *
+ * SECURITY REQUIREMENT: These headers MUST be set by authenticated middleware only.
+ * Never trust client-provided values for x-user-id, x-user-email, x-user-role.
+ * These should be set by middleware (NextAuth, JWT middleware) ONLY, not from client.
+ *
+ * Client cannot forge these headers if middleware strips and re-sets them.
  */
 export function getAuthContextFromHeaders(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -23,9 +29,29 @@ export function getAuthContextFromHeaders(request: NextRequest) {
   const authVerified = request.headers.get('x-auth-verified')
   const correlationId = request.headers.get('x-correlation-id')
 
+  // Validate userId format: alphanumeric, dash, underscore only
+  const isValidUserId = userId ? /^[a-zA-Z0-9_-]{1,128}$/.test(userId) : true
+
+  // Validate userEmail format: basic email validation
+  const isValidEmail = userEmail ? /^[^\s@]{1,254}@[^\s@]{1,255}$/.test(userEmail) : true
+
+  if (!isValidUserId) {
+    logger.warn('Invalid userId format in auth headers', {
+      component: 'auth-helpers',
+      userId: userId?.substring(0, 10),
+    })
+  }
+
+  if (!isValidEmail) {
+    logger.warn('Invalid email format in auth headers', {
+      component: 'auth-helpers',
+      email: userEmail?.substring(0, 10),
+    })
+  }
+
   return {
-    userId,
-    userEmail,
+    userId: isValidUserId ? userId : null,
+    userEmail: isValidEmail ? userEmail : null,
     userRole: (userRole as UserRole) || 'user',
     authVerified: authVerified === 'true',
     correlationId: correlationId || 'unknown',
@@ -51,6 +77,8 @@ export async function getAuthSession() {
 /**
  * Verify that request is authenticated
  * Returns auth context or error response
+ *
+ * SECURITY: Validates both authentication status AND header format
  */
 export function verifyAuth(request: NextRequest): {
   authenticated: boolean
@@ -64,6 +92,7 @@ export function verifyAuth(request: NextRequest): {
 } {
   const authContext = getAuthContextFromHeaders(request)
 
+  // Check if authenticated AND userId is valid (not null after format validation)
   if (!authContext.authVerified || !authContext.userId) {
     const errorResponse = createErrorResponse(
       'Authentication required',

@@ -473,15 +473,10 @@ export class CircuitBreaker {
         lastFailureTime: now,
       }
     }
-    this.successCount = 0
-
-    if (this.failureCount >= this.failureThreshold) {
-      this.state = 'OPEN'
-    }
   }
 
-  getState(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
-    return this.state
+  getState(): CircuitBreakerState['status'] {
+    return this.state.status
   }
 }
 

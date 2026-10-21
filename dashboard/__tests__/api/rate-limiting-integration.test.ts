@@ -4,8 +4,7 @@
  */
 
 import { createMockRequest } from '../lib/test-utils'
-import { rateLimiters } from '@/lib/rate-limiting'
-import { createRateLimiter, RATE_LIMIT_CONFIGS } from '@/lib/middleware/rateLimit'
+import { rateLimiters, createRateLimiter } from '@/lib/rate-limiting'
 
 describe('Rate Limiting Integration', () => {
   describe('Authentication Endpoints', () => {

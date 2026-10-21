@@ -84,9 +84,9 @@ export function setCsrfTokenCookie(response: NextResponse): string {
  * Middleware to validate CSRF token on state-changing requests
  * SECURITY: Also validates origin/referer to prevent cross-site attacks
  *
- * NOTE: Request body is consumed by this middleware. If you need the body
- * in your route handler, use a separate request object or clone the request
- * before calling this middleware. Next.js request bodies can only be read once.
+ * IMPORTANT: This middleware clones the request before reading the body,
+ * so the original request body is preserved for route handlers.
+ * The cloned body is only used to extract the CSRF token.
  */
 export async function validateCsrfMiddleware(
   request: NextRequest,
@@ -118,12 +118,16 @@ export async function validateCsrfMiddleware(
       }
     }
 
-    // Try to get token from header or body
+    // FIXED: Clone request to preserve body for route handler
+    // Next.js request bodies can only be read once, so we must clone
+    // to avoid consuming the body stream.
     let tokenFromBody: string | null = null
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       try {
-        const body = await request.json()
+        // Clone the request to read body without consuming the original
+        const clonedRequest = request.clone()
+        const body = await clonedRequest.json()
         tokenFromBody = body._csrf || body.csrfToken || null
       } catch {
         // Body parse error - token must be in header
@@ -156,17 +160,22 @@ export async function validateCsrfMiddleware(
 
 /**
  * DEPRECATED: Use the return value from setCsrfTokenCookie instead.
- * setCsrfTokenCookie already returns the generated token, so this function
- * is unnecessary and fragile (parses Set-Cookie headers).
  *
- * Example instead:
- * const token = setCsrfTokenCookie(response) // Returns token directly
+ * This function was fragile because it tried to parse Set-Cookie headers.
+ * setCsrfTokenCookie now returns the generated token directly.
+ *
+ * CORRECT pattern:
+ * ```typescript
+ * const token = setCsrfTokenCookie(response)  // Returns token directly
  * response.headers.set('X-CSRF-Token', token) // Send to client if needed
+ * ```
  *
  * @deprecated Use the return value from setCsrfTokenCookie() instead
+ * @throws Error if called - use setCsrfTokenCookie() return value instead
  */
-export function getCsrfTokenFromResponse(_response: NextResponse): string | null {
-  // This function is kept for backwards compatibility but returns null
-  // Use the return value from setCsrfTokenCookie() instead for simpler, safer code
-  return null
+export function getCsrfTokenFromResponse(_response: NextResponse): never {
+  throw new Error(
+    'getCsrfTokenFromResponse is deprecated. Use setCsrfTokenCookie(response) return value instead. ' +
+    'setCsrfTokenCookie now returns the generated token directly.'
+  )
 }

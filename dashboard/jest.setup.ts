@@ -46,21 +46,6 @@ expect.extend({
       }
     }
   },
-  toStartWith(received: unknown, expected: string) {
-    if (typeof received !== 'string') {
-      return {
-        pass: false,
-        message: () => `Expected string, got ${typeof received}`,
-      }
-    }
-    const pass = received.startsWith(expected)
-    return {
-      pass,
-      message: () => pass
-        ? `Expected string not to start with "${expected}"`
-        : `Expected string to start with "${expected}", but got "${received}"`,
-    }
-  },
 })
 
 // Global test timeout

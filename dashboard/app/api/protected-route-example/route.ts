@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
   const correlationId = extractCorrelationFromRequest(request.headers)
   const startTime = Date.now()
 
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'protected-route')
+  // Apply rate limiting (use 'protected' endpoint name - see lib/rate-limiting.ts)
+  const rateLimitError = await applyRateLimit(request, 'protected')
   if (rateLimitError) return rateLimitError
 
   const logContext = createLogContext({
@@ -139,8 +139,8 @@ export async function POST(request: NextRequest) {
   const correlationId = extractCorrelationFromRequest(request.headers)
   const startTime = Date.now()
 
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'protected-route')
+  // Apply rate limiting (use 'protected' endpoint name - see lib/rate-limiting.ts)
+  const rateLimitError = await applyRateLimit(request, 'protected')
   if (rateLimitError) return rateLimitError
 
   // Validate CSRF token for state-changing request
@@ -191,21 +191,50 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, description } = body
 
-    // Validate input
-    if (!name || typeof name !== 'string') {
-      logger.warn('Invalid input - missing name', {
+    // SECURITY: Strict input validation
+    // Name: required, string, 1-256 chars, alphanumeric + spaces/dashes/underscores
+    // Description: optional, string, max 2048 chars
+    if (
+      !name ||
+      typeof name !== 'string' ||
+      name.length < 1 ||
+      name.length > 256 ||
+      !/^[a-zA-Z0-9\s_\-]{1,256}$/.test(name)
+    ) {
+      logger.warn('Invalid input - invalid name format', {
         ...logContext,
         userId: authContext.userId,
+        nameLength: typeof name === 'string' ? name.length : 'not_string',
       })
 
       return NextResponse.json(
         {
           success: false,
-          error: 'Missing or invalid name field',
+          error: 'Name must be 1-256 characters, alphanumeric with spaces/dashes/underscores only',
           code: 'VALIDATION_ERROR',
         },
         { status: 400 }
       )
+    }
+
+    // Validate description if provided
+    if (description !== undefined && description !== null) {
+      if (typeof description !== 'string' || description.length > 2048) {
+        logger.warn('Invalid input - invalid description format', {
+          ...logContext,
+          userId: authContext.userId,
+          descLength: typeof description === 'string' ? description.length : 'not_string',
+        })
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Description must be a string with max 2048 characters',
+            code: 'VALIDATION_ERROR',
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Example: Create resource with cryptographically secure ID
@@ -264,8 +293,8 @@ export async function DELETE(request: NextRequest) {
   const correlationId = extractCorrelationFromRequest(request.headers)
   const startTime = Date.now()
 
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'protected-route')
+  // Apply rate limiting (use 'protected' endpoint name - see lib/rate-limiting.ts)
+  const rateLimitError = await applyRateLimit(request, 'protected')
   if (rateLimitError) return rateLimitError
 
   // Validate CSRF token for state-changing request

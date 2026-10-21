@@ -92,11 +92,23 @@ export function createRateLimitedResponse<T>(
 
 /**
  * Health check function - returns true if rate limiting is operational
+ * Verifies critical rate limiters are configured and functional
  */
 export function isRateLimitingOperational(): boolean {
-  return (
-    rateLimiters.auth !== undefined &&
-    rateLimiters.brain !== undefined &&
-    rateLimiters.protected !== undefined
-  )
+  const hasAuth = rateLimiters.auth !== undefined
+  const hasBrain = rateLimiters.brain !== undefined
+  const hasProtected = rateLimiters.protected !== undefined
+  const hasHealth = rateLimiters.health !== undefined
+
+  if (!hasAuth || !hasBrain || !hasProtected || !hasHealth) {
+    logger.error('Rate limiter health check failed', new Error('Missing rate limiters'), {
+      hasAuth,
+      hasBrain,
+      hasProtected,
+      hasHealth,
+    })
+    return false
+  }
+
+  return true
 }
