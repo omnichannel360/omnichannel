@@ -1,15 +1,21 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 import { withFileLock } from './file-lock'
+import { createLogger } from './logger'
 
-// Simple inline logger for file corruption detection
+const logger = createLogger('atomic-file-ops')
+
+/**
+ * Log file corruption detection using structured logger.
+ * FIXED: Now uses the centralized logger instead of direct stderr writes,
+ * preserving structured logging, correlation IDs, and consistent error handling.
+ */
 const logFileCorruption = (filePath: string, error: unknown) => {
-  const errorMsg = error instanceof Error ? error.message : String(error)
-  const timestamp = new Date().toISOString()
-  const logEntry = { timestamp, level: 'WARN', module: 'atomic-file-ops', path: filePath, error: errorMsg }
-  if (typeof process !== 'undefined' && process.stderr) {
-    process.stderr.write(JSON.stringify(logEntry) + '\n')
-  }
+  logger.warn('File corruption detected - invalid JSON content', {
+    filePath,
+    error: error instanceof Error ? error.message : String(error),
+    errorType: error instanceof Error ? error.constructor.name : typeof error,
+  })
 }
 
 export async function atomicRead<T>(filePath: string, fallback?: T): Promise<T> {

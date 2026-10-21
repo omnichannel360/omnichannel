@@ -5,6 +5,10 @@
 
 import type { Logger } from './logger'
 
+// Cache crypto module at module load time (FIXED: avoid require() on every call)
+let nodeCrypto: { randomUUID?: () => string } | null = null
+let cryptoInitialized = false
+
 // Use dynamic require to avoid circular dependency with logger
 let logger: Logger | null = null
 function getLogger() {
@@ -31,12 +35,25 @@ function getLogger() {
   return logger
 }
 
+// Initialize crypto module once at module load (FIXED: cache for performance)
+function initializeCrypto(): void {
+  if (cryptoInitialized) return
+  cryptoInitialized = true
+  try {
+    nodeCrypto = require('crypto') as { randomUUID?: () => string }
+  } catch {
+    nodeCrypto = null
+  }
+}
+
 export function generateUUIDv4(): string {
   // PRIORITY 1: Use Node.js native crypto.randomUUID() (fastest, most secure)
   // Available in Node.js 15.7+, uses OS entropy pool
-  try {
-    // eslint-disable-next-line global-require
-    const { randomUUID } = require('crypto')
+  if (!cryptoInitialized) {
+    initializeCrypto()
+  }
+
+  if (nodeCrypto?.randomUUID && typeof nodeCrypto.randomUUID === 'function') {
     if (typeof randomUUID === 'function') {
       return randomUUID()
     }
