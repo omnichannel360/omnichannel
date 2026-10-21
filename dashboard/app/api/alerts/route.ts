@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { withFileLock } from '@/lib/file-lock'
 import { AlertCreateSchema, AlertUpdateSchema, generateId } from '@/lib/validation'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
-import { withFileLock } from '@/lib/file-lock'
 
 interface Alert {
   id: string
