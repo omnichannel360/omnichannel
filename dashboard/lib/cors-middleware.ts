@@ -17,6 +17,8 @@ const ALLOWED_ORIGINS = [
   // Add your production domains here
 ] as const
 
+type AllowedOrigin = (typeof ALLOWED_ORIGINS)[number]
+
 /**
  * Allowed HTTP methods
  */
@@ -34,13 +36,20 @@ const ALLOWED_HEADERS = [
 ]
 
 /**
+ * Check if origin is in allowed list with type safety
+ */
+function isAllowedOrigin(origin: string): origin is AllowedOrigin {
+  return ALLOWED_ORIGINS.includes(origin as AllowedOrigin)
+}
+
+/**
  * Apply CORS headers to response
  * @param response - NextResponse to enhance
  * @param origin - Request origin (if allowed)
  * @returns Response with CORS headers if origin is allowed
  */
 export function applyCorsHeaders(response: NextResponse, origin: string | null): NextResponse {
-  if (!origin || !ALLOWED_ORIGINS.includes(origin as any)) {
+  if (!origin || !isAllowedOrigin(origin)) {
     // Don't add CORS headers for disallowed origins
     return response
   }
@@ -80,5 +89,5 @@ export function corsMiddleware(request: NextRequest): NextResponse | null {
  */
 export function isCorsOriginAllowed(origin: string | null): boolean {
   if (!origin) return false
-  return ALLOWED_ORIGINS.includes(origin as any)
+  return isAllowedOrigin(origin)
 }

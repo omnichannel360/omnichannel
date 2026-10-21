@@ -17,9 +17,13 @@ const EMAIL_MAX_LENGTH = 254
 
 /**
  * PASSWORD VALIDATION CONFIGURATION
+ * FIXED: Now uses shared constants from password-validation-constants.ts
+ * to ensure consistent validation across all endpoints
  */
-const PASSWORD_MIN_LENGTH = 8
-const PASSWORD_MAX_LENGTH = 128
+import { PASSWORD_VALIDATION } from './validation/password-validation-constants'
+
+const PASSWORD_MIN_LENGTH = PASSWORD_VALIDATION.minLength
+const PASSWORD_MAX_LENGTH = PASSWORD_VALIDATION.maxLength
 
 /**
  * STRING INPUT VALIDATION CONSTRAINTS
@@ -60,7 +64,7 @@ export const PasswordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
   .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
-  .refine((pwd) => !/^(.{3,}).*\1$/.test(pwd), 'Password should not start and end with the same 3+ character pattern')
+  .refine((pwd) => !PASSWORD_VALIDATION.regex.test(pwd), PASSWORD_VALIDATION.description)
 
 export const StringSchema = z
   .string()

@@ -282,11 +282,22 @@ function generateRefreshToken(userId: string, email: string): string {
 }
 
 /**
- * User credential validation - CRITICAL: UNIMPLEMENTED
+ * User credential validation - PASSWORD-BASED AUTHENTICATION
  *
- * PASSWORD-BASED AUTHENTICATION
- * Validates user credentials against stored password hash
- * Uses bcrypt for secure password comparison
+ * IMPLEMENTATION GUIDE:
+ * This function currently returns null (password-based auth disabled).
+ * For production, connect to your user database and bcrypt password verification.
+ *
+ * Step 1: Install bcrypt: npm install bcrypt
+ * Step 2: Import: import bcrypt from 'bcrypt'
+ * Step 3: Uncomment the code below and replace 'db.users' with your actual database module
+ *
+ * SECURITY NOTES:
+ * - Never log the user's password or password hash
+ * - Always use bcrypt for password hashing and comparison
+ * - Use constant-time comparison to prevent timing attacks
+ * - Enforce password validation rules from PASSWORD_VALIDATION (shared constants)
+ * - Rate-limit failed attempts in your login endpoint
  */
 async function validateUserCredentials(
   email: string,
@@ -295,24 +306,57 @@ async function validateUserCredentials(
   try {
     // Input validation
     if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+      logger.warn('Invalid credential format', {
+        component: 'auth.config',
+        operation: 'validateUserCredentials',
+      })
       return null
     }
 
-    // Database integration required for production
-    // TODO: Implement actual database query and bcrypt verification
-    // const user = await db.users.findByEmail(email)
-    // if (!user) return null
-    // const valid = await bcrypt.compare(password, user.password_hash)
-    // return valid ? { id: user.id, email: user.email, role: user.role } : null
+    // IMPLEMENTATION TEMPLATE (uncomment when database is ready):
+    // import bcrypt from 'bcrypt'
+    // import { db } from '@/lib/db' // Your database module
+    //
+    // const user = await db.users.findByEmail(email.toLowerCase())
+    // if (!user) {
+    //   // Prevent timing attacks by still running bcrypt comparison
+    //   await bcrypt.compare(password, '$2b$10$dummy-hash-to-prevent-timing-attack')
+    //   return null
+    // }
+    //
+    // const isValidPassword = await bcrypt.compare(password, user.password_hash)
+    // if (!isValidPassword) {
+    //   logger.warn('Failed password authentication attempt', {
+    //     component: 'auth.config',
+    //     email: email.toLowerCase(),
+    //   })
+    //   return null
+    // }
+    //
+    // logger.info('User authenticated via password', {
+    //   component: 'auth.config',
+    //   userId: user.id,
+    //   email: user.email,
+    // })
+    //
+    // return {
+    //   id: user.id,
+    //   email: user.email,
+    //   role: user.role || 'user',
+    // }
 
-    logger.warn('Password auth requires database integration', {
+    // CURRENT: Token-based authentication only
+    logger.warn('Password-based authentication is not configured. Using token-based auth only.', {
       component: 'auth.config',
-      email,
+      operation: 'validateUserCredentials',
     })
 
     return null
   } catch (error) {
-    logger.error('Password authentication error', error as Error)
+    logger.error('Password authentication error', error as Error, {
+      component: 'auth.config',
+      operation: 'validateUserCredentials',
+    })
     return null
   }
 }

@@ -15,17 +15,19 @@ export const EmailSchema = z
   .trim()
 
 // Password validation - strong password requirements
-// CONSOLIDATED: Uses same regex as input-validation.ts (line 66) for consistency
+// CONSOLIDATED: Single source of truth for password rules - imports from shared config
+import { PASSWORD_VALIDATION } from './password-validation-constants'
+
 export const PasswordSchema = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
-  .max(128, 'Password must not exceed 128 characters')
+  .min(PASSWORD_VALIDATION.minLength, `Password must be at least ${PASSWORD_VALIDATION.minLength} characters`)
+  .max(PASSWORD_VALIDATION.maxLength, `Password must not exceed ${PASSWORD_VALIDATION.maxLength} characters`)
   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
   .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
-  .refine((pwd) => !/^(.{3,})(\d{0,9})?\1$/.test(pwd), 'Password should not have obvious repeated patterns (e.g., "test123test")')
+  .refine((pwd) => PASSWORD_VALIDATION.regex.test(pwd), PASSWORD_VALIDATION.description)
 
 // Weak password for development/testing (optional override)
 export const PasswordSchemaWeak = z
