@@ -36,7 +36,10 @@ describe('POST /api/meetings - Path Traversal Security', () => {
 
       // Assert
       expect(response.status).toBe(400)
-      expect(data.error).toBeDefined()
+      expect(data.error).not.toBeUndefined()
+      expect(data.error).not.toBeNull()
+      expect(typeof data.error).toBe('string')
+      expect(data.error.length).toBeGreaterThan(0)
     })
 
     it('should reject meeting_type with absolute path', async () => {
@@ -55,7 +58,10 @@ describe('POST /api/meetings - Path Traversal Security', () => {
 
       // Assert
       expect(response.status).toBe(400)
-      expect(data.error).toBeDefined()
+      expect(data.error).not.toBeUndefined()
+      expect(data.error).not.toBeNull()
+      expect(typeof data.error).toBe('string')
+      expect(data.error.length).toBeGreaterThan(0)
     })
 
     it('should reject meeting_type with backslashes (NTFS traversal)', async () => {
@@ -300,8 +306,12 @@ describe('POST /api/meetings - Path Traversal Security', () => {
 
       const data = await response.json()
       expect(data.success).toBe(true)
-      expect(data.data).toBeDefined()
-      expect(data.meta).toBeDefined()
+      expect(data.data).not.toBeUndefined()
+      expect(Array.isArray(data.data) || typeof data.data === 'object').toBe(true)
+      expect(data.meta).not.toBeUndefined()
+      expect(data.meta).toHaveProperty('total')
+      expect(typeof data.meta.total).toBe('number')
+      expect(data.meta.total).toBeGreaterThanOrEqual(0)
     })
   })
 })

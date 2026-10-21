@@ -44,9 +44,11 @@ describe('Error Codes and Status Mapping', () => {
 
     it('should have no undefined error codes', () => {
       Object.values(ERROR_CODES).forEach((code) => {
-        expect(code).toBeDefined()
+        expect(code).not.toBeUndefined()
+        expect(code).not.toBeNull()
         expect(typeof code).toBe('string')
         expect(code.length).toBeGreaterThan(0)
+        expect(code).toMatch(/^[A-Z_]+$/)
       })
     })
   })
