@@ -40,23 +40,22 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
         return
       }
 
-      // Set timeout only for remaining duration
-      const timeoutId = setTimeout(() => {
-        if (!settled) {
-          settled = true
-          reject(new Error(`Lock execution timeout after ${timeoutMs}ms for file: ${filePath}`))
-        }
-      }, remainingMs)
-
       try {
-        const result = await callback()
-        clearTimeout(timeoutId)
+        // Use Promise.race to ensure timeout actually interrupts execution
+        // This prevents the race condition where callback continues after timeout
+        const timeoutPromise = new Promise<T>((_, reject) =>
+          setTimeout(() => {
+            reject(new Error(`Lock execution timeout after ${timeoutMs}ms for file: ${filePath}`))
+          }, remainingMs)
+        )
+
+        const result = await Promise.race([callback(), timeoutPromise])
+
         if (!settled) {
           settled = true
           resolve(result)
         }
       } catch (error) {
-        clearTimeout(timeoutId)
         if (!settled) {
           settled = true
           reject(error)

@@ -11,6 +11,26 @@ const CORRELATION_ID_HEADER = 'x-correlation-id'
 const REQUEST_START_TIME_HEADER = 'x-request-start-time'
 
 /**
+ * Generate secure random component for correlation IDs
+ * Uses consistent crypto API checking pattern
+ */
+function generateSecureRandomPart(): string {
+  // Try Node.js crypto module first
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+
+  // Fallback: use browser crypto API
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(6))
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  // Last resort: timestamp + Math.random
+  return Math.random().toString(36).substring(2, 11)
+}
+
+/**
  * Generate or extract correlation ID from request
  * Uses cryptographically secure random generation
  */
@@ -20,11 +40,7 @@ export function getOrCreateCorrelationId(request: NextRequest): string {
     return existing
   }
 
-  // Use crypto.getRandomValues for secure random bytes, fallback to timestamp
-  const randomPart = globalThis.crypto?.getRandomValues
-    ? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('')
-    : Math.random().toString(36).substring(2, 11)
-
+  const randomPart = generateSecureRandomPart()
   return `req-${Date.now()}-${randomPart}`
 }
 

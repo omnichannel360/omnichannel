@@ -304,19 +304,32 @@ export function createLogger(serviceName: string, options: LoggerOptions = {}): 
 export const logger = createLogger('default')
 
 /**
+ * Generate secure random ID for correlation tracking
+ * Uses crypto.randomUUID when available, falls back to secure random bytes
+ */
+function generateSecureId(): string {
+  // Prefer crypto.randomUUID if available (Node.js 15+)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+
+  // Fallback: use crypto.getRandomValues if available (browser)
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(6))
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  // Last resort: timestamp + Math.random
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+}
+
+/**
  * Create a logger context helper
  * Uses secure UUID generation for correlation IDs
  */
 export function createLogContext(overrides?: Partial<LogContext>): LogContext {
-  // Use crypto.randomUUID if available, otherwise use generateId for secure fallback
-  const correlationId = typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${globalThis.crypto?.getRandomValues ?
-      Array.from(globalThis.crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('') :
-      Math.random().toString(36).substring(2, 11)}`
-
   return {
-    correlationId,
+    correlationId: generateSecureId(),
     timestamp: new Date().toISOString(),
     ...overrides
   }
