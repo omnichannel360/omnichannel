@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
-import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
-
-// Create rate limiter for this endpoint
-const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.health)
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { HealthStatusResponseSchema, HealthComponentSchema } from '@/lib/validation'
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy'
@@ -113,10 +111,8 @@ function generateAlerts(
 
 export async function GET(request: NextRequest) {
   // Apply rate limiting
-  const rateLimitCheck = await rateLimitMiddleware(request)
-  if (!rateLimitCheck.allowed) {
-    return rateLimitCheck.response!
-  }
+  const rateLimitError = await applyRateLimit(request, 'health')
+  if (rateLimitError) return rateLimitError
 
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
@@ -167,21 +163,21 @@ export async function GET(request: NextRequest) {
       alerts,
     }
 
-    let response = NextResponse.json(status, {
+    // Validate response against schema
+    const validated = HealthStatusResponseSchema.safeParse(status)
+    if (!validated.success) {
+      console.error('Health response validation failed:', validated.error)
+      return NextResponse.json(
+        { success: false, error: 'Health check response validation failed' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(validated.data, {
       status: status.status === 'healthy' ? 200 : status.status === 'degraded' ? 200 : 503,
     })
-
-    // Add rate limit headers
-    response = addRateLimitHeaders(
-      response,
-      rateLimitCheck.remaining!,
-      rateLimitCheck.resetTime!,
-      rateLimitCheck.limit!
-    )
-
-    return response
   } catch (error) {
-    let response = NextResponse.json(
+    return NextResponse.json(
       {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
@@ -192,15 +188,5 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     )
-
-    // Add rate limit headers even on error
-    response = addRateLimitHeaders(
-      response,
-      rateLimitCheck.remaining!,
-      rateLimitCheck.resetTime!,
-      rateLimitCheck.limit!
-    )
-
-    return response
   }
 }
