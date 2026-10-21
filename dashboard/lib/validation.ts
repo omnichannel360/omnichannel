@@ -48,6 +48,27 @@ export const VALID_SKILL_TYPES = new Set([
 export type ValidSkillType = typeof VALID_SKILL_TYPES extends Set<infer T> ? T : never
 
 /**
+ * Shared dangerous patterns used in filename validation.
+ * Extracted to single source of truth to prevent duplication and inconsistency.
+ * These patterns indicate directory traversal or command injection attempts.
+ */
+const DANGEROUS_PATTERNS = ['..',
+  '/',
+  '\\',
+  '~',
+  '$',
+  '%',
+  '*',
+  '?',
+  '"',
+  "'",
+  '<',
+  '>',
+  '|',
+  '\0',
+] as const
+
+/**
  * Whitelist of characters allowed in an identifier that ends up in a filename.
  * No dots, slashes, backslashes or colons, so traversal and NTFS stream tricks are impossible.
  * Additionally enforces against common path traversal patterns.
@@ -58,26 +79,7 @@ export const MeetingTypeSchema = z
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/, 'meeting_type may only contain letters, digits, _ and -')
   .refine(
-    (value) => {
-      // Explicitly reject common path traversal patterns
-      const dangerousPatterns = [
-        '..',
-        '/',
-        '\\',
-        '~',
-        '$',
-        '%',
-        '*',
-        '?',
-        '"',
-        "'",
-        '<',
-        '>',
-        '|',
-        '\0',
-      ]
-      return !dangerousPatterns.some((pattern) => value.includes(pattern))
-    },
+    (value) => !DANGEROUS_PATTERNS.some((pattern) => value.includes(pattern)),
     'meeting_type contains forbidden characters'
   )
   .refine(
@@ -95,26 +97,7 @@ export const SkillTypeSchema = z
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/, 'skill_triggered may only contain letters, digits, _ and -')
   .refine(
-    (value) => {
-      // Explicitly reject common path traversal patterns
-      const dangerousPatterns = [
-        '..',
-        '/',
-        '\\',
-        '~',
-        '$',
-        '%',
-        '*',
-        '?',
-        '"',
-        "'",
-        '<',
-        '>',
-        '|',
-        '\0',
-      ]
-      return !dangerousPatterns.some((pattern) => value.includes(pattern))
-    },
+    (value) => !DANGEROUS_PATTERNS.some((pattern) => value.includes(pattern)),
     'skill_triggered contains forbidden characters'
   )
   .refine(

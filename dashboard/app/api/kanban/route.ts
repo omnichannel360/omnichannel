@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { promises as fs } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { TaskCreateSchema, TaskUpdateSchema } from '@/lib/validation'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
-import { withFileLock } from '@/lib/file-lock'
-import { ensureDataDir } from '@/lib/ensure-dir'
+import { atomicUpdate, atomicRead } from '@/lib/atomic-file-ops'
 
 interface Task {
   id: string
@@ -24,43 +22,6 @@ const DEFAULT_TASKS: Task[] = [
   { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
 ]
 
-async function loadTasks(): Promise<Task[]> {
-  return withFileLock(DATA_FILE, async () => {
-    await ensureDataDir(path.dirname(DATA_FILE))
-    try {
-      const data = await fs.readFile(DATA_FILE, 'utf-8')
-      try {
-        return JSON.parse(data)
-      } catch (parseError) {
-        // File exists but contains invalid JSON - this is a corruption error
-        throw new Error('Tasks file is corrupted or contains invalid JSON')
-      }
-    } catch (error) {
-      // If file doesn't exist, initialize with defaults
-      const isFileNotFound = error instanceof Error &&
-        (error as NodeJS.ErrnoException).code === 'ENOENT'
-      if (isFileNotFound) {
-        await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TASKS, null, 2), 'utf-8')
-        return DEFAULT_TASKS
-      }
-      // Re-throw corruption or other errors to be handled by API endpoint
-      throw error
-    }
-  })
-}
-
-async function saveTasks(tasks: Task[]): Promise<void> {
-  return withFileLock(DATA_FILE, async () => {
-    try {
-      await ensureDataDir(path.dirname(DATA_FILE))
-      await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2), 'utf-8')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(`Failed to save tasks: ${message}`)
-    }
-  })
-}
-
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
@@ -68,8 +29,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tasks = await loadTasks()
-    return NextResponse.json({ success: true, data: tasks })
+    const tasks = await atomicRead<Task[]>(DATA_FILE)
+    return NextResponse.json({ success: true, data: tasks.length ? tasks : DEFAULT_TASKS })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Failed to load tasks' },
@@ -100,7 +61,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const tasks = await loadTasks()
     const { title, status } = parsedBody.data
     const newTask: Task = {
       id: crypto.randomUUID(),
@@ -108,10 +68,13 @@ export async function POST(request: NextRequest) {
       status,
     }
 
-    tasks.push(newTask)
-    await saveTasks(tasks)
+    // Atomic operation: load → add → save in single critical section
+    const result = await atomicUpdate<Task[], Task>(DATA_FILE, async (tasks) => {
+      const updated = [...(tasks.length ? tasks : DEFAULT_TASKS), newTask]
+      return { updated, result: newTask }
+    })
 
-    return NextResponse.json({ success: true, data: newTask }, { status: 201 })
+    return NextResponse.json({ success: true, data: result }, { status: 201 })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Failed to create task' },
