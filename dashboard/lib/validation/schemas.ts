@@ -9,11 +9,11 @@ import { PASSWORD_VALIDATION } from './password-validation-constants'
 // Email validation - RFC 5322 compliant
 export const EmailSchema = z
   .string()
+  .trim()
+  .toLowerCase()
   .email('Invalid email format')
   .min(3, 'Email must be at least 3 characters')
   .max(254, 'Email must not exceed 254 characters')
-  .toLowerCase()
-  .trim()
 
 // Password validation - strong password requirements
 // CONSOLIDATED: Single source of truth for password rules - imports from shared config
@@ -83,6 +83,27 @@ function createSafeString(minLength = 0, maxLength = 1000): z.ZodTypeAny {
         return false
       }
 
+      // Check HTML event handler attributes (onclick=, onerror=, onload=, etc.)
+      // This prevents XSS via: <img src=x onerror=alert(1)>, <div onclick=...>, etc.
+      if (/on\w+\s*=/i.test(val)) {
+        return false
+      }
+
+      // Check for iframe, embed, and object tags
+      if (/<(iframe|embed|object)/i.test(val)) {
+        return false
+      }
+
+      // Check for vbscript: protocol
+      if (/vbscript:/i.test(val)) {
+        return false
+      }
+
+      // Check for SVG with event handlers or scripts
+      if (/<svg/i.test(val) || /<svg[^>]*on/i.test(val)) {
+        return false
+      }
+
       // Check URL-decoded dangerous patterns (catches obfuscation like java%73cript:)
       try {
         const decoded = decodeURIComponent(lowerVal)
@@ -96,6 +117,10 @@ function createSafeString(minLength = 0, maxLength = 1000): z.ZodTypeAny {
           return false
         }
         if (decoded.includes('data:text/html')) {
+          return false
+        }
+        // Also check for event handlers in decoded form
+        if (/on\w+\s*=/i.test(decoded)) {
           return false
         }
       } catch {
@@ -263,8 +288,7 @@ export const MeetingSchema = z.object({
   attendees: z
     .array(EmailSchema)
     .min(1, 'At least one attendee is required')
-    .optional()
-    .default([]),
+    .optional(),
 })
 
 export type Meeting = z.infer<typeof MeetingSchema>

@@ -83,11 +83,15 @@ export function setCsrfTokenCookie(response: NextResponse): string {
 /**
  * Middleware to validate CSRF token on state-changing requests
  * SECURITY: Also validates origin/referer to prevent cross-site attacks
+ *
+ * NOTE: Request body is consumed by this middleware. If you need the body
+ * in your route handler, use a separate request object or clone the request
+ * before calling this middleware. Next.js request bodies can only be read once.
  */
 export async function validateCsrfMiddleware(
   request: NextRequest,
   allowedOrigins?: string[]
-): Promise<{ valid: boolean; response?: NextResponse }> {
+): Promise<{ valid: boolean; response?: NextResponse; tokenFromBody?: string | null }> {
   // Only validate state-changing requests
   const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH']
   if (!stateChangingMethods.includes(request.method)) {
@@ -126,7 +130,6 @@ export async function validateCsrfMiddleware(
       }
     }
 
-    const tokenFromHeader = request.headers.get(CSRF_HEADER_NAME)
     const result = verifyCsrfToken(request, tokenFromBody)
 
     if (!result.valid) {
@@ -139,7 +142,7 @@ export async function validateCsrfMiddleware(
       }
     }
 
-    return { valid: true }
+    return { valid: true, tokenFromBody }
   } catch (error) {
     return {
       valid: false,
@@ -152,22 +155,18 @@ export async function validateCsrfMiddleware(
 }
 
 /**
- * Get current CSRF token from cookies (for responses)
- * SECURITY: Returns the CSRF token that should be sent by the client in future requests
- * This is typically called after setCsrfTokenCookie to provide token to client
+ * DEPRECATED: Use the return value from setCsrfTokenCookie instead.
+ * setCsrfTokenCookie already returns the generated token, so this function
+ * is unnecessary and fragile (parses Set-Cookie headers).
  *
- * @param response - Next.js response object
- * @returns CSRF token value to send to client, or null if not set
+ * Example instead:
+ * const token = setCsrfTokenCookie(response) // Returns token directly
+ * response.headers.set('X-CSRF-Token', token) // Send to client if needed
+ *
+ * @deprecated Use the return value from setCsrfTokenCookie() instead
  */
 export function getCsrfTokenFromResponse(response: NextResponse): string | null {
-  // Extract the CSRF token from the Set-Cookie headers if it was just set
-  const setCookieHeader = response.headers.get('set-cookie')
-  if (!setCookieHeader || !setCookieHeader.includes(CSRF_COOKIE_NAME)) {
-    return null
-  }
-
-  // Extract token value from cookie string
-  // Cookie format: __Host-csrf=<token>; HttpOnly; ...
-  const match = setCookieHeader.match(new RegExp(`${CSRF_COOKIE_NAME}=([^;]+)`))
-  return match ? match[1] : null
+  // This function is kept for backwards compatibility but should not be used
+  console.warn('[DEPRECATED] getCsrfTokenFromResponse() is deprecated. Use the return value from setCsrfTokenCookie() instead.')
+  return null
 }

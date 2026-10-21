@@ -241,26 +241,8 @@ function isValidApiKey(key: string): boolean {
   // Strict whitelist: only alphanumeric, underscore, hyphen, dot
   // Explicitly does NOT allow: space, newline, tab, quotes, brackets, etc.
   // Regex: ^[a-zA-Z0-9._-]{12,256}$
-  if (!/^[a-zA-Z0-9._-]{12,256}$/.test(key)) return false
-
-  // Defense-in-depth: ensure no control characters or dangerous Unicode
-  // Check for any character with code < 32 (control chars) or > 127 (extended)
-  for (let i = 0; i < key.length; i++) {
-    const code = key.charCodeAt(i)
-    // Allow: 45-46 (-.), 48-57 (0-9), 65-90 (A-Z), 95 (_), 97-122 (a-z)
-    if (
-      code < 45 || // Below valid range
-      (code > 46 && code < 48) || // Between . and 0
-      (code > 57 && code < 65) || // Between 9 and A
-      (code > 90 && code < 95) || // Between Z and _
-      (code > 95 && code < 97) || // Between _ and a
-      code > 122 // Above z
-    ) {
-      return false
-    }
-  }
-
-  return true
+  // This regex enforces the exact character set and length requirements
+  return /^[a-zA-Z0-9._-]{12,256}$/.test(key)
 }
 
 /**

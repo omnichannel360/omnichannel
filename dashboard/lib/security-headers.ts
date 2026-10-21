@@ -70,9 +70,6 @@ export function applySecurityHeaders(
     // Skip cache header if not needed
     if (key === 'Cache-Control' && !disableCache) return
 
-    // Skip HSTS in non-production
-    if (key === 'Strict-Transport-Security' && !isProduction) return
-
     response.headers.set(key, value)
   })
 
