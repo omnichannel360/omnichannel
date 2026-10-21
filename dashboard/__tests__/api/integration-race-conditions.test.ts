@@ -6,7 +6,7 @@
 
 import path from 'path'
 import { promises as fs } from 'fs'
-import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
+import { atomicUpdate, atomicRead, atomicWrite, atomicConditionalUpdate, atomicReadModifyWrite } from '@/lib/atomic-file-ops'
 import { atomicReaddir, atomicMkdir } from '@/lib/atomic-dir-ops'
 import { clearAllLocks } from '@/lib/file-lock'
 
@@ -83,7 +83,7 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
         // Alerts API: add 5 alerts concurrently
         Promise.all(
           Array.from({ length: 5 }, (_, i) =>
-            atomicUpdate<Alert[], Alert>(alertsFile, async (data) => {
+            atomicUpdate<Alert[]>(alertsFile, async (data) => {
               const alert: Alert = {
                 id: `alert-${i}`,
                 timestamp: new Date().toISOString(),
@@ -92,47 +92,47 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
                 message: `Alert ${i}`,
                 status: 'active',
               }
-              return { updated: [...data, alert], result: alert }
-            })
+              return [...(Array.isArray(data) ? data : []), alert]
+            }, [])
           )
         ),
 
         // Kanban API: add 5 tasks concurrently
         Promise.all(
           Array.from({ length: 5 }, (_, i) =>
-            atomicUpdate<Task[], Task>(tasksFile, async (data) => {
+            atomicUpdate<Task[]>(tasksFile, async (data) => {
               const task: Task = {
                 id: `task-${i}`,
                 title: `Task ${i}`,
                 status: 'todo',
               }
-              return { updated: [...data, task], result: task }
-            })
+              return [...(Array.isArray(data) ? data : []), task]
+            }, [])
           )
         ),
 
         // Meetings API: add 5 meeting logs concurrently
         Promise.all(
           Array.from({ length: 5 }, (_, i) =>
-            atomicUpdate<MeetingLog[], MeetingLog>(meetingsLogFile, async (data) => {
+            atomicUpdate<MeetingLog[]>(meetingsLogFile, async (data) => {
               const log: MeetingLog = {
                 timestamp: new Date().toISOString(),
                 meeting_type: 'standup',
                 skill_triggered: 'skill-sync',
                 status: 'completed',
               }
-              return { updated: [...data, log], result: log }
-            })
+              return [...(Array.isArray(data) ? data : []), log]
+            }, [])
           )
         ),
       ])
 
-      // Verify all operations succeeded
+      // Verify all operations succeeded and returned correct counts
       expect(alerts).toHaveLength(5)
       expect(tasks).toHaveLength(5)
       expect(meetings).toHaveLength(5)
 
-      // Verify data consistency by reading back
+      // Verify data consistency by reading back and checking for duplicates
       const finalAlerts = await atomicRead<Alert[]>(alertsFile)
       const finalTasks = await atomicRead<Task[]>(tasksFile)
       const finalMeetings = await atomicRead<MeetingLog[]>(meetingsLogFile)
@@ -141,11 +141,11 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
       expect(finalTasks).toHaveLength(5)
       expect(finalMeetings).toHaveLength(5)
 
-      // Verify no data loss or duplication
+      // Verify no data loss or duplication via unique ID sets
       const alertIds = new Set(finalAlerts.map(a => a.id))
       const taskIds = new Set(finalTasks.map(t => t.id))
-      expect(alertIds.size).toBe(5)
-      expect(taskIds.size).toBe(5)
+      expect(alertIds.size).toBe(5) // No duplicate alert IDs
+      expect(taskIds.size).toBe(5) // No duplicate task IDs
     })
 
     it('atomic directory operations prevent race conditions in brain directory', async () => {
@@ -173,7 +173,7 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
       // Verify directory was created and contains files
       const files = await atomicReaddir(brainDir)
       const jsonFiles = files.filter(f => f.endsWith('.json'))
-      expect(jsonFiles.length).toBeGreaterThanOrEqual(3)
+      expect(jsonFiles.length).toBe(3)
     })
 
     it('lost update anomaly prevention across all APIs', async () => {
@@ -217,14 +217,14 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
       // Distribute 100 operations across 3 files (33-33-34)
       const promises = Array.from({ length: 100 }, (_, i) => {
         const fileIndex = i % 3
-        return atomicUpdate<DataRecord[], DataRecord>(files[fileIndex], async (data) => {
+        return atomicUpdate<DataRecord[]>(files[fileIndex], async (data) => {
           const record: DataRecord = {
             id: `record-${i}`,
             value: i,
             timestamp: new Date().toISOString(),
           }
-          return { updated: [...data, record], result: record }
-        })
+          return [...(Array.isArray(data) ? data : []), record]
+        }, [])
       })
 
       const results = await Promise.all(promises)
@@ -233,8 +233,8 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
       // Verify all files contain the expected data
       for (const file of files) {
         const data = await atomicRead<DataRecord[]>(file)
-        expect(data.length).toBeGreaterThan(0)
-        expect(data.length).toBeLessThanOrEqual(34)
+        // Distribution across 3 files: first 2 get 33, last gets 34
+        expect([33, 34]).toContain(data.length)
       }
     })
 
@@ -276,15 +276,15 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
       const file = path.join(testBaseDir, 'error-resilience.json')
 
       const promises = Array.from({ length: 20 }, (_, i) =>
-        atomicUpdate<Record[], Record | null>(file, async (data) => {
+        atomicUpdate<Record[]>(file, async (data) => {
           // Every 4th operation fails
           if (i % 4 === 0) {
             throw new Error(`Intentional error at ${i}`)
           }
 
           const record: Record = { id: `rec-${i}`, value: i }
-          return { updated: [...data, record], result: record }
-        }).catch(() => null)
+          return [...(Array.isArray(data) ? data : []), record]
+        }, []).catch(() => null)
       )
 
       const results = await Promise.all(promises)
@@ -292,7 +292,7 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
       const failures = results.filter(r => r === null).length
 
       expect(successes + failures).toBe(20)
-      expect(failures).toBeGreaterThan(0)
+      expect(failures).toBe(5) // Every 4th operation fails: 20/4 = 5 failures
 
       // Data should only contain successful writes
       const finalData = await atomicRead<Record[]>(file)
@@ -313,15 +313,12 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
 
       // Fire off rapid operations
       const promises = Array.from({ length: 50 }, (_, i) =>
-        atomicUpdate<LongOp[], LongOp>(file, async (data) => {
+        atomicUpdate<LongOp[]>(file, async (data) => {
           // Simulate some work
           await new Promise(resolve => setTimeout(resolve, Math.random() * 10))
 
-          return {
-            updated: [...data, { id: `op-${i}`, duration: i }],
-            result: { id: `op-${i}`, duration: i },
-          }
-        })
+          return [...(Array.isArray(data) ? data : []), { id: `op-${i}`, duration: i }]
+        }, [])
       )
 
       const results = await Promise.all(promises)
@@ -329,6 +326,161 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
 
       const finalData = await atomicRead<LongOp[]>(file)
       expect(finalData.length).toBe(50)
+    })
+  })
+
+  describe('Conditional Update Operations', () => {
+    it('atomicConditionalUpdate - applies update only when condition is true', async () => {
+      interface Counter {
+        count: number
+        updated: boolean
+      }
+
+      const file = path.join(testBaseDir, 'conditional-update.json')
+      const initial: Counter = { count: 0, updated: false }
+
+      await atomicWrite<Counter>(file, initial)
+
+      // Condition: count < 10
+      const result1 = await atomicConditionalUpdate<Counter>(
+        file,
+        (data) => data.count < 10,
+        async (data) => ({ count: data.count + 1, updated: true }),
+        initial
+      )
+
+      expect(result1.updated).toBe(true)
+      expect(result1.data.count).toBe(1)
+
+      // Condition: count < 10 (should still be true)
+      const result2 = await atomicConditionalUpdate<Counter>(
+        file,
+        (data) => data.count < 10,
+        async (data) => ({ count: data.count + 5, updated: true }),
+        initial
+      )
+
+      expect(result2.updated).toBe(true)
+      expect(result2.data.count).toBe(6)
+
+      // Condition: count < 5 (should be false now)
+      const result3 = await atomicConditionalUpdate<Counter>(
+        file,
+        (data) => data.count < 5,
+        async (data) => ({ count: data.count + 100, updated: true }),
+        initial
+      )
+
+      expect(result3.updated).toBe(false)
+      expect(result3.data.count).toBe(6) // Unchanged
+    })
+
+    it('atomicReadModifyWrite - applies transformation and persists result', async () => {
+      interface Document {
+        id: string
+        content: string
+        version: number
+      }
+
+      const file = path.join(testBaseDir, 'read-modify-write.json')
+      const initial: Document = {
+        id: 'doc-1',
+        content: 'Initial content',
+        version: 1,
+      }
+
+      await atomicWrite<Document>(file, initial)
+
+      // Modify the document
+      const modified = await atomicReadModifyWrite<Document>(
+        file,
+        async (doc) => ({
+          ...doc,
+          content: `${doc.content} - Modified`,
+          version: doc.version + 1,
+        }),
+        initial
+      )
+
+      expect(modified.content).toContain('Modified')
+      expect(modified.version).toBe(2)
+
+      // Verify persistence
+      const fromDisk = await atomicRead<Document>(file)
+      expect(fromDisk.version).toBe(2)
+      expect(fromDisk.content).toContain('Modified')
+    })
+  })
+
+  describe('Concurrent Conditional Updates', () => {
+    it('concurrent conditional updates respect condition checks', async () => {
+      interface Status {
+        state: string
+        updateCount: number
+      }
+
+      const file = path.join(testBaseDir, 'concurrent-conditional.json')
+      const initial: Status = { state: 'pending', updateCount: 0 }
+
+      await atomicWrite<Status>(file, initial)
+
+      // 10 concurrent conditional updates - only some should succeed
+      const promises = Array.from({ length: 10 }, (_, i) =>
+        atomicConditionalUpdate<Status>(
+          file,
+          (data) => data.updateCount < 5, // Only first 5 can succeed
+          async (data) => ({
+            state: 'updated',
+            updateCount: data.updateCount + 1,
+          }),
+          initial
+        )
+      )
+
+      const results = await Promise.all(promises)
+      const successes = results.filter((r) => r.updated).length
+      const failures = results.filter((r) => !r.updated).length
+
+      // Exactly 5 should succeed, 5 should fail
+      expect(successes).toBe(5)
+      expect(failures).toBe(5)
+
+      // Verify final state
+      const final = await atomicRead<Status>(file)
+      expect(final.updateCount).toBe(5)
+    })
+
+    it('read-modify-write preserves consistency under concurrent load', async () => {
+      interface Accumulator {
+        total: number
+        operations: number
+      }
+
+      const file = path.join(testBaseDir, 'concurrent-rmw.json')
+      const initial: Accumulator = { total: 0, operations: 0 }
+
+      await atomicWrite<Accumulator>(file, initial)
+
+      // 20 concurrent read-modify-write operations
+      const promises = Array.from({ length: 20 }, (_, i) =>
+        atomicReadModifyWrite<Accumulator>(
+          file,
+          async (data) => ({
+            total: data.total + (i + 1),
+            operations: data.operations + 1,
+          }),
+          initial
+        )
+      )
+
+      await Promise.all(promises)
+      const final = await atomicRead<Accumulator>(file)
+
+      // Verify all operations completed
+      expect(final.operations).toBe(20)
+
+      // Verify total: 1+2+...+20 = 210
+      expect(final.total).toBe(210)
     })
   })
 })

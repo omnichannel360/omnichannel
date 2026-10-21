@@ -10,57 +10,87 @@ describe('Auth Middleware', () => {
 
   describe('withAuth wrapper', () => {
     it('should allow authenticated requests to proceed', async () => {
+      // Arrange
       const token = await generateToken('user-123', 'user@example.com', 'user')
       const request = new NextRequest('http://localhost:3000/api/test', {
         headers: { authorization: `Bearer ${token}` },
-      })
+      }) as unknown as NextRequest
+
+      // Act
       const handler = withAuth(mockHandler)
-      const response = await handler(request as any)
+      const response = await handler(request)
       const data = await response.json()
+
+      // Assert
       expect(response.status).toBe(200)
       expect(data.success).toBe(true)
     })
 
     it('should reject requests without authentication token', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test')
+      // Arrange
+      const request = new NextRequest('http://localhost:3000/api/test') as unknown as NextRequest
+
+      // Act
       const handler = withAuth(mockHandler)
-      const response = await handler(request as any)
+      const response = await handler(request)
+
+      // Assert
       expect(response.status).toBe(401)
     })
 
     it('should reject requests with invalid token', async () => {
+      // Arrange
       const request = new NextRequest('http://localhost:3000/api/test', {
         headers: { authorization: 'Bearer invalid.token.here' },
-      })
+      }) as unknown as NextRequest
+
+      // Act
       const handler = withAuth(mockHandler)
-      const response = await handler(request as any)
+      const response = await handler(request)
+
+      // Assert
       expect(response.status).toBe(401)
     })
 
     it('should enforce role-based access control', async () => {
+      // Arrange
       const userToken = await generateToken('user-123', 'user@example.com', 'user')
       const request = new NextRequest('http://localhost:3000/api/admin', {
         headers: { authorization: `Bearer ${userToken}` },
-      })
+      }) as unknown as NextRequest
+
+      // Act
       const handler = withAuth(mockHandler, { requiredRole: 'admin' })
-      const response = await handler(request as any)
+      const response = await handler(request)
+
+      // Assert
       expect(response.status).toBe(403)
     })
 
     it('should allow admin users to access admin endpoints', async () => {
+      // Arrange
       const adminToken = await generateToken('admin-123', 'admin@example.com', 'admin')
       const request = new NextRequest('http://localhost:3000/api/admin', {
         headers: { authorization: `Bearer ${adminToken}` },
-      })
+      }) as unknown as NextRequest
+
+      // Act
       const handler = withAuth(mockHandler, { requiredRole: 'admin' })
-      const response = await handler(request as any)
+      const response = await handler(request)
+
+      // Assert
       expect(response.status).toBe(200)
     })
 
     it('should allow public endpoints without authentication', async () => {
+      // Arrange
       const request = new NextRequest('http://localhost:3000/api/auth/login')
+
+      // Act
       const handler = withAuth(mockHandler, { publicEndpoints: ['/api/auth/login'] })
-      const response = await handler(request as any)
+      const response = await handler(request as unknown as NextRequest)
+
+      // Assert
       expect(response.status).toBe(200)
     })
   })

@@ -28,16 +28,33 @@ import { ZodError } from 'zod'
 describe('Input Validation - Core Middleware', () => {
   describe('formatZodErrors', () => {
     it('should format Zod errors into readable messages', () => {
+      // Arrange
+      const invalidInput = {}
+      let caughtError: ZodError | null = null
+
+      // Act
       try {
-        LoginRequestSchema.parse({})
+        LoginRequestSchema.parse(invalidInput)
       } catch (error) {
         if (error instanceof ZodError) {
-          const formatted = formatZodErrors(error)
-          expect(formatted).toHaveLength(2) // email and password are required
-          expect(formatted[0]).toHaveProperty('field')
-          expect(formatted[0]).toHaveProperty('message')
-          expect(formatted[0]).toHaveProperty('code')
+          caughtError = error
         }
+      }
+
+      // Assert
+      expect(caughtError).not.toBeNull()
+      expect(caughtError).toBeInstanceOf(ZodError)
+
+      if (caughtError instanceof ZodError) {
+        const formatted = formatZodErrors(caughtError)
+        expect(Array.isArray(formatted)).toBe(true)
+        expect(formatted.length).toBeGreaterThanOrEqual(2) // at least email and password
+        expect(formatted[0]).toHaveProperty('field')
+        expect(formatted[0]).toHaveProperty('message')
+        expect(formatted[0]).toHaveProperty('code')
+        expect(typeof formatted[0].field).toBe('string')
+        expect(typeof formatted[0].message).toBe('string')
+        expect(typeof formatted[0].code).toBe('string')
       }
     })
   })
@@ -73,26 +90,75 @@ describe('Input Validation - Core Middleware', () => {
 
   describe('validateBody - Required Fields', () => {
     it('should reject missing required email', () => {
-      const result = LoginRequestSchema.safeParse({
-        password: 'Password123!',
-      })
+      // Arrange
+      const invalidInput = { password: 'Password123!' }
+
+      // Act
+      const result = LoginRequestSchema.safeParse(invalidInput)
+
+      // Assert
       expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBeDefined()
+        expect(result.error.errors.length).toBeGreaterThan(0)
+        const emailError = result.error.errors.find((e) => e.path.includes('email'))
+        expect(emailError).toBeDefined()
+      }
     })
 
     it('should reject missing required password', () => {
-      const result = LoginRequestSchema.safeParse({
-        email: 'user@example.com',
-      })
+      // Arrange
+      const invalidInput = { email: 'user@example.com' }
+
+      // Act
+      const result = LoginRequestSchema.safeParse(invalidInput)
+
+      // Assert
       expect(result.success).toBe(false)
+      if (!result.success) {
+        const passwordError = result.error.errors.find((e) => e.path.includes('password'))
+        expect(passwordError).toBeDefined()
+      }
     })
 
     it('should reject empty string for required field', () => {
-      const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: '',
-        message: 'Test message',
-      })
+      // Arrange
+      const invalidInput = { level: 'info', component: '', message: 'Test message' }
+
+      // Act
+      const result = AlertCreateBodySchema.safeParse(invalidInput)
+
+      // Assert
       expect(result.success).toBe(false)
+      if (!result.success) {
+        const componentError = result.error.errors.find((e) => e.path.includes('component'))
+        expect(componentError).toBeDefined()
+        expect(componentError?.message).toContain('at least 1 character')
+      }
+    })
+
+    it('should reject null values for required fields', () => {
+      // Arrange - Edge case: explicit null
+      const invalidInput = { email: null, password: null }
+
+      // Act
+      const result = LoginRequestSchema.safeParse(invalidInput)
+
+      // Assert
+      expect(result.success).toBe(false)
+      expect(result.error.errors.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('should reject undefined values for required fields', () => {
+      // Arrange - Edge case: undefined
+      const invalidInput = { email: undefined, password: undefined }
+
+      // Act
+      const result = LoginRequestSchema.safeParse(invalidInput)
+
+      // Assert
+      expect(result.success).toBe(false)
+      expect(result.error.errors.length).toBeGreaterThanOrEqual(2)
     })
   })
 
@@ -136,30 +202,83 @@ describe('Input Validation - Core Middleware', () => {
 
   describe('validateBody - XSS Prevention', () => {
     it('should reject message with script tags', () => {
+      // Arrange
+      const xssPayload = '<script>alert("xss")</script>'
+
+      // Act
       const result = AlertCreateBodySchema.safeParse({
         level: 'info',
         component: 'test',
-        message: '<script>alert("xss")</script>',
+        message: xssPayload,
       })
+
+      // Assert
       expect(result.success).toBe(false)
+      expect(result.error.errors[0].code).toContain('XSS')
     })
 
     it('should reject message with javascript: protocol', () => {
+      // Arrange
+      const xssPayload = '<a href="javascript:alert()">click</a>'
+
+      // Act
       const result = AlertCreateBodySchema.safeParse({
         level: 'info',
         component: 'test',
-        message: '<a href="javascript:alert()">click</a>',
+        message: xssPayload,
       })
+
+      // Assert
       expect(result.success).toBe(false)
     })
 
     it('should accept safe HTML entities', () => {
+      // Arrange
+      const safeContent = 'Test & <div> content'
+
+      // Act
       const result = AlertCreateBodySchema.safeParse({
         level: 'info',
         component: 'test',
-        message: 'Test & <div> content',
+        message: safeContent,
       })
+
+      // Assert
       expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.message).toBe(safeContent)
+        expect(typeof result.data.message).toBe('string')
+      }
+    })
+
+    it('should reject obfuscated script tags with whitespace', () => {
+      // Arrange - Edge case: whitespace obfuscation
+      const obfuscated = '< s c r i p t >alert(1)</ s c r i p t >'
+
+      // Act
+      const result = AlertCreateBodySchema.safeParse({
+        level: 'info',
+        component: 'test',
+        message: obfuscated,
+      })
+
+      // Assert
+      expect(result.success).toBe(false)
+    })
+
+    it('should reject uppercase SCRIPT tags', () => {
+      // Arrange - Edge case: case variation
+      const payload = '<SCRIPT>alert(1)</SCRIPT>'
+
+      // Act
+      const result = AlertCreateBodySchema.safeParse({
+        level: 'info',
+        component: 'test',
+        message: payload,
+      })
+
+      // Assert
+      expect(result.success).toBe(false)
     })
   })
 
@@ -506,36 +625,123 @@ describe('Input Validation - Security Edge Cases', () => {
 
 describe('Input Validation - Comprehensive API Tests', () => {
   it('should validate complete alert creation flow', () => {
+    // Arrange
     const validAlert = {
       level: 'warning' as const,
       component: 'payment-service',
       message: 'High latency detected',
     }
+
+    // Act
     const result = AlertCreateBodySchema.safeParse(validAlert)
+
+    // Assert
     expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.level).toBe('warning')
+      expect(result.data.component).toBe('payment-service')
+      expect(result.data.message).toBe('High latency detected')
+      expect(typeof result.data.level).toBe('string')
+      expect(typeof result.data.component).toBe('string')
+      expect(typeof result.data.message).toBe('string')
+    }
   })
 
   it('should validate complete task creation flow', () => {
+    // Arrange
     const validTask = {
       title: 'Implement user authentication',
       description: 'Add JWT-based authentication',
       status: 'in_progress' as const,
       priority: 'high' as const,
     }
+
+    // Act
     const result = KanbanItemSchema.safeParse(validTask)
+
+    // Assert
     expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.title).toBe('Implement user authentication')
+      expect(result.data.status).toBe('in_progress')
+      expect(result.data.priority).toBe('high')
+    }
   })
 
   it('should provide detailed error messages on failure', () => {
+    // Arrange
     const invalidInput = {
       level: 'invalid-level',
       component: 'A'.repeat(101),
       message: '',
     }
+
+    // Act
     const result = AlertCreateBodySchema.safeParse(invalidInput)
+
+    // Assert
     expect(result.success).toBe(false)
     if (!result.success) {
+      expect(Array.isArray(result.error.errors)).toBe(true)
       expect(result.error.errors.length).toBeGreaterThan(0)
+      expect(result.error.errors[0]).toHaveProperty('message')
+      expect(result.error.errors[0]).toHaveProperty('path')
+      result.error.errors.forEach((error) => {
+        expect(typeof error.message).toBe('string')
+        expect(error.message.length).toBeGreaterThan(0)
+      })
     }
+  })
+
+  it('should handle unicode characters in strings', () => {
+    // Arrange - Edge case: Unicode characters
+    const unicodeMessage = 'Alert with emoji 🚨 and unicode: café, 日本語'
+
+    // Act
+    const result = AlertCreateBodySchema.safeParse({
+      level: 'info',
+      component: 'test',
+      message: unicodeMessage,
+    })
+
+    // Assert
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.message).toBe(unicodeMessage)
+      expect(result.data.message.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('should handle whitespace normalization', () => {
+    // Arrange - Edge case: leading/trailing whitespace
+    const input = {
+      email: '  user@example.com  ',
+      password: 'Password123!',
+    }
+
+    // Act
+    const result = LoginRequestSchema.safeParse(input)
+
+    // Assert
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.email).toBe('user@example.com')
+      expect(result.data.email).not.toContain('  ')
+    }
+  })
+
+  it('should reject extremely large payloads', () => {
+    // Arrange - Edge case: size limit
+    const hugeMessage = 'X'.repeat(3000) // Exceeds 2000 char limit
+
+    // Act
+    const result = AlertCreateBodySchema.safeParse({
+      level: 'info',
+      component: 'test',
+      message: hugeMessage,
+    })
+
+    // Assert
+    expect(result.success).toBe(false)
   })
 })

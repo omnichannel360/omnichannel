@@ -37,8 +37,9 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
     })
 
     it('should return empty array/object for non-existent files', async () => {
-      const result = await atomicRead(testFile)
-      expect(Array.isArray(result) || typeof result === 'object').toBe(true)
+      const result = await atomicRead(testFile, [])
+      expect(result).toEqual([])
+      expect(Array.isArray(result)).toBe(true)
     })
 
     it('should handle concurrent reads safely', async () => {

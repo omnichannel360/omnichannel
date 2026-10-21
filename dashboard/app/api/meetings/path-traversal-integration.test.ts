@@ -161,7 +161,7 @@ describe('Path Traversal Integration - Complete Defense Verification', () => {
 
       if (!result.success) {
         const safeFallback = 'unknown'
-        expect(VALID_MEETING_TYPES.has(safeFallback as any)).toBe(true)
+        expect(VALID_MEETING_TYPES.has(safeFallback as unknown as NextRequest)).toBe(true)
       }
     })
 

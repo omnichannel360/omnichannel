@@ -330,7 +330,7 @@ describe('Error Handling - Comprehensive Suite', () => {
   describe('Error code mapping', () => {
     it('should map all error codes to HTTP status', () => {
       Object.values(ERROR_CODES).forEach((code) => {
-        const status = getHttpStatus(code as any)
+        const status = getHttpStatus(code as unknown as NextRequest)
         expect(status).toBeGreaterThanOrEqual(400)
         expect(status).toBeLessThan(600)
       })
@@ -349,7 +349,7 @@ describe('Error Handling - Comprehensive Suite', () => {
     })
 
     it('should default to 500 for unknown codes', () => {
-      expect(getHttpStatus('UNKNOWN_CODE' as any)).toBe(500)
+      expect(getHttpStatus('UNKNOWN_CODE' as unknown as NextRequest)).toBe(500)
     })
   })
 

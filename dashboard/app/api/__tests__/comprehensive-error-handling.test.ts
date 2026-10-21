@@ -104,7 +104,7 @@ describe('Error Handling Utilities', () => {
     })
 
     test('defaults to 500 for unknown codes', () => {
-      expect(getHttpStatus('UNKNOWN_CODE' as any)).toBe(500)
+      expect(getHttpStatus('UNKNOWN_CODE' as unknown as NextRequest)).toBe(500)
     })
   })
 

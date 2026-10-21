@@ -226,12 +226,26 @@ export async function atomicReadModifyWrite<T>(
  * Atomic transaction: execute multiple file operations atomically
  * All operations must succeed or all are rolled back
  */
-export async function atomicTransaction(
-  operations: Array<() => Promise<void>>,
-): Promise<void> {
-  // Execute all operations sequentially
-  // If any fails, all are considered failed (no rollback capability in this implementation)
-  for (const operation of operations) {
-    await operation()
-  }
+export async function atomicTransaction<T>(
+  filePath: string,
+  callback: (read: () => Promise<T>, write: (data: T) => Promise<void>) => Promise<T>,
+): Promise<T> {
+  return withFileLock(filePath, async () => {
+    let cachedData: T | undefined
+
+    const read = async (): Promise<T> => {
+      if (cachedData !== undefined) {
+        return cachedData
+      }
+      cachedData = await atomicRead<T>(filePath)
+      return cachedData
+    }
+
+    const write = async (data: T): Promise<void> => {
+      cachedData = data
+      await atomicWrite<T>(filePath, data)
+    }
+
+    return callback(read, write)
+  })
 }

@@ -21,6 +21,7 @@ jest.mock('@/lib/ensure-dir', () => ({
 describe('POST /api/meetings - Path Traversal Security', () => {
   describe('Meeting type validation with path traversal attempts', () => {
     it('should reject meeting_type with ../ path traversal', async () => {
+      // Arrange
       const request = new NextRequest(new URL('http://localhost/api/meetings'), {
         method: 'POST',
         body: JSON.stringify({
@@ -29,15 +30,17 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      // Act
+      const response = await POST(request as unknown as NextRequest)
       const data = await response.json()
 
-      // Schema validation should catch this
+      // Assert
       expect(response.status).toBe(400)
       expect(data.error).toBeDefined()
     })
 
     it('should reject meeting_type with absolute path', async () => {
+      // Arrange
       const request = new NextRequest(new URL('http://localhost/api/meetings'), {
         method: 'POST',
         body: JSON.stringify({
@@ -46,14 +49,17 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      // Act
+      const response = await POST(request as unknown as NextRequest)
       const data = await response.json()
 
+      // Assert
       expect(response.status).toBe(400)
       expect(data.error).toBeDefined()
     })
 
     it('should reject meeting_type with backslashes (NTFS traversal)', async () => {
+      // Arrange
       const request = new NextRequest(new URL('http://localhost/api/meetings'), {
         method: 'POST',
         body: JSON.stringify({
@@ -62,13 +68,16 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      // Act
+      const response = await POST(request as unknown as NextRequest)
       const data = await response.json()
 
+      // Assert
       expect(response.status).toBe(400)
     })
 
     it('should reject meeting_type with null bytes', async () => {
+      // Arrange
       const request = new NextRequest(new URL('http://localhost/api/meetings'), {
         method: 'POST',
         body: JSON.stringify({
@@ -77,9 +86,11 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      // Act
+      const response = await POST(request as unknown as NextRequest)
       const data = await response.json()
 
+      // Assert
       expect(response.status).toBe(400)
     })
 
@@ -101,7 +112,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
           }),
         })
 
-        const response = await POST(request as any)
+        const response = await POST(request as unknown as NextRequest)
         expect(response.status).toBe(400)
       }
     })
@@ -118,7 +129,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
           }),
         })
 
-        const response = await POST(request as any)
+        const response = await POST(request as unknown as NextRequest)
         expect(response.status).toBe(200)
       }
     })
@@ -132,7 +143,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(400)
     })
 
@@ -145,7 +156,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(400)
     })
 
@@ -158,7 +169,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(400)
     })
 
@@ -171,7 +182,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(400)
     })
 
@@ -184,7 +195,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       const data = await response.json()
 
       // Should succeed with null meeting_type if message is present
@@ -202,7 +213,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(200)
 
       // The safeJoin function should ensure no path traversal
@@ -218,7 +229,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       const data = await response.json()
 
       // Should handle gracefully
@@ -235,7 +246,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(400)
     })
 
@@ -248,7 +259,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect([200, 400]).toContain(response.status)
     })
 
@@ -258,7 +269,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         body: '{invalid json',
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(400)
       const data = await response.json()
       expect(data.error).toContain('Invalid JSON')
@@ -273,7 +284,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         }),
       })
 
-      const response = await POST(request as any)
+      const response = await POST(request as unknown as NextRequest)
       expect(response.status).toBe(400)
     })
   })
@@ -284,7 +295,7 @@ describe('POST /api/meetings - Path Traversal Security', () => {
         method: 'GET',
       })
 
-      const response = await GET(request as any)
+      const response = await GET(request as unknown as NextRequest)
       expect(response.status).toBe(200)
 
       const data = await response.json()

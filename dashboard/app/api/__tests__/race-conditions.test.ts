@@ -247,7 +247,7 @@ describe('API Route Race Condition Integration Tests', () => {
       expect(Array.isArray(finalLogs) && finalLogs.length).toBe(15)
 
       // Verify no duplicates
-      const indices = Array.isArray(finalLogs) ? finalLogs.map(l => (l as any).log_index) : []
+      const indices = Array.isArray(finalLogs) ? finalLogs.map(l => (l as unknown as NextRequest).log_index) : []
       const uniqueIndices = new Set(indices)
       expect(uniqueIndices.size).toBe(15)
     })

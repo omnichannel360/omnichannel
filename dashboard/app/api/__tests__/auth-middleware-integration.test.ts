@@ -35,7 +35,7 @@ describe('Auth Middleware Integration Tests', () => {
       }),
       nextUrl: {
         pathname: '/api/test',
-      } as any,
+      } as unknown as { pathname: string },
     }
   })
 
@@ -67,8 +67,8 @@ describe('Auth Middleware Integration Tests', () => {
 
         const request = {
           ...mockRequest,
-          nextUrl: { pathname: route } as any,
-        } as NextRequest
+          nextUrl: { pathname: route } as unknown as { pathname: string },
+        } as unknown as NextRequest
 
         const result = await withAuthProtection(request, {
           requireAuth: true,
@@ -87,7 +87,7 @@ describe('Auth Middleware Integration Tests', () => {
 
         const request = {
           ...mockRequest,
-          nextUrl: { pathname: route } as any,
+          nextUrl: { pathname: route } as unknown as { pathname: string },
           headers: new Headers(),
         } as NextRequest
 
@@ -107,7 +107,7 @@ describe('Auth Middleware Integration Tests', () => {
 
         const request = {
           ...mockRequest,
-          nextUrl: { pathname: route } as any,
+          nextUrl: { pathname: route } as unknown as { pathname: string },
           headers: new Headers({
             'authorization': 'Bearer invalid-token',
           }),
@@ -134,7 +134,7 @@ describe('Auth Middleware Integration Tests', () => {
       it(`${route} should not require authentication`, async () => {
         const request = {
           ...mockRequest,
-          nextUrl: { pathname: route } as any,
+          nextUrl: { pathname: route } as unknown as { pathname: string },
           headers: new Headers(),
         } as NextRequest
 
@@ -152,7 +152,7 @@ describe('Auth Middleware Integration Tests', () => {
     it('/api/health should not require authentication', async () => {
       const request = {
         ...mockRequest,
-        nextUrl: { pathname: '/api/health' } as any,
+        nextUrl: { pathname: '/api/health' } as unknown as { pathname: string },
         headers: new Headers(),
       } as NextRequest
 

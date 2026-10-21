@@ -128,7 +128,7 @@ describe('Error Logging in API Routes', () => {
     })
 
     it('handles custom error codes', () => {
-      const error = new Error('Not found') as any
+      const error = new Error('Not found') as unknown
       error.code = 'ENOENT'
       const context: LogContext = { operation: 'read_file' }
 
@@ -200,7 +200,7 @@ describe('Error Logging in API Routes', () => {
           password: 'secret123',
           sessionId: 'sess-secret'
         }
-      } as any
+      } as unknown
 
       logger.error('User operation failed', new Error('Error'), context)
 
