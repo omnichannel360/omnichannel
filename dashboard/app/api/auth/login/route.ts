@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createToken } from '@/lib/auth'
+import { generateToken } from '@/lib/auth'
 
 interface LoginRequest {
   email: string
@@ -49,11 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
     }
 
     // Create JWT token
-    const token = await createToken({
-      sub: email,
-      email,
-      role: 'admin',
-    })
+    const token = await generateToken(email, email, 'admin')
 
     return NextResponse.json(
       {

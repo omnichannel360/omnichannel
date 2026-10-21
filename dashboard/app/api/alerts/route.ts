@@ -3,6 +3,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { AlertCreateSchema, AlertUpdateSchema, generateId } from '@/lib/validation'
+import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
 
 interface Alert {
   id: string
@@ -15,7 +16,7 @@ interface Alert {
 
 const ALERTS_LOG = path.join(process.cwd(), 'data', 'alerts.json')
 
-async function ensureAlertsFile() {
+async function ensureAlertsFile(): Promise<void> {
   const dir = path.dirname(ALERTS_LOG)
   try {
     await fs.mkdir(dir, { recursive: true })
@@ -47,7 +48,7 @@ async function loadAlerts(): Promise<Alert[]> {
 async function saveAlerts(alerts: Alert[]): Promise<void> {
   try {
     await ensureAlertsFile()
-    await fs.writeFile(ALERTS_LOG, JSON.stringify(alerts, null, 2))
+    await fs.writeFile(ALERTS_LOG, JSON.stringify(alerts, null, 2), 'utf-8')
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     throw new Error(`Failed to save alerts: ${message}`)
@@ -87,16 +88,12 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON in request body' },
-      { status: 400 }
-    )
+  const parsed = await parseRequestJson(request)
+  if (!parsed.success) {
+    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
   }
 
+  const body = parsed.body
   const parsedBody = AlertCreateSchema.safeParse(body)
   if (!parsedBody.success) {
     return NextResponse.json(
@@ -121,16 +118,12 @@ export async function PATCH(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON in request body' },
-      { status: 400 }
-    )
+  const parsed = await parseRequestJson(request)
+  if (!parsed.success) {
+    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
   }
 
+  const body = parsed.body
   const parsedBody = AlertUpdateSchema.safeParse(body)
   if (!parsedBody.success) {
     return NextResponse.json(
@@ -142,15 +135,16 @@ export async function PATCH(request: NextRequest) {
   const { alert_id, status } = parsedBody.data
 
   const alerts = await loadAlerts()
-  const alert = alerts.find(a => a.id === alert_id)
+  const alertIndex = alerts.findIndex(a => a.id === alert_id)
 
-  if (!alert) {
+  if (alertIndex === -1) {
     return NextResponse.json({ success: false, error: 'Alert not found' }, { status: 404 })
   }
 
-  alert.status = status
+  const updatedAlert = { ...alerts[alertIndex], status }
+  const updatedAlerts = [...alerts.slice(0, alertIndex), updatedAlert, ...alerts.slice(alertIndex + 1)]
   try {
-    await saveAlerts(alerts)
+    await saveAlerts(updatedAlerts)
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to update alert' },
@@ -158,5 +152,5 @@ export async function PATCH(request: NextRequest) {
     )
   }
 
-  return NextResponse.json({ success: true, alert })
+  return NextResponse.json({ success: true, alert: updatedAlert })
 }

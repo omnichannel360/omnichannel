@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    if (!fs.existsSync(PROFILES_DIR)) {
+    try {
+      await fs.stat(PROFILES_DIR)
+    } catch {
       return NextResponse.json({
         success: true,
         data: [],
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const entries = fs.readdirSync(PROFILES_DIR, { withFileTypes: true })
+    const entries = await fs.readdir(PROFILES_DIR, { withFileTypes: true })
     const profiles: AgentProfile[] = entries
       .filter(entry => entry.isDirectory())
       .map(entry => ({

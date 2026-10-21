@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, test, expect } from '@jest/globals'
 import { middleware } from '@/middleware'
 import { NextRequest } from 'next/server'
 import { generateToken } from '@/lib/auth'
@@ -16,7 +16,7 @@ describe('Authentication Middleware', () => {
     ]
 
     protectedRoutes.forEach(route => {
-      it(`should allow ${route} with valid token`, async () => {
+      test(`should allow ${route} with valid token`, async () => {
         const token = await generateToken('user-1', 'user@example.com', 'user', 3600)
 
         const request = new NextRequest(new URL(`http://localhost:3000${route}`), {
@@ -29,14 +29,14 @@ describe('Authentication Middleware', () => {
         expect(response.status).not.toBe(401)
       })
 
-      it(`should reject ${route} without token`, async () => {
+      test(`should reject ${route} without token`, async () => {
         const request = new NextRequest(new URL(`http://localhost:3000${route}`))
 
         const response = await middleware(request)
         expect(response.status).toBe(401)
       })
 
-      it(`should reject ${route} with invalid token`, async () => {
+      test(`should reject ${route} with invalid token`, async () => {
         const request = new NextRequest(new URL(`http://localhost:3000${route}`), {
           headers: {
             'Authorization': 'Bearer invalid.token.here',
@@ -50,14 +50,14 @@ describe('Authentication Middleware', () => {
   })
 
   describe('Public Routes', () => {
-    it('should allow /api/health without authentication', async () => {
+    test('should allow /api/health without authentication', async () => {
       const request = new NextRequest(new URL('http://localhost:3000/api/health'))
 
       const response = await middleware(request)
       expect(response.status).not.toBe(401)
     })
 
-    it('should allow /api/auth endpoints without authentication', async () => {
+    test('should allow /api/auth endpoints without authentication', async () => {
       const request = new NextRequest(new URL('http://localhost:3000/api/auth'))
 
       const response = await middleware(request)
@@ -66,7 +66,7 @@ describe('Authentication Middleware', () => {
   })
 
   describe('Token Validation in Middleware', () => {
-    it('should attach user info headers for valid token', async () => {
+    test('should attach user info headers for valid token', async () => {
       const token = await generateToken('user-123', 'test@example.com', 'admin', 3600)
 
       const request = new NextRequest(new URL('http://localhost:3000/api/alerts'), {
@@ -83,7 +83,7 @@ describe('Authentication Middleware', () => {
       expect(response.headers.get('x-user-role')).toBe('admin')
     })
 
-    it('should handle missing token gracefully', async () => {
+    test('should handle missing token gracefully', async () => {
       const request = new NextRequest(new URL('http://localhost:3000/api/alerts'))
 
       const response = await middleware(request)
@@ -95,7 +95,7 @@ describe('Authentication Middleware', () => {
   })
 
   describe('Authorization Header Formats', () => {
-    it('should require Bearer prefix', async () => {
+    test('should require Bearer prefix', async () => {
       const token = await generateToken('user-1', 'user@example.com', 'user', 3600)
 
       const request = new NextRequest(new URL('http://localhost:3000/api/alerts'), {
@@ -108,7 +108,7 @@ describe('Authentication Middleware', () => {
       expect(response.status).toBe(401)
     })
 
-    it('should handle case-insensitive Bearer prefix', async () => {
+    test('should handle case-insensitive Bearer prefix', async () => {
       const token = await generateToken('user-1', 'user@example.com', 'user', 3600)
 
       const request = new NextRequest(new URL('http://localhost:3000/api/alerts'), {

@@ -9,8 +9,18 @@ import { generateToken, generateRefreshToken } from '@/lib/auth'
  * @returns { accessToken: string, refreshToken: string, expiresIn: number }
  */
 export async function POST(request: NextRequest) {
+  let body: unknown
   try {
-    const { userId, email, role = 'user' } = await request.json()
+    body = await request.json()
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
+
+  try {
+    const { userId, email, role = 'user' } = body as Record<string, unknown>
 
     // Validate input
     if (!userId || !email) {
@@ -21,8 +31,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate tokens
-    const accessToken = await generateToken(userId, email, role, 24 * 60 * 60) // 24 hours
-    const refreshToken = await generateRefreshToken(userId, email, 7 * 24 * 60 * 60) // 7 days
+    const accessToken = await generateToken(userId as string, email as string, role as string, 24 * 60 * 60) // 24 hours
+    const refreshToken = await generateRefreshToken(userId as string, email as string, 7 * 24 * 60 * 60) // 7 days
 
     return NextResponse.json({
       accessToken,
@@ -31,9 +41,9 @@ export async function POST(request: NextRequest) {
       tokenType: 'Bearer',
     })
   } catch (error) {
-    console.error('[Auth Endpoint Error]', error)
+    const message = error instanceof Error ? error.message : 'Failed to generate tokens'
     return NextResponse.json(
-      { error: 'Failed to generate tokens' },
+      { error: message },
       { status: 500 }
     )
   }

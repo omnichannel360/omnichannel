@@ -26,14 +26,14 @@ describe('Protected API Endpoints', () => {
 
     test('should return 401 with expired token', async () => {
       const response = await fetch('/api/alerts', {
-        headers: { 'Authorization': Bearer \ },
+        headers: { 'Authorization': `Bearer ${expiredToken}` },
       })
       expect(response.status).toBe(401)
     })
 
     test('should return 200 with valid token', async () => {
       const response = await fetch('/api/alerts', {
-        headers: { 'Authorization': Bearer \ },
+        headers: { 'Authorization': `Bearer ${validToken}` },
       })
       expect(response.status).toBe(200)
       const data = await response.json()
@@ -50,7 +50,7 @@ describe('Protected API Endpoints', () => {
 
     test('should return 200 with valid token', async () => {
       const response = await fetch('/api/brain', {
-        headers: { 'Authorization': Bearer \ },
+        headers: { 'Authorization': `Bearer ${validToken}` },
       })
       expect(response.status).toBe(200)
       const data = await response.json()
@@ -66,7 +66,7 @@ describe('Protected API Endpoints', () => {
 
     test('should return 200 with valid token', async () => {
       const response = await fetch('/api/kanban', {
-        headers: { 'Authorization': Bearer \ },
+        headers: { 'Authorization': `Bearer ${validToken}` },
       })
       expect(response.status).toBe(200)
       const data = await response.json()

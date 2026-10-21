@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { randomUUID } from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { TaskCreateSchema, TaskUpdateSchema } from '@/lib/validation'
+import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
 
 interface Task {
   id: string
@@ -13,7 +16,13 @@ interface Task {
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'kanban.json')
 
-async function ensureDataDir() {
+const DEFAULT_TASKS: Task[] = [
+  { id: randomUUID(), title: 'Complete API design', status: 'done' },
+  { id: randomUUID(), title: 'Implement authentication', status: 'in-progress' },
+  { id: randomUUID(), title: 'Write tests', status: 'todo' },
+]
+
+async function ensureDataDir(): Promise<void> {
   const dir = path.dirname(DATA_FILE)
   try {
     await fs.mkdir(dir, { recursive: true })
@@ -25,7 +34,6 @@ async function ensureDataDir() {
 async function loadTasks(): Promise<Task[]> {
   await ensureDataDir()
   try {
-    await fs.access(DATA_FILE)
     const data = await fs.readFile(DATA_FILE, 'utf-8')
     try {
       return JSON.parse(data)
@@ -33,22 +41,12 @@ async function loadTasks(): Promise<Task[]> {
       const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
       console.error('[KanbanAPI] JSON parse error:', message)
       // Return defaults on parse error
-      const defaults: Task[] = [
-        { id: crypto.randomUUID(), title: 'Complete API design', status: 'done' },
-        { id: crypto.randomUUID(), title: 'Implement authentication', status: 'in-progress' },
-        { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
-      ]
-      await fs.writeFile(DATA_FILE, JSON.stringify(defaults, null, 2), 'utf-8')
-      return defaults
+      await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TASKS, null, 2), 'utf-8')
+      return DEFAULT_TASKS
     }
   } catch (error) {
-    const defaults: Task[] = [
-      { id: crypto.randomUUID(), title: 'Complete API design', status: 'done' },
-      { id: crypto.randomUUID(), title: 'Implement authentication', status: 'in-progress' },
-      { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
-    ]
-    await fs.writeFile(DATA_FILE, JSON.stringify(defaults, null, 2), 'utf-8')
-    return defaults
+    await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TASKS, null, 2), 'utf-8')
+    return DEFAULT_TASKS
   }
 }
 
@@ -85,31 +83,28 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON in request body' },
-      { status: 400 }
-    )
+  const parsed = await parseRequestJson(request)
+  if (!parsed.success) {
+    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
   }
 
-  const { title, status = 'todo' } = body as Record<string, unknown>
-
-  if (!title) {
+  const body = parsed.body
+  // Validate body against schema
+  const parsedBody = TaskCreateSchema.safeParse(body)
+  if (!parsedBody.success) {
     return NextResponse.json(
-      { success: false, error: 'Title required' },
+      { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
       { status: 400 }
     )
   }
 
   try {
     const tasks = await loadTasks()
+    const { title, status } = parsedBody.data
     const newTask: Task = {
-      id: Date.now().toString(),
-      title: String(title),
-      status: String(status) as 'todo' | 'in-progress' | 'done',
+      id: randomUUID(),
+      title,
+      status,
     }
 
     tasks.push(newTask)
@@ -130,40 +125,44 @@ export async function PUT(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON in request body' },
-      { status: 400 }
-    )
+  const parsed = await parseRequestJson(request)
+  if (!parsed.success) {
+    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
   }
 
-  const { id, ...updates } = body as Record<string, unknown>
-
-  if (!id) {
+  const body = parsed.body
+  // Validate body against schema
+  const parsedBody = TaskUpdateSchema.safeParse(body)
+  if (!parsedBody.success) {
     return NextResponse.json(
-      { success: false, error: 'ID required' },
+      { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
       { status: 400 }
     )
   }
 
   try {
+    const { id, ...updates } = parsedBody.data
     const tasks = await loadTasks()
-    const task = tasks.find(t => t.id === id)
+    const taskIndex = tasks.findIndex(t => t.id === id)
 
-    if (!task) {
+    if (taskIndex === -1) {
       return NextResponse.json(
         { success: false, error: 'Task not found' },
         { status: 404 }
       )
     }
 
-    Object.assign(task, updates)
-    await saveTasks(tasks)
+    // Apply updates using immutable pattern
+    const updatedTask: Task = {
+      ...tasks[taskIndex],
+      ...Object.fromEntries(
+        Object.entries(updates).filter(([, v]) => v !== undefined)
+      ),
+    }
+    const updatedTasks = [...tasks.slice(0, taskIndex), updatedTask, ...tasks.slice(taskIndex + 1)]
+    await saveTasks(updatedTasks)
 
-    return NextResponse.json({ success: true, data: task })
+    return NextResponse.json({ success: true, data: updatedTask })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Failed to update task' },

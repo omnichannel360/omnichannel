@@ -23,7 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<VerifyResp
           authenticated: false,
           error: authResult.error,
         },
-        { status: authResult.status }
+        { status: 401 }
       )
     }
 

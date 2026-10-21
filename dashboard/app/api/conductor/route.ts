@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
+import { z } from 'zod'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface ConversationLog {
@@ -18,6 +19,11 @@ interface SkillRegistry {
 const LOG_FILE = path.join(process.cwd(), 'data', 'conductor-logs.json')
 const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
 
+// Schema validation for conductor request body
+const ConductorMessageSchema = z.object({
+  message: z.string().min(1).max(2000),
+})
+
 async function ensureDataDir() {
   const dir = path.dirname(LOG_FILE)
   try {
@@ -30,8 +36,16 @@ async function ensureDataDir() {
 async function loadSkillRegistry(): Promise<SkillRegistry | null> {
   try {
     const data = await fs.readFile(SKILL_REGISTRY_PATH, 'utf-8')
-    return JSON.parse(data)
-  } catch {
+    try {
+      return JSON.parse(data)
+    } catch (parseError) {
+      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      console.error('[ConductorAPI] JSON parse error when loading skill registry:', message)
+      return null
+    }
+  } catch (readError) {
+    const message = readError instanceof Error ? readError.message : 'Unknown read error'
+    console.debug('[ConductorAPI] Skill registry file not found or unreadable:', message)
     return null
   }
 }
@@ -39,16 +53,24 @@ async function loadSkillRegistry(): Promise<SkillRegistry | null> {
 async function loadLogs(): Promise<ConversationLog[]> {
   await ensureDataDir()
   try {
-    const data = fs.readFileSync(LOG_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
+    const data = await fs.readFile(LOG_FILE, 'utf-8')
+    try {
+      return JSON.parse(data)
+    } catch (parseError) {
+      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      console.error('[ConductorAPI] JSON parse error when loading logs:', message)
+      return []
+    }
+  } catch (readError) {
+    const message = readError instanceof Error ? readError.message : 'Unknown read error'
+    console.error('[ConductorAPI] Error reading logs file:', message)
     return []
   }
 }
 
-function saveLogs(logs: ConversationLog[]) {
-  ensureDataDir()
-  fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2))
+async function saveLogs(logs: ConversationLog[]) {
+  await ensureDataDir()
+  await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), 'utf-8')
 }
 
 function findMatchingSkill(message: string, registry: SkillRegistry | null): string | null {
@@ -91,18 +113,29 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
+  let body: unknown
   try {
-    const body = await request.json()
-    const { message } = body
+    body = await request.json()
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
 
-    if (!message || !message.trim()) {
+  try {
+    // Validate body against schema
+    const parsedBody = ConductorMessageSchema.safeParse(body)
+    if (!parsedBody.success) {
       return NextResponse.json(
-        { success: false, error: 'Message required' },
+        { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
         { status: 400 }
       )
     }
 
-    const registry = loadSkillRegistry()
+    const { message } = parsedBody.data
+
+    const registry = await loadSkillRegistry()
     const skillId = findMatchingSkill(message, registry)
     const task = parseTaskFromMessage(message)
 
@@ -120,7 +153,7 @@ export async function POST(request: NextRequest) {
       response = `Processing: ${task.action}. No specific agents assigned. Awaiting clarification.`
     }
 
-    const logs = loadLogs()
+    const logs = await loadLogs()
     logs.push({
       timestamp: new Date().toISOString(),
       userMessage: message,
@@ -128,7 +161,7 @@ export async function POST(request: NextRequest) {
       dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
       dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
     })
-    saveLogs(logs)
+    await saveLogs(logs)
 
     return NextResponse.json({
       success: true,
@@ -151,7 +184,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const logs = loadLogs()
+    const logs = await loadLogs()
     return NextResponse.json({
       success: true,
       data: logs,

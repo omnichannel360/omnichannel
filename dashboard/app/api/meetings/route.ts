@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 import { MeetingRequestSchema, MeetingTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
@@ -31,51 +31,55 @@ const MEETINGS_DATA_PATH = path.join(process.cwd(), 'data', 'meetings.json')
 const MEETINGS_LOG = path.join(process.cwd(), 'data', 'meetings-log.json')
 const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
 
-function ensureDataDir() {
+async function ensureDataDir() {
   const dir = path.dirname(MEETINGS_LOG)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+  try {
+    await fs.mkdir(dir, { recursive: true })
+  } catch {
+    // Already exists
   }
 }
 
-function loadMeetingsConfig(): Record<string, Meeting> {
+async function loadMeetingsConfig(): Promise<Record<string, Meeting>> {
   try {
-    const content = fs.readFileSync(MEETINGS_DATA_PATH, 'utf-8')
+    const content = await fs.readFile(MEETINGS_DATA_PATH, 'utf-8')
     return JSON.parse(content)
   } catch {
     return {}
   }
 }
 
-function loadMeetingLogs(): MeetingLog[] {
-  ensureDataDir()
-  if (!fs.existsSync(MEETINGS_LOG)) return []
+async function loadMeetingLogs(): Promise<MeetingLog[]> {
+  await ensureDataDir()
   try {
-    const data = fs.readFileSync(MEETINGS_LOG, 'utf-8')
+    await fs.stat(MEETINGS_LOG)
+    const data = await fs.readFile(MEETINGS_LOG, 'utf-8')
     return JSON.parse(data)
   } catch {
     return []
   }
 }
 
-function saveMeetingLogs(logs: MeetingLog[]) {
-  ensureDataDir()
-  fs.writeFileSync(MEETINGS_LOG, JSON.stringify(logs, null, 2))
+async function saveMeetingLogs(logs: MeetingLog[]): Promise<void> {
+  await ensureDataDir()
+  await fs.writeFile(MEETINGS_LOG, JSON.stringify(logs, null, 2), 'utf-8')
 }
 
-function loadSkillRegistry(): SkillRegistry | null {
+async function loadSkillRegistry(): Promise<SkillRegistry | null> {
   try {
-    const content = fs.readFileSync(SKILL_REGISTRY_PATH, 'utf-8')
+    const content = await fs.readFile(SKILL_REGISTRY_PATH, 'utf-8')
     return JSON.parse(content)
   } catch {
     return null
   }
 }
 
-function logToBrain(log: MeetingLog) {
+async function logToBrain(log: MeetingLog): Promise<void> {
   const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
-  if (!fs.existsSync(brainDir)) {
-    fs.mkdirSync(brainDir, { recursive: true })
+  try {
+    await fs.mkdir(brainDir, { recursive: true })
+  } catch {
+    // Already exists
   }
 
   const id = generateId('meeting')
@@ -93,7 +97,7 @@ function logToBrain(log: MeetingLog) {
     status: MeetingStatusSchema.parse(log.status),
   }
 
-  fs.writeFileSync(filePath, JSON.stringify(brainRecord, null, 2))
+  await fs.writeFile(filePath, JSON.stringify(brainRecord, null, 2), 'utf-8')
 }
 
 function parseMeetingFromMessage(message: string, registry: SkillRegistry | null): {
@@ -134,8 +138,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const meetings = loadMeetingsConfig()
-    const logs = loadMeetingLogs()
+    const meetings = await loadMeetingsConfig()
+    const logs = await loadMeetingLogs()
 
     const meetingsList = Object.values(meetings)
 
@@ -164,8 +168,18 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
+  let body: unknown
   try {
-    const input = MeetingRequestSchema.safeParse(await request.json().catch(() => null))
+    body = await request.json()
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
+
+  try {
+    const input = MeetingRequestSchema.safeParse(body)
     if (!input.success) {
       return NextResponse.json(
         { success: false, error: 'Invalid request', details: input.error.flatten().fieldErrors },
@@ -174,7 +188,7 @@ export async function POST(request: NextRequest) {
     }
     const { message, meeting_type, participants } = input.data
 
-    const registry = loadSkillRegistry()
+    const registry = await loadSkillRegistry()
 
     let parsed: { meeting_type: string | null; skill: string | null; description: string } = {
       meeting_type: meeting_type || null,
@@ -186,7 +200,7 @@ export async function POST(request: NextRequest) {
       parsed = parseMeetingFromMessage(message, registry)
     }
 
-    const logs = loadMeetingLogs()
+    const logs = await loadMeetingLogs()
     const log: MeetingLog = {
       timestamp: new Date().toISOString(),
       meeting_type: MeetingTypeSchema.safeParse(parsed.meeting_type).success ? (parsed.meeting_type as string) : 'unknown',
@@ -197,8 +211,8 @@ export async function POST(request: NextRequest) {
     }
 
     logs.push(log)
-    logToBrain(log)
-    saveMeetingLogs(logs)
+    await logToBrain(log)
+    await saveMeetingLogs(logs)
 
     const response = parsed.skill
       ? `Dispatching meeting skill: ${parsed.skill} for "${parsed.meeting_type}". Meeting logged and skill triggered.`

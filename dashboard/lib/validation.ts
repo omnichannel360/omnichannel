@@ -41,6 +41,22 @@ export const AlertUpdateSchema = z.object({
   status: AlertStatusSchema,
 })
 
+export const TaskStatusSchema = z.enum(['todo', 'in-progress', 'done'])
+export type TaskStatus = z.infer<typeof TaskStatusSchema>
+
+export const TaskCreateSchema = z.object({
+  title: z.string().min(1).max(500),
+  status: TaskStatusSchema.optional().default('todo'),
+})
+
+export const TaskUpdateSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1).max(500).optional(),
+  status: TaskStatusSchema.optional(),
+  assignee: z.string().max(100).optional(),
+  dueDate: z.string().optional(),
+})
+
 /** Collision-safe ID: optional prefix + random UUID v4. */
 export function generateId(prefix?: string): string {
   const id = randomUUID()
