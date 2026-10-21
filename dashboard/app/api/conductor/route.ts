@@ -108,13 +108,16 @@ function parseTaskFromMessage(message: string): {
   description: string
 } {
   const agents: string[] = []
+  const lowerMessage = message.toLowerCase()
 
-  if (message.toLowerCase().includes('test')) agents.push('test-automation-1', 'test-automation-2')
-  if (message.toLowerCase().includes('fix') || message.toLowerCase().includes('bug')) agents.push('bug-fixer-1', 'bug-fixer-2')
-  if (message.toLowerCase().includes('code') || message.toLowerCase().includes('deploy')) agents.push('backend-dev-node', 'devops-engineer-1')
-  if (message.toLowerCase().includes('design')) agents.push('ui-designer-web', 'design-director')
-  if (message.toLowerCase().includes('analyze')) agents.push('data-engineer', 'analytics-engineer')
-  if (message.toLowerCase().includes('review')) agents.push('code-reviewer', 'backend-reviewer', 'frontend-reviewer')
+  // Use word boundary regex to prevent false positives
+  // "test" matches "test X" but not "testing" or "attestation"
+  if (/\btest\b/.test(lowerMessage)) agents.push('test-automation-1', 'test-automation-2')
+  if (/\b(fix|bug|debug|error|issue)\b/.test(lowerMessage)) agents.push('bug-fixer-1', 'bug-fixer-2')
+  if (/\b(code|deploy|deployment|build)\b/.test(lowerMessage)) agents.push('backend-dev-node', 'devops-engineer-1')
+  if (/\b(design|ui|ux|layout|visual)\b/.test(lowerMessage)) agents.push('ui-designer-web', 'design-director')
+  if (/\b(analyze|analysis|report|metric|data)\b/.test(lowerMessage)) agents.push('data-engineer', 'analytics-engineer')
+  if (/\b(review|audit|inspect|check|verify)\b/.test(lowerMessage)) agents.push('code-reviewer', 'backend-reviewer', 'frontend-reviewer')
 
   const uniqueAgents = [...new Set(agents)]
 

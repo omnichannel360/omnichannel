@@ -39,9 +39,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
     )
   }
 
-  // SECURITY: Validate content-type header
+  // SECURITY: Validate content-type header (exact match, not substring)
   const contentType = request.headers.get('content-type')
-  if (!contentType?.includes('application/json')) {
+  // Handle charset parameter: "application/json; charset=utf-8" is valid
+  const baseContentType = contentType?.split(';')[0]?.trim()
+  if (baseContentType !== 'application/json') {
     logger.warn('Invalid content-type for login request', {
       ...logContext,
       contentType: contentType || 'missing',
