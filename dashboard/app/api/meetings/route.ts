@@ -3,8 +3,8 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { MeetingRequestSchema, MeetingTypeSchema, SkillTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
 import { withFileLock } from '@/lib/file-lock'
-import { ensureDataDir } from '@/lib/ensure-dir'
 
 interface Meeting {
   id: string
@@ -35,31 +35,14 @@ const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.j
 
 async function loadMeetingsConfig(): Promise<Record<string, Meeting>> {
   try {
-    const content = await fs.readFile(MEETINGS_DATA_PATH, 'utf-8')
-    return JSON.parse(content)
+    return await atomicRead<Record<string, Meeting>>(MEETINGS_DATA_PATH)
   } catch {
     return {}
   }
 }
 
 async function loadMeetingLogs(): Promise<MeetingLog[]> {
-  return withFileLock(MEETINGS_LOG, async () => {
-    await ensureDataDir(path.dirname(MEETINGS_LOG))
-    try {
-      await fs.stat(MEETINGS_LOG)
-      const data = await fs.readFile(MEETINGS_LOG, 'utf-8')
-      return JSON.parse(data)
-    } catch {
-      return []
-    }
-  })
-}
-
-async function saveMeetingLogs(logs: MeetingLog[]): Promise<void> {
-  return withFileLock(MEETINGS_LOG, async () => {
-    await ensureDataDir(path.dirname(MEETINGS_LOG))
-    await fs.writeFile(MEETINGS_LOG, JSON.stringify(logs, null, 2), 'utf-8')
-  })
+  return atomicRead<MeetingLog[]>(MEETINGS_LOG)
 }
 
 async function loadSkillRegistry(): Promise<SkillRegistry | null> {
@@ -76,55 +59,60 @@ async function logToBrain(log: MeetingLog): Promise<void> {
   const id = generateId('meeting')
 
   // DEFENSE LAYER 1: Validate meeting_type against strict whitelist schema
-  // Gracefully fall back to 'unknown' if validation fails (defensive programming)
+  // Explicit error throwing ensures security events are auditable
   const validatedType = MeetingTypeSchema.safeParse(log.meeting_type)
-  const safeType = validatedType.success ? validatedType.data : 'unknown'
+  if (!validatedType.success) {
+    throw new Error(
+      `Invalid meeting_type: ${validatedType.error.errors.map((e) => e.message).join('; ')}`
+    )
+  }
+  const safeType = validatedType.data
 
   // DEFENSE LAYER 2: Validate skill_triggered against strict whitelist schema
-  // Gracefully fall back to 'unknown' if validation fails (defensive programming)
+  // Explicit error throwing ensures security events are auditable
   let safeSkill = 'unknown'
   if (log.skill_triggered && log.skill_triggered !== 'none') {
     const validatedSkill = SkillTypeSchema.safeParse(log.skill_triggered)
-    if (validatedSkill.success) {
-      safeSkill = validatedSkill.data
+    if (!validatedSkill.success) {
+      throw new Error(
+        `Invalid skill_triggered: ${validatedSkill.error.errors.map((e) => e.message).join('; ')}`
+      )
     }
+    safeSkill = validatedSkill.data
   }
 
-  // DEFENSE LAYER 3: No path traversal possible
-  // The regex in MeetingTypeSchema and SkillTypeSchema forbids path separators (/, \),
-  // dots (..), tildes (~), and all special characters. The whitelist enforcement ensures
-  // only safe values from VALID_MEETING_TYPES and VALID_SKILL_TYPES reach this code.
-  // Path traversal is impossible at this point due to schema validation.
-  // This is CQRS pattern: safe types guaranteed by schema before I/O.
+  // DEFENSE LAYER 3: Verify validated inputs contain no path components
+  // Even though schema validation already blocks these, this explicit check ensures
+  // defense-in-depth: if schema validation has a bug, this catches it
+  const basenameOnlyType = path.basename(safeType)
+  const basenameOnlySkill = path.basename(safeSkill)
+  if (basenameOnlyType !== safeType || basenameOnlySkill !== safeSkill) {
+    throw new Error(
+      `SECURITY: Validated input contains path separators (schema validation failure): type=${safeType}, skill=${safeSkill}`
+    )
+  }
 
   // DEFENSE LAYER 4: Construct filename with validated safe components
-  // Format: {type}_{skill}_{id}.json for better file organization
-  const fileName = `${safeType}_${safeSkill}_${id}.json`
+  // Format: {type}_{skill}_{id}.json - all components are validated + verified
+  const fileName = `${basenameOnlyType}_${basenameOnlySkill}_${id}.json`
 
   // DEFENSE LAYER 5: Use safeJoin to prevent any remaining path traversal attempts
   // This performs resolution and containment validation (uses basename + dirname check)
   const filePath = safeJoin(brainDir, fileName)
 
-  return withFileLock(filePath, async () => {
-    try {
-      await fs.mkdir(brainDir, { recursive: true })
-    } catch {
-      // Already exists
-    }
+  const brainRecord = {
+    id,
+    timestamp: log.timestamp,
+    category: 'meetings',
+    meeting_type: log.meeting_type,
+    skill_triggered: log.skill_triggered,
+    participants: log.participants || [],
+    outcomes: log.outcomes || {},
+    status: MeetingStatusSchema.parse(log.status),
+  }
 
-    const brainRecord = {
-      id,
-      timestamp: log.timestamp,
-      category: 'meetings',
-      meeting_type: log.meeting_type,
-      skill_triggered: log.skill_triggered,
-      participants: log.participants || [],
-      outcomes: log.outcomes || {},
-      status: MeetingStatusSchema.parse(log.status),
-    }
-
-    await fs.writeFile(filePath, JSON.stringify(brainRecord, null, 2), 'utf-8')
-  })
+  // Atomic write ensures the log file is written safely with lock
+  await atomicWrite(filePath, brainRecord)
 }
 
 function parseMeetingFromMessage(message: string, registry: SkillRegistry | null): {
@@ -227,8 +215,6 @@ export async function POST(request: NextRequest) {
       parsed = parseMeetingFromMessage(message, registry)
     }
 
-    const logs = await loadMeetingLogs()
-
     // SECURITY: Validate meeting_type against whitelist schema (Layer 1)
     const validatedMeetingType = parsed.meeting_type
       ? MeetingTypeSchema.safeParse(parsed.meeting_type)
@@ -259,9 +245,13 @@ export async function POST(request: NextRequest) {
       outcomes: {},
     }
 
-    logs.push(log)
-    await logToBrain(log)
-    await saveMeetingLogs(logs)
+    // ATOMIC OPERATION: Load logs → add new log → save in single critical section
+    const savedLog = await atomicUpdate<MeetingLog[], MeetingLog>(MEETINGS_LOG, async (logs) => {
+      const updated = [...logs, log]
+      return { updated, result: log }
+    })
+
+    await logToBrain(savedLog)
 
     // SECURITY: Return only validated data in response to prevent leaking unvalidated input
     const response = safeSkill !== 'none' && safeSkill !== 'unknown'

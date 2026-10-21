@@ -48,30 +48,10 @@ export const VALID_SKILL_TYPES = new Set([
 export type ValidSkillType = typeof VALID_SKILL_TYPES extends Set<infer T> ? T : never
 
 /**
- * Shared dangerous patterns used in filename validation.
- * Extracted to single source of truth to prevent duplication and inconsistency.
- * These patterns indicate directory traversal or command injection attempts.
- */
-const DANGEROUS_PATTERNS = ['..',
-  '/',
-  '\\',
-  '~',
-  '$',
-  '%',
-  '*',
-  '?',
-  '"',
-  "'",
-  '<',
-  '>',
-  '|',
-  '\0',
-] as const
-
-/**
- * Whitelist of characters allowed in an identifier that ends up in a filename.
- * No dots, slashes, backslashes or colons, so traversal and NTFS stream tricks are impossible.
- * Additionally enforces against common path traversal patterns.
+ * Meeting type validation with whitelist enforcement.
+ * Regex only allows: letters, digits, underscore, hyphen
+ * This prevents ALL path traversal and injection attempts (/, \, ., ~, special chars, etc.)
+ * Additional whitelist check ensures only approved business values are accepted.
  */
 export const MeetingTypeSchema = z
   .string()
@@ -79,27 +59,20 @@ export const MeetingTypeSchema = z
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/, 'meeting_type may only contain letters, digits, _ and -')
   .refine(
-    (value) => !DANGEROUS_PATTERNS.some((pattern) => value.includes(pattern)),
-    'meeting_type contains forbidden characters'
-  )
-  .refine(
     (value) => VALID_MEETING_TYPES.has(value as ValidMeetingType),
     'meeting_type must be one of the allowed types'
   )
 
 /**
- * Skill identifier whitelist - same restrictions as meeting_type.
- * Prevents path traversal and injection attacks via skill names.
+ * Skill type validation with whitelist enforcement.
+ * Same restrictions as MeetingTypeSchema - prevents all path traversal/injection attacks.
+ * Whitelist check ensures only approved skill values are accepted.
  */
 export const SkillTypeSchema = z
   .string()
   .min(1)
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/, 'skill_triggered may only contain letters, digits, _ and -')
-  .refine(
-    (value) => !DANGEROUS_PATTERNS.some((pattern) => value.includes(pattern)),
-    'skill_triggered contains forbidden characters'
-  )
   .refine(
     (value) => VALID_SKILL_TYPES.has(value as ValidSkillType),
     'skill_triggered must be one of the allowed types'
