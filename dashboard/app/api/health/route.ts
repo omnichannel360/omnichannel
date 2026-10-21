@@ -115,7 +115,11 @@ async function getMeetingsLogStats(correlationId: string): Promise<{ count: numb
         return { count: 0, success_count: 0 }
       }
 
-      const successCount = logs.filter((l: any) => l.status === 'scheduled').length
+      interface MeetingLog {
+        status: string
+        [key: string]: unknown
+      }
+      const successCount = logs.filter((l: MeetingLog) => l.status === 'scheduled').length
       return { count: logs.length, success_count: successCount }
     })
   } catch (error) {

@@ -31,9 +31,11 @@ interface ErrorDetails {
 }
 
 function extractErrorDetails(error: unknown, contextFallback: string = 'Operation failed'): ErrorDetails {
+  if (error instanceof SyntaxError) {
+    return { errorType: 'SyntaxError', errorMessage: error.message }
+  }
   if (error instanceof Error) {
-    const errorType = error instanceof SyntaxError ? 'SyntaxError' : error.constructor.name
-    return { errorType, errorMessage: error.message }
+    return { errorType: error.constructor.name, errorMessage: error.message }
   }
   return { errorType: 'UnknownError', errorMessage: contextFallback }
 }

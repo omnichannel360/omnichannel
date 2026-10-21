@@ -29,6 +29,11 @@ export async function POST(request: NextRequest) {
     return rateLimitCheck.response!
   }
 
+  // Ensure rate limit values exist after allowed check
+  const remaining = rateLimitCheck.remaining ?? 0
+  const resetTime = rateLimitCheck.resetTime ?? Math.floor(Date.now() / 1000) + 3600
+  const limit = rateLimitCheck.limit ?? 100
+
   const startTime = Date.now()
   const logContext = createLogContext({
     method: request.method,
@@ -73,9 +78,9 @@ export async function POST(request: NextRequest) {
     // Add rate limit headers to successful response
     response = addRateLimitHeaders(
       response,
-      rateLimitCheck.remaining!,
-      rateLimitCheck.resetTime!,
-      rateLimitCheck.limit!
+      remaining,
+      resetTime,
+      limit
     )
 
     return response
@@ -96,9 +101,9 @@ export async function POST(request: NextRequest) {
     // Add rate limit headers even on error
     return addRateLimitHeaders(
       response,
-      rateLimitCheck.remaining!,
-      rateLimitCheck.resetTime!,
-      rateLimitCheck.limit!
+      remaining,
+      resetTime,
+      limit
     )
   }
 }

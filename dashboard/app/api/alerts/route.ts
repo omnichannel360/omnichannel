@@ -109,13 +109,15 @@ const alertHandlers = protectRouteMulti(
       try {
         const bodyResult = await validateBody<AlertCreateBody>(request, AlertCreateBodySchema)
         if (!bodyResult.success) {
-          const validationError = bodyResult.response as NextResponse
+          if (!(bodyResult.response instanceof NextResponse)) {
+            throw new Error('Validation error response is not a NextResponse')
+          }
           logger.warn('Alert creation validation failed', {
             ...logContext,
-            statusCode: validationError.status,
+            statusCode: bodyResult.response.status,
             responseTimeMs: Date.now() - startTime,
           })
-          const resp = validationError.clone()
+          const resp = bodyResult.response.clone()
           resp.headers.set('x-correlation-id', requestId)
           return resp
         }
@@ -149,7 +151,6 @@ const alertHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
-        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
         const errorMessage = error instanceof Error ? error.message : 'Failed to create alert'
 
         const { response, statusCode } = handleRouteError(error, requestId, {
@@ -163,7 +164,6 @@ const alertHandlers = protectRouteMulti(
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
-          errorType,
           errorMessage,
         }))
 
@@ -191,13 +191,15 @@ const alertHandlers = protectRouteMulti(
       try {
         const bodyResult = await validateBody<AlertUpdateBody>(request, AlertUpdateBodySchema)
         if (!bodyResult.success) {
-          const validationError = bodyResult.response as NextResponse
+          if (!(bodyResult.response instanceof NextResponse)) {
+            throw new Error('Validation error response is not a NextResponse')
+          }
           logger.warn('Alert update validation failed', {
             ...logContext,
-            statusCode: validationError.status,
+            statusCode: bodyResult.response.status,
             responseTimeMs: Date.now() - startTime,
           })
-          const resp = validationError.clone()
+          const resp = bodyResult.response.clone()
           resp.headers.set('x-correlation-id', requestId)
           return resp
         }
@@ -232,7 +234,6 @@ const alertHandlers = protectRouteMulti(
         return response
       } catch (error) {
         const responseTime = Date.now() - startTime
-        const errorType = error instanceof SyntaxError ? 'SyntaxError' : error instanceof Error ? error.constructor.name : 'UnknownError'
         const errorMessage = error instanceof Error ? error.message : 'Failed to update alert'
 
         const { response, statusCode } = handleRouteError(error, requestId, {
@@ -246,7 +247,6 @@ const alertHandlers = protectRouteMulti(
           ...logContext,
           statusCode,
           responseTimeMs: responseTime,
-          errorType,
           errorMessage,
         }))
 

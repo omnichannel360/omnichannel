@@ -9,6 +9,9 @@ import {
   rateLimiters,
   type RateLimitConfig,
 } from "@/lib/rate-limiting";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger('rate-limit-middleware');
 
 type RouteHandler = (
   request: NextRequest
@@ -48,7 +51,7 @@ export function withRateLimit(
       // Rate limit passed, call handler
       return await handler(request);
     } catch (error) {
-      console.error("Rate limit middleware error:", error);
+      logger.error("Rate limit middleware error:", error);
       // If rate limiting fails, continue to handler (fail open)
       return await handler(request);
     }

@@ -10,6 +10,9 @@ import {
   createRateLimitErrorResponse,
   createRateLimitHeaders,
 } from './rate-limit-config'
+import { createLogger } from './logger'
+
+const logger = createLogger('rate-limit')
 
 // Global rate limiter instances for each config
 const limiters: Map<string, ReturnType<typeof createRateLimiter>> = new Map()
@@ -89,7 +92,7 @@ export function withRateLimit(
         headers,
       })
     } catch (error) {
-      console.error('[Rate Limit] Error:', error)
+      logger.error('[Rate Limit] Error:', error)
       // On error, allow request but log it
       return handler(request, context)
     }

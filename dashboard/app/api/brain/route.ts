@@ -67,13 +67,15 @@ export const GET = protectRoute(
       // Validate query parameters with Zod schema
       const queryResult = await validateQuery<BrainQuery>(request, BrainQuerySchema)
       if (!queryResult.success) {
-        const validationError = queryResult.response as NextResponse
+        if (!(queryResult.response instanceof NextResponse)) {
+          throw new Error('Validation error response is not a NextResponse')
+        }
         logger.warn('Brain query validation failed', {
           ...logContext,
-          statusCode: validationError.status,
+          statusCode: queryResult.response.status,
           responseTimeMs: Date.now() - startTime,
         })
-        return validationError
+        return queryResult.response
       }
 
       const { category, limit } = queryResult.data

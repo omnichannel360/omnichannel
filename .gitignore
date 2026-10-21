@@ -73,3 +73,9 @@ backups/
 
 # Output
 .cache/
+
+# Data Files (Contains runtime-generated state, must not be committed)
+/dashboard/data/
+/data/
+*.json.bak
+*.json.tmp

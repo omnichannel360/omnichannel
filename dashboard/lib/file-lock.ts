@@ -1,3 +1,7 @@
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('file-lock')
+
 interface FileLock {
   queue: Array<() => Promise<void>>
   locked: boolean
@@ -14,6 +18,7 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
   }
 
   return new Promise<T>((resolve, reject) => {
+    let callbackPromise: Promise<void> | null = null
     const executeCallback = async (): Promise<void> => {
       try {
         const result = await callback()
@@ -25,15 +30,17 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
         const fileLock = locks.get(filePath)
         if (!fileLock) {
           // Safety check: should never happen, but log if lock was deleted unexpectedly
-          console.error(`[FileLock] Lock for ${filePath} was deleted during execution`)
+          logger.error('Lock was deleted during execution', new Error('Lock deleted'), { filePath })
           return
         }
 
         const nextCallback = fileLock.queue.shift()
         if (nextCallback) {
-          // Execute next queued callback; don't await to prevent blocking
-          nextCallback().catch((error) => {
-            console.error(`[FileLock] Error executing queued callback for ${filePath}:`, error)
+          // Execute next queued callback and track the promise
+          callbackPromise = nextCallback().catch((error) => {
+            logger.error('Error executing queued callback', error, { filePath })
+            // Continue to next callback instead of stopping
+            return Promise.resolve()
           })
         } else {
           fileLock.locked = false
@@ -45,13 +52,14 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
       }
     }
 
+    // Atomically check and set lock state to prevent race conditions
     if (lock.locked) {
       lock.queue.push(executeCallback)
     } else {
       lock.locked = true
       // Initiate async execution without awaiting: the Promise will resolve/reject
       // based on the callback's completion, independent of this Promise executor
-      void executeCallback()
+      callbackPromise = executeCallback()
     }
   })
 }

@@ -22,7 +22,37 @@ interface AgentProfile {
   status?: string
 }
 
-const PROFILES_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes', 'profiles')
+/**
+ * Get the profiles directory path.
+ * Validates that HOME or USERPROFILE environment variable is set.
+ * @throws {Error} If neither HOME nor USERPROFILE is configured
+ */
+function getProfilesDir(): string {
+  const homeDir = process.env.HOME || process.env.USERPROFILE
+
+  if (!homeDir) {
+    throw new Error(
+      'PROFILES_DIR configuration error: HOME or USERPROFILE environment variable not set. ' +
+      'Cannot locate .hermes/profiles directory. ' +
+      'Please configure HOME or USERPROFILE in your environment.'
+    )
+  }
+
+  return path.join(homeDir, '.hermes', 'profiles')
+}
+
+// Validate profiles directory at module load time
+let PROFILES_DIR: string
+try {
+  PROFILES_DIR = getProfilesDir()
+} catch (error) {
+  logger.error('Failed to initialize profiles directory', error, {
+    operation: 'profiles_init',
+    message: error instanceof Error ? error.message : String(error),
+  })
+  // Use fallback for development
+  PROFILES_DIR = path.join(process.cwd(), 'config', 'profiles')
+}
 
 function inferRoleFromName(name: string): string {
   const parts = name.split('-')

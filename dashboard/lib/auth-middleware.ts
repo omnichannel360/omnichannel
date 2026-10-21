@@ -130,11 +130,15 @@ export async function verifyAuthMiddleware(
  * Higher-order function to wrap API handlers with auth middleware
  * Usage: export const POST = withAuth(myHandler, { allowedRoles: ['admin'] })
  */
-export function withAuth<T extends (...args: any[]) => Promise<Response>>(
+interface AuthenticatedRequest extends NextRequest {
+  auth?: AuthContext
+}
+
+export function withAuth<T extends (req: NextRequest, ...args: unknown[]) => Promise<Response>>(
   handler: T,
   options: AuthMiddlewareOptions = {}
-): (...args: any[]) => Promise<Response> {
-  return async (request: NextRequest, ...args: any[]) => {
+): (req: NextRequest, ...args: unknown[]) => Promise<Response> {
+  return async (request: NextRequest, ...args: unknown[]) => {
     const authResult = await verifyAuthMiddleware(request, options)
 
     // If auth failed, authResult is a NextResponse
@@ -143,7 +147,7 @@ export function withAuth<T extends (...args: any[]) => Promise<Response>>(
     }
 
     // Attach auth context to request for use in handler
-    const requestWithAuth = request as any
+    const requestWithAuth = request as AuthenticatedRequest
     requestWithAuth.auth = authResult
 
     try {

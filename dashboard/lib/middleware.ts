@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken, AuthErrors } from './auth'
+import { createLogger } from './logger'
+
+const logger = createLogger('auth-middleware')
 
 /**
  * Middleware to protect API routes with JWT authentication
@@ -21,7 +24,7 @@ export async function protectRoute(
 
     return await handler(request, user)
   } catch (error) {
-    console.error('[Auth Middleware Error]', error)
+    logger.error('[Auth Middleware Error]', error)
     return NextResponse.json(
       { error: AuthErrors.UNAUTHORIZED.message },
       { status: AuthErrors.UNAUTHORIZED.status }
@@ -41,7 +44,7 @@ export async function protectRouteOptional(
     const user = await verifyToken(request)
     return await handler(request, user || undefined)
   } catch (error) {
-    console.error('[Auth Middleware Error]', error)
+    logger.error('[Auth Middleware Error]', error)
     return NextResponse.json(
       { error: AuthErrors.UNAUTHORIZED.message },
       { status: AuthErrors.UNAUTHORIZED.status }

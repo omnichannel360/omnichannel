@@ -33,7 +33,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
       statusCode: 429,
       responseTimeMs: Date.now() - startTime,
     })
-    return rateLimitError as NextResponse<LoginResponse>
+    // Type-safe casting: return the rate limit error response
+    return rateLimitError instanceof NextResponse
+      ? (rateLimitError as NextResponse<LoginResponse>)
+      : NextResponse.json({ success: false, error: 'Rate limit exceeded' }, { status: 429 })
   }
 
   try {
