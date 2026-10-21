@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.01% </span>
+                <span class="strong">79.62% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>44/53</span>
+                <span class='fraction'>43/54</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">76.19% </span>
+                <span class="strong">61.9% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/21</span>
+                <span class='fraction'>13/21</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.01% </span>
+                <span class="strong">79.62% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>44/53</span>
+                <span class='fraction'>43/54</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -235,7 +235,16 @@
 <a name='L170'></a><a href='#L170'>170</a>
 <a name='L171'></a><a href='#L171'>171</a>
 <a name='L172'></a><a href='#L172'>172</a>
-<a name='L173'></a><a href='#L173'>173</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -356,12 +365,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -382,6 +395,10 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -403,9 +420,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * CSRF Token Protection Middleware
@@ -493,9 +511,9 @@ export function setCsrfTokenCookie(response: NextResponse): string {
  * Middleware to validate CSRF token on state-changing requests
  * SECURITY: Also validates origin/referer to prevent cross-site attacks
  *
- * NOTE: Request body is consumed by this middleware. If you need the body
- * in your route handler, use a separate request object or clone the request
- * before calling this middleware. Next.js request bodies can only be read once.
+ * IMPORTANT: This middleware clones the request before reading the body,
+ * so the original request body is preserved for route handlers.
+ * The cloned body is only used to extract the CSRF token.
  */
 export async function validateCsrfMiddleware(
   request: NextRequest,
@@ -527,13 +545,17 @@ export async function validateCsrfMiddleware(
       }
     }
 &nbsp;
-    // Try to get token from header or body
+    // FIXED: Clone request to preserve body for route handler
+    // Next.js request bodies can only be read once, so we must clone
+    // to avoid consuming the body stream.
     let tokenFromBody: string | null = null
 &nbsp;
     if (request.method !== 'GET' &amp;&amp; request.method !== 'HEAD') {
       try {
-        const body = await request.json()
-        tokenFromBody = body._csrf || body.csrfToken || null
+        // Clone the request to read body without consuming the original
+        const clonedRequest = request.clone()
+        const body = <span class="cstat-no" title="statement not covered" >await clonedRequest.json()</span>
+<span class="cstat-no" title="statement not covered" >        tokenFromBody = body._csrf || body.csrfToken || null</span>
       } catch {
         // Body parse error - token must be in header
       }
@@ -565,19 +587,24 @@ export async function validateCsrfMiddleware(
 &nbsp;
 /**
  * DEPRECATED: Use the return value from setCsrfTokenCookie instead.
- * setCsrfTokenCookie already returns the generated token, so this function
- * is unnecessary and fragile (parses Set-Cookie headers).
  *
- * Example instead:
- * const token = setCsrfTokenCookie(response) // Returns token directly
+ * This function was fragile because it tried to parse Set-Cookie headers.
+ * setCsrfTokenCookie now returns the generated token directly.
+ *
+ * CORRECT pattern:
+ * ```typescript
+ * const token = setCsrfTokenCookie(response)  // Returns token directly
  * response.headers.set('X-CSRF-Token', token) // Send to client if needed
+ * ```
  *
  * @deprecated Use the return value from setCsrfTokenCookie() instead
+ * @throws Error if called - use setCsrfTokenCookie() return value instead
  */
-export function <span class="fstat-no" title="function not covered" >getCsrfTokenFromResponse(</span>_response: NextResponse): string | null {
-  // This function is kept for backwards compatibility but returns null
-  // Use the return value from setCsrfTokenCookie() instead for simpler, safer code
-<span class="cstat-no" title="statement not covered" >  return null</span>
+export function <span class="fstat-no" title="function not covered" >getCsrfTokenFromResponse(</span>_response: NextResponse): never {
+<span class="cstat-no" title="statement not covered" >  throw new Error(</span>
+    'getCsrfTokenFromResponse is deprecated. Use setCsrfTokenCookie(response) return value instead. ' +
+    'setCsrfTokenCookie now returns the generated token directly.'
+  )
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -586,7 +613,7 @@ export function <span class="fstat-no" title="function not covered" >getCsrfToke
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-21T20:04:10.263Z
+                at 2026-10-21T20:14:39.893Z
             </div>
         <script src="../prettify.js"></script>
         <script>
