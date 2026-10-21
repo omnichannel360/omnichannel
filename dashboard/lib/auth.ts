@@ -190,15 +190,32 @@ export function getRolePermissions(role: UserRole): string[] {
 
 /**
  * Validate token payload has required fields
+ * FIXED: Added explicit null/undefined checks and timestamp validation
  */
 export function isValidTokenPayload(payload: unknown): payload is TokenPayload {
   if (!payload || typeof payload !== 'object') return false
+
   const p = payload as Record<string, unknown>
-  return (
-    typeof p.sub === 'string' &&
-    typeof p.email === 'string' &&
-    (p.role === 'admin' || p.role === 'user' || p.role === 'viewer') &&
-    typeof p.iat === 'number' &&
-    typeof p.exp === 'number'
-  )
+
+  // Validate all required fields exist and have correct types
+  if (typeof p.sub !== 'string' || p.sub.length === 0) return false
+  if (typeof p.email !== 'string' || p.email.length === 0) return false
+  if (typeof p.iat !== 'number' || p.iat <= 0) return false
+  if (typeof p.exp !== 'number' || p.exp <= 0) return false
+
+  // Validate role is one of the allowed values
+  const validRoles: UserRole[] = ['admin', 'user', 'viewer']
+  if (!validRoles.includes(p.role as UserRole)) return false
+
+  // Validate token is not expired
+  const now = Math.floor(Date.now() / 1000)
+  if (p.exp <= now) return false
+
+  // Validate iat is in the past
+  if (p.iat > now) return false
+
+  // Validate iat is before exp
+  if (p.iat >= p.exp) return false
+
+  return true
 }

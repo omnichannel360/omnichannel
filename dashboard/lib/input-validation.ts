@@ -59,6 +59,8 @@ export const PasswordSchema = z
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
+  .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
+  .refine((pwd) => !/^(.+?).*\1$/.test(pwd) || pwd.length > 12, 'Password should not be easily guessable')
 
 export const StringSchema = z
   .string()

@@ -274,15 +274,22 @@ export async function validateQuery<T>(
 
     // Convert URLSearchParams to object
     searchParams.forEach((value, key) => {
-      // Try to parse as number if it looks like one
-      if (!isNaN(Number(value)) && value !== '') {
-        queryObject[key] = Number(value)
-      } else if (value.toLowerCase() === 'true') {
+      // Try to parse as number if it looks like one (avoid parsing "NaN", "Infinity", etc)
+      const trimmed = value.trim()
+      if (trimmed !== '' && !isNaN(Number(trimmed)) && trimmed !== 'NaN' && trimmed !== 'Infinity' && trimmed !== '-Infinity') {
+        const num = Number(trimmed)
+        // Only use if it's a finite number
+        if (isFinite(num)) {
+          queryObject[key] = num
+        } else {
+          queryObject[key] = trimmed
+        }
+      } else if (trimmed.toLowerCase() === 'true') {
         queryObject[key] = true
-      } else if (value.toLowerCase() === 'false') {
+      } else if (trimmed.toLowerCase() === 'false') {
         queryObject[key] = false
       } else {
-        queryObject[key] = value
+        queryObject[key] = trimmed || value // Preserve original if empty after trim
       }
     })
 

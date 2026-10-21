@@ -351,6 +351,7 @@ export async function retryWithBackoff<T>(
 
 /**
  * Circuit breaker for protecting dependent services
+ * FIXED: Immutable state transitions to prevent race conditions
  */
 export class CircuitBreaker {
   private failureCount = 0
@@ -365,12 +366,11 @@ export class CircuitBreaker {
   ) {}
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.state === 'OPEN') {
-      if (Date.now() - this.lastFailureTime > this.resetTimeoutMs) {
-        this.state = 'HALF_OPEN'
-      } else {
-        throw new Error('Circuit breaker is OPEN - service unavailable')
-      }
+    // Atomically check and transition state
+    const currentState = this.getStateWithTransition()
+
+    if (currentState === 'OPEN') {
+      throw new Error('Circuit breaker is OPEN - service unavailable')
     }
 
     try {
@@ -383,7 +383,20 @@ export class CircuitBreaker {
     }
   }
 
-  private onSuccess() {
+  private getStateWithTransition(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
+    if (this.state === 'OPEN') {
+      const now = Date.now()
+      if (now - this.lastFailureTime > this.resetTimeoutMs) {
+        // Atomically transition from OPEN to HALF_OPEN
+        this.state = 'HALF_OPEN'
+        this.successCount = 0
+        return 'HALF_OPEN'
+      }
+    }
+    return this.state
+  }
+
+  private onSuccess(): void {
     this.failureCount = 0
     if (this.state === 'HALF_OPEN') {
       this.successCount++
@@ -394,7 +407,7 @@ export class CircuitBreaker {
     }
   }
 
-  private onFailure() {
+  private onFailure(): void {
     this.failureCount++
     this.lastFailureTime = Date.now()
     this.successCount = 0
@@ -404,7 +417,7 @@ export class CircuitBreaker {
     }
   }
 
-  getState() {
+  getState(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
     return this.state
   }
 }

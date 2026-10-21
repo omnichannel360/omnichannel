@@ -38,19 +38,24 @@ export interface RateLimitStore {
 
 /**
  * In-memory rate limit store with proper immutability
- * and automatic cleanup
+ * and automatic cleanup. FIXED: Proper cleanup and lifecycle management
  */
 export class InMemoryRateLimitStore implements RateLimitStore {
   private store: Map<string, RateLimitRecord> = new Map()
   private cleanupInterval: NodeJS.Timeout | null = null
   private readonly cleanupIntervalMs = 60000 // 1 minute
+  private destroyed = false
 
   constructor(private readonly windowMs: number) {
     this.startCleanup()
   }
 
   private startCleanup(): void {
+    if (this.destroyed) return
+
     this.cleanupInterval = setInterval(() => {
+      if (this.destroyed) return
+
       const now = Date.now()
       const keysToDelete: string[] = []
 
@@ -70,6 +75,10 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   }
 
   async increment(key: string): Promise<RateLimitRecord> {
+    if (this.destroyed) {
+      throw new Error('RateLimitStore has been destroyed')
+    }
+
     const now = Date.now()
     const existing = this.store.get(key)
 
@@ -97,6 +106,10 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   }
 
   async get(key: string): Promise<RateLimitRecord | null> {
+    if (this.destroyed) {
+      throw new Error('RateLimitStore has been destroyed')
+    }
+
     const record = this.store.get(key)
     const now = Date.now()
 
@@ -109,10 +122,14 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   }
 
   async reset(key: string): Promise<void> {
+    if (this.destroyed) {
+      throw new Error('RateLimitStore has been destroyed')
+    }
     this.store.delete(key)
   }
 
   async cleanup(): Promise<void> {
+    this.destroyed = true
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval)
       this.cleanupInterval = null

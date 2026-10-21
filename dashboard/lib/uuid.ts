@@ -18,11 +18,8 @@ function getLogger() {
         warn: (message: string, context?: Record<string, unknown>) => {
           const timestamp = new Date().toISOString()
           const logEntry = { timestamp, level: 'WARN', module: 'uuid', message, ...(context || {}) }
-          // Write to stderr to avoid mixing with stdout
-          if (typeof process !== 'undefined' && process.stderr) {
-            process.stderr.write(JSON.stringify(logEntry) + '\n')
-          } else if (typeof console !== 'undefined') {
-            // Browser fallback - still use console but structured
+          // Use console only - process.stderr not available in Edge Runtime
+          if (typeof console !== 'undefined') {
             console.warn('[WARN]', logEntry)
           }
         }

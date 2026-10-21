@@ -65,7 +65,7 @@ async function logToBrain(log: MeetingLog): Promise<void> {
   const id = generateId('meeting')
 
   // DEFENSE LAYER 1: Validate meeting_type against strict whitelist schema
-  // Explicit error throwing ensures security events are auditable
+  // Schema regex: /^[a-zA-Z0-9_-]+$/ prevents path separators
   const validatedType = MeetingTypeSchema.safeParse(log.meeting_type)
   if (!validatedType.success) {
     throw new Error(
@@ -75,7 +75,7 @@ async function logToBrain(log: MeetingLog): Promise<void> {
   const safeType = validatedType.data
 
   // DEFENSE LAYER 2: Validate skill_triggered against strict whitelist schema
-  // Explicit error throwing ensures security events are auditable
+  // Schema regex: /^[a-zA-Z0-9_-]+$/ prevents path separators
   let safeSkill = 'unknown'
   if (log.skill_triggered && log.skill_triggered !== 'none') {
     const validatedSkill = SkillTypeSchema.safeParse(log.skill_triggered)
@@ -87,23 +87,12 @@ async function logToBrain(log: MeetingLog): Promise<void> {
     safeSkill = validatedSkill.data
   }
 
-  // DEFENSE LAYER 3: Verify validated inputs contain no path components
-  // Even though schema validation already blocks these, this explicit check ensures
-  // defense-in-depth: if schema validation has a bug, this catches it
-  const basenameOnlyType = path.basename(safeType)
-  const basenameOnlySkill = path.basename(safeSkill)
-  if (basenameOnlyType !== safeType || basenameOnlySkill !== safeSkill) {
-    throw new Error(
-      `SECURITY: Validated input contains path separators (schema validation failure): type=${safeType}, skill=${safeSkill}`
-    )
-  }
+  // DEFENSE LAYER 3: Construct filename with validated safe components
+  // Format: {type}_{skill}_{id}.json - all components validated by schema or generateId()
+  const fileName = `${safeType}_${safeSkill}_${id}.json`
 
-  // DEFENSE LAYER 4: Construct filename with validated safe components
-  // Format: {type}_{skill}_{id}.json - all components are validated + verified
-  const fileName = `${basenameOnlyType}_${basenameOnlySkill}_${id}.json`
-
-  // DEFENSE LAYER 5: Use safeJoin to prevent any remaining path traversal attempts
-  // This performs resolution and containment validation (uses basename + dirname check)
+  // DEFENSE LAYER 4: Use safeJoin to prevent any path traversal attempts
+  // This performs final validation (basename + dirname check)
   const filePath = safeJoin(brainDir, fileName)
 
   const brainRecord = {
@@ -242,14 +231,14 @@ const meetingHandlers = protectRouteMulti(
         // - Previous code: atomicUpdate() then logToBrain() (two separate operations)
         // - Problem: If logToBrain fails, log is already saved but brain not updated (inconsistency)
         // - Fixed: Both operations inside atomic update - fails together or succeeds together
-        const savedLog = await atomicUpdate<MeetingLog[], MeetingLog>(MEETINGS_LOG, async (logs) => {
+        const savedLog = await atomicUpdate<MeetingLog[]>(MEETINGS_LOG, async (logs) => {
           const updated = [...logs, log]
 
           // Log to brain as part of atomic operation
           // If logToBrain throws, entire atomicUpdate fails (no partial write)
           await logToBrain(log)
 
-          return { updated, result: log }
+          return updated
         })
 
         // SECURITY: Return only validated data in response to prevent leaking unvalidated input

@@ -6,7 +6,15 @@ export async function atomicRead<T>(filePath: string, fallback?: T): Promise<T> 
   return withFileLock(filePath, async () => {
     try {
       const content = await fs.readFile(filePath, 'utf-8')
-      return JSON.parse(content) as T
+      try {
+        return JSON.parse(content) as T
+      } catch (parseError) {
+        // If JSON parsing fails and fallback provided, use it
+        if (fallback !== undefined) {
+          return fallback
+        }
+        throw parseError
+      }
     } catch (error: unknown) {
       const fsError = error as NodeJS.ErrnoException
       if (fsError?.code === 'ENOENT' && fallback !== undefined) return fallback
@@ -27,7 +35,16 @@ export async function atomicWrite<T>(filePath: string, data: T): Promise<void> {
         throw error
       }
     }
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+
+    // Validate data can be serialized before writing
+    let jsonContent: string
+    try {
+      jsonContent = JSON.stringify(data, null, 2)
+    } catch (error) {
+      throw new Error(`Failed to serialize data to JSON: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    await fs.writeFile(filePath, jsonContent, 'utf-8')
   })
 }
 
@@ -40,7 +57,12 @@ export async function atomicUpdate<T>(
     let current: T
     try {
       const content = await fs.readFile(filePath, 'utf-8')
-      current = JSON.parse(content) as T
+      try {
+        current = JSON.parse(content) as T
+      } catch (parseError) {
+        // If JSON parsing fails, use fallback
+        current = fallback
+      }
     } catch (error: unknown) {
       const fsError = error as NodeJS.ErrnoException
       if (fsError?.code === 'ENOENT') {
@@ -61,7 +83,16 @@ export async function atomicUpdate<T>(
         throw error
       }
     }
-    await fs.writeFile(filePath, JSON.stringify(updated, null, 2), 'utf-8')
+
+    // Validate data can be serialized before writing
+    let jsonContent: string
+    try {
+      jsonContent = JSON.stringify(updated, null, 2)
+    } catch (error) {
+      throw new Error(`Failed to serialize updated data to JSON: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    await fs.writeFile(filePath, jsonContent, 'utf-8')
     return updated
   })
 }
@@ -76,7 +107,12 @@ export async function atomicConditionalUpdate<T>(
     let current: T
     try {
       const content = await fs.readFile(filePath, 'utf-8')
-      current = JSON.parse(content) as T
+      try {
+        current = JSON.parse(content) as T
+      } catch (parseError) {
+        // If JSON parsing fails, use fallback
+        current = fallback
+      }
     } catch (error: unknown) {
       const fsError = error as NodeJS.ErrnoException
       if (fsError?.code === 'ENOENT') {
@@ -101,7 +137,16 @@ export async function atomicConditionalUpdate<T>(
         throw error
       }
     }
-    await fs.writeFile(filePath, JSON.stringify(updated, null, 2), 'utf-8')
+
+    // Validate data can be serialized before writing
+    let jsonContent: string
+    try {
+      jsonContent = JSON.stringify(updated, null, 2)
+    } catch (error) {
+      throw new Error(`Failed to serialize updated data to JSON: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    await fs.writeFile(filePath, jsonContent, 'utf-8')
     return { updated: true, data: updated }
   })
 }
