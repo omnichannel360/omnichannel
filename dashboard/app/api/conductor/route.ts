@@ -18,25 +18,26 @@ interface SkillRegistry {
 const LOG_FILE = path.join(process.cwd(), 'data', 'conductor-logs.json')
 const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
 
-function ensureDataDir() {
+async function ensureDataDir() {
   const dir = path.dirname(LOG_FILE)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+  try {
+    await fs.mkdir(dir, { recursive: true })
+  } catch {
+    // Already exists
   }
 }
 
-function loadSkillRegistry(): SkillRegistry | null {
+async function loadSkillRegistry(): Promise<SkillRegistry | null> {
   try {
-    const data = fs.readFileSync(SKILL_REGISTRY_PATH, 'utf-8')
+    const data = await fs.readFile(SKILL_REGISTRY_PATH, 'utf-8')
     return JSON.parse(data)
   } catch {
     return null
   }
 }
 
-function loadLogs(): ConversationLog[] {
-  ensureDataDir()
-  if (!fs.existsSync(LOG_FILE)) return []
+async function loadLogs(): Promise<ConversationLog[]> {
+  await ensureDataDir()
   try {
     const data = fs.readFileSync(LOG_FILE, 'utf-8')
     return JSON.parse(data)

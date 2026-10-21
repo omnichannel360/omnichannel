@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { MeetingRequestSchema, MeetingTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface Meeting {
@@ -77,18 +78,19 @@ function logToBrain(log: MeetingLog) {
     fs.mkdirSync(brainDir, { recursive: true })
   }
 
-  const fileName = `${log.meeting_type}_${new Date().getTime()}.json`
-  const filePath = path.join(brainDir, fileName)
+  const id = generateId('meeting')
+  const safeType = MeetingTypeSchema.safeParse(log.meeting_type)
+  const filePath = safeJoin(brainDir, `${safeType.success ? safeType.data : 'unknown'}_${id}.json`)
 
   const brainRecord = {
-    id: `meeting_${Date.now()}`,
+    id,
     timestamp: log.timestamp,
     category: 'meetings',
     meeting_type: log.meeting_type,
     skill_triggered: log.skill_triggered,
     participants: log.participants || [],
     outcomes: log.outcomes || {},
-    status: log.status,
+    status: MeetingStatusSchema.parse(log.status),
   }
 
   fs.writeFileSync(filePath, JSON.stringify(brainRecord, null, 2))
@@ -163,15 +165,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json()
-    const { message, meeting_type, participants } = body
-
-    if (!message && !meeting_type) {
+    const input = MeetingRequestSchema.safeParse(await request.json().catch(() => null))
+    if (!input.success) {
       return NextResponse.json(
-        { success: false, error: 'Message or meeting_type required' },
+        { success: false, error: 'Invalid request', details: input.error.flatten().fieldErrors },
         { status: 400 }
       )
     }
+    const { message, meeting_type, participants } = input.data
 
     const registry = loadSkillRegistry()
 
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
     const logs = loadMeetingLogs()
     const log: MeetingLog = {
       timestamp: new Date().toISOString(),
-      meeting_type: parsed.meeting_type || 'unknown',
+      meeting_type: MeetingTypeSchema.safeParse(parsed.meeting_type).success ? (parsed.meeting_type as string) : 'unknown',
       skill_triggered: parsed.skill || 'none',
       status: parsed.skill ? 'scheduled' : 'failed',
       participants: participants || [],

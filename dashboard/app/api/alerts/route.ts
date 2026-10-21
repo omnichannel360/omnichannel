@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { AlertCreateSchema, AlertUpdateSchema, generateId } from '@/lib/validation'
 
 interface Alert {
   id: string
@@ -37,7 +38,7 @@ function saveAlerts(alerts: Alert[]) {
 
 function createAlert(level: Alert['level'], component: string, message: string): Alert {
   return {
-    id: `alert_${Date.now()}`,
+    id: generateId('alert'),
     timestamp: new Date().toISOString(),
     level,
     component,
@@ -68,12 +69,15 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const { level, component, message } = await request.json()
-
-  if (!level || !component || !message) {
-    return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
+  const parsedBody = AlertCreateSchema.safeParse(await request.json().catch(() => null))
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
+      { status: 400 }
+    )
   }
 
+  const { level, component, message } = parsedBody.data
   const alert = createAlert(level, component, message)
   const alerts = loadAlerts()
 
@@ -89,11 +93,15 @@ export async function PATCH(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const { alert_id, status } = await request.json()
-
-  if (!alert_id || !status) {
-    return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
+  const parsedBody = AlertUpdateSchema.safeParse(await request.json().catch(() => null))
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
+      { status: 400 }
+    )
   }
+
+  const { alert_id, status } = parsedBody.data
 
   const alerts = loadAlerts()
   const alert = alerts.find(a => a.id === alert_id)

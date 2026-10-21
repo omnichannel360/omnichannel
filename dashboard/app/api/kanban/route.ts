@@ -13,31 +13,35 @@ interface Task {
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'kanban.json')
 
-function ensureDataDir() {
+async function ensureDataDir() {
   const dir = path.dirname(DATA_FILE)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+  try {
+    await fs.mkdir(dir, { recursive: true })
+  } catch {
+    // Already exists
   }
 }
 
-function loadTasks(): Task[] {
-  ensureDataDir()
-  if (!fs.existsSync(DATA_FILE)) {
+async function loadTasks(): Promise<Task[]> {
+  await ensureDataDir()
+  try {
+    await fs.access(DATA_FILE)
+    const data = await fs.readFile(DATA_FILE, 'utf-8')
+    return JSON.parse(data)
+  } catch {
     const defaults: Task[] = [
-      { id: '1', title: 'Complete API design', status: 'done' },
-      { id: '2', title: 'Implement authentication', status: 'in-progress' },
-      { id: '3', title: 'Write tests', status: 'todo' },
+      { id: crypto.randomUUID(), title: 'Complete API design', status: 'done' },
+      { id: crypto.randomUUID(), title: 'Implement authentication', status: 'in-progress' },
+      { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
     ]
-    fs.writeFileSync(DATA_FILE, JSON.stringify(defaults, null, 2))
+    await fs.writeFile(DATA_FILE, JSON.stringify(defaults, null, 2))
     return defaults
   }
-  const data = fs.readFileSync(DATA_FILE, 'utf-8')
-  return JSON.parse(data)
 }
 
-function saveTasks(tasks: Task[]) {
-  ensureDataDir()
-  fs.writeFileSync(DATA_FILE, JSON.stringify(tasks, null, 2))
+async function saveTasks(tasks: Task[]) {
+  await ensureDataDir()
+  await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2))
 }
 
 export async function GET(request: NextRequest) {

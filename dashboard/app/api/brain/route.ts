@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { randomUUID } from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 interface Memory {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
 
             if (!category || mem.category === category) {
               memories.push({
-                id: mem.id || crypto.randomUUID(),
+                id: mem.id || randomUUID(),
                 timestamp: mem.timestamp || new Date().toISOString(),
                 action: mem.action || '',
                 result: mem.result || '',
