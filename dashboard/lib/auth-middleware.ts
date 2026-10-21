@@ -176,7 +176,19 @@ export function withAuth<T extends (req: NextRequest, ...args: unknown[]) => Pro
 
 /**
  * Extract auth context from request headers
- * Used to retrieve auth data injected by Next.js middleware
+ * Used to retrieve auth data injected by Next.js middleware during request processing
+ *
+ * @param request - The incoming NextRequest object with auth headers injected
+ * @returns AuthContext - Contains authenticated status, userId, email, and role if authenticated
+ *                        Returns authenticated=false with error message if userId header is missing
+ *
+ * @internal This function is for internal API route handlers only.
+ * Use verifyAuthMiddleware() for full authentication and role-based access control.
+ *
+ * Header expectations:
+ * - x-user-id: Required. User identifier from JWT token
+ * - x-user-email: Optional. User email from JWT token
+ * - x-user-role: Optional. User role from JWT token (admin/user/viewer)
  */
 export function extractAuthFromHeaders(request: NextRequest): AuthContext {
   const userId = request.headers.get('x-user-id')
