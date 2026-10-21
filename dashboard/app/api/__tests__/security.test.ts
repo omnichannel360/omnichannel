@@ -10,7 +10,7 @@
  * Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals'
+import { describe, it, expect } from '@jest/globals'
 import jwt from 'jsonwebtoken'
 
 // Test configuration
@@ -95,13 +95,15 @@ describe('API Security Tests — All Endpoints', () => {
           }
         })
 
-        it('should return 401 without authorization token', async () => {
-          // Missing authorization header should result in 401 from route handler
+        it('should validate request lacks authorization when not provided', async () => {
+          // Test setup: create request without authorization header
           const testRequest = new Request(`${TEST_BASE_URL}/api/alerts`, {
             method: 'GET',
             headers: { 'content-type': 'application/json' }
           })
-          // Verification: Request without Authorization header fails verification
+          // Verification: confirm test setup has no authorization header
+          // NOTE: This tests request construction, not route behavior.
+          // TODO: Add integration test that calls actual route handler and verifies 401 response
           expect(testRequest.headers.get('authorization')).toBeNull()
         })
 
@@ -118,10 +120,9 @@ describe('API Security Tests — All Endpoints', () => {
           // Verify the token was generated with expiration in the past
           expect(token).toBeDefined()
           expect(token.split('.').length).toBe(3) // Structure is valid JWT
-          // Decode and verify exp claim is in the past
+          // Decode and verify exp claim is in the past with type-safe narrowing
           const decoded = jwt.decode(token)
-          expect(decoded).toBeDefined()
-          // Type-safe extraction: verify exp is present and is a number
+          // Type-safe extraction: verify decoded is object with exp property
           if (decoded && typeof decoded === 'object' && 'exp' in decoded) {
             const decodedPayload = decoded as Record<string, unknown>
             expect(decodedPayload.exp).toBeDefined()
@@ -181,13 +182,15 @@ describe('API Security Tests — All Endpoints', () => {
           expect(alertBody.component).toBeDefined()
         })
 
-        it('should return 401 without token', async () => {
-          // Request without Authorization header is rejected
+        it('should validate POST request lacks authorization when not provided', async () => {
+          // Test setup: create POST request without authorization header
           const testRequest = new Request(`${TEST_BASE_URL}/api/alerts`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' }
           })
-          // Verification: No authorization header means auth fails
+          // Verification: confirm test setup has no authorization header
+          // NOTE: This tests request construction, not route handler behavior.
+          // TODO: Add integration test that calls actual route handler and verifies 401 response
           expect(testRequest.headers.get('authorization')).toBeNull()
         })
 
@@ -208,20 +211,27 @@ describe('API Security Tests — All Endpoints', () => {
           const token = generateTestToken({ userId: 'user-1', role: 'user' })
           // Valid token allows update operations
           expect(token).toBeDefined()
-          const decoded = jwt.decode(token) as any
-          expect(decoded.userId).toBe('user-1')
+          // Type-safe extraction: verify decoded is object with userId property
+          const decoded = jwt.decode(token)
+          if (decoded && typeof decoded === 'object' && 'userId' in decoded) {
+            expect((decoded as Record<string, unknown>).userId).toBe('user-1')
+          } else {
+            throw new Error('Token structure invalid: missing userId')
+          }
           // Update body structure
           const updateBody = { severity: 'medium' }
           expect(updateBody.severity).toBeDefined()
         })
 
-        it('should return 401 without token', async () => {
-          // PATCH request without Authorization header
+        it('should validate PATCH request lacks authorization when not provided', async () => {
+          // Test setup: create PATCH request without authorization header
           const testRequest = new Request(`${TEST_BASE_URL}/api/alerts/123`, {
             method: 'PATCH',
             headers: { 'content-type': 'application/json' }
           })
-          // Verification: No auth header means request is rejected
+          // Verification: confirm test setup has no authorization header
+          // NOTE: This tests request construction, not route handler behavior.
+          // TODO: Add integration test that calls actual route handler and verifies 401 response
           expect(testRequest.headers.get('authorization')).toBeNull()
         })
       })
@@ -240,12 +250,15 @@ describe('API Security Tests — All Endpoints', () => {
         expect(Array.isArray(brainData.insights)).toBe(true)
       })
 
-      it('should return 401 without token', async () => {
-        // GET /api/brain without Authorization header fails
+      it('should validate request lacks authorization when not provided', async () => {
+        // Test setup: create request without authorization header
         const testRequest = new Request(`${TEST_BASE_URL}/api/brain`, {
           method: 'GET',
           headers: { 'content-type': 'application/json' }
         })
+        // Verification: confirm test setup has no authorization header
+        // NOTE: This tests request construction, not route handler behavior.
+        // TODO: Add integration test that calls actual route handler and verifies 401 response
         expect(testRequest.headers.get('authorization')).toBeNull()
       })
 

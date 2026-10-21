@@ -134,7 +134,7 @@ async function calculateActualMetrics(): Promise<Metrics> {
       },
     }
   } catch (error) {
-    logger.warn('Failed to calculate actual metrics, using defaults', error, {
+    logger.error('Failed to calculate actual metrics, using defaults', error, {
       operation: 'calculate_actual_metrics',
     })
 
