@@ -4,6 +4,7 @@ import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { AlertCreateSchema, AlertUpdateSchema, generateId } from '@/lib/validation'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
+import { withFileLock } from '@/lib/file-lock'
 
 interface Alert {
   id: string
@@ -25,34 +26,38 @@ async function ensureAlertsFile(): Promise<void> {
       await fs.writeFile(ALERTS_LOG, JSON.stringify([], null, 2), 'utf-8')
     }
   } catch (error) {
-    console.error('[AlertsAPI] Error ensuring alerts file:', error)
+    // Silently fail if unable to ensure file - errors will be caught by callers
   }
 }
 
 async function loadAlerts(): Promise<Alert[]> {
-  await ensureAlertsFile()
-  try {
-    const data = await fs.readFile(ALERTS_LOG, 'utf-8')
+  return withFileLock(ALERTS_LOG, async () => {
+    await ensureAlertsFile()
     try {
-      return JSON.parse(data)
-    } catch (parseError) {
-      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
-      console.error('[AlertsAPI] JSON parse error:', message)
-      return []
+      const data = await fs.readFile(ALERTS_LOG, 'utf-8')
+      try {
+        return JSON.parse(data)
+      } catch (parseError) {
+        // File exists but contains invalid JSON - this is a corruption error
+        throw new Error('Alerts file is corrupted or contains invalid JSON')
+      }
+    } catch (error) {
+      // Re-throw to be handled by API endpoint
+      throw error
     }
-  } catch {
-    return []
-  }
+  })
 }
 
 async function saveAlerts(alerts: Alert[]): Promise<void> {
-  try {
-    await ensureAlertsFile()
-    await fs.writeFile(ALERTS_LOG, JSON.stringify(alerts, null, 2), 'utf-8')
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`Failed to save alerts: ${message}`)
-  }
+  return withFileLock(ALERTS_LOG, async () => {
+    try {
+      await ensureAlertsFile()
+      await fs.writeFile(ALERTS_LOG, JSON.stringify(alerts, null, 2), 'utf-8')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(`Failed to save alerts: ${message}`)
+    }
+  })
 }
 
 function createAlert(level: Alert['level'], component: string, message: string): Alert {
@@ -72,14 +77,21 @@ export async function GET(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const alerts = await loadAlerts()
-  const activeOnly = request.nextUrl.searchParams.get('active') === 'true'
+  try {
+    const alerts = await loadAlerts()
+    const activeOnly = request.nextUrl.searchParams.get('active') === 'true'
 
-  return NextResponse.json({
-    success: true,
-    alerts: activeOnly ? alerts.filter(a => a.status === 'active') : alerts,
-    total: alerts.length,
-  })
+    return NextResponse.json({
+      success: true,
+      alerts: activeOnly ? alerts.filter(a => a.status === 'active') : alerts,
+      total: alerts.length,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to load alerts' },
+      { status: 500 }
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -90,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseRequestJson(request)
   if (!parsed.success) {
-    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
+    return jsonParseErrorResponse()
   }
 
   const body = parsed.body
@@ -104,10 +116,17 @@ export async function POST(request: NextRequest) {
 
   const { level, component, message } = parsedBody.data
   const alert = createAlert(level, component, message)
-  const alerts = await loadAlerts()
 
-  alerts.push(alert)
-  await saveAlerts(alerts)
+  try {
+    const alerts = await loadAlerts()
+    alerts.push(alert)
+    await saveAlerts(alerts)
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to create alert' },
+      { status: 500 }
+    )
+  }
 
   return NextResponse.json({ success: true, alert }, { status: 201 })
 }
@@ -120,7 +139,7 @@ export async function PATCH(request: NextRequest) {
 
   const parsed = await parseRequestJson(request)
   if (!parsed.success) {
-    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
+    return jsonParseErrorResponse()
   }
 
   const body = parsed.body
@@ -134,7 +153,16 @@ export async function PATCH(request: NextRequest) {
 
   const { alert_id, status } = parsedBody.data
 
-  const alerts = await loadAlerts()
+  let alerts: Alert[]
+  try {
+    alerts = await loadAlerts()
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to load alerts' },
+      { status: 500 }
+    )
+  }
+
   const alertIndex = alerts.findIndex(a => a.id === alert_id)
 
   if (alertIndex === -1) {
@@ -147,7 +175,7 @@ export async function PATCH(request: NextRequest) {
     await saveAlerts(updatedAlerts)
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to update alert' },
+      { success: false, error: 'Failed to update alert' },
       { status: 500 }
     )
   }

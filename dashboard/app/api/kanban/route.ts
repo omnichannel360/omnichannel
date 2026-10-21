@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { randomUUID } from 'crypto'
+import crypto from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { TaskCreateSchema, TaskUpdateSchema } from '@/lib/validation'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
+import { withFileLock } from '@/lib/file-lock'
 
 interface Task {
   id: string
@@ -17,9 +18,9 @@ interface Task {
 const DATA_FILE = path.join(process.cwd(), 'data', 'kanban.json')
 
 const DEFAULT_TASKS: Task[] = [
-  { id: randomUUID(), title: 'Complete API design', status: 'done' },
-  { id: randomUUID(), title: 'Implement authentication', status: 'in-progress' },
-  { id: randomUUID(), title: 'Write tests', status: 'todo' },
+  { id: crypto.randomUUID(), title: 'Complete API design', status: 'done' as const },
+  { id: crypto.randomUUID(), title: 'Implement authentication', status: 'in-progress' },
+  { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
 ]
 
 async function ensureDataDir(): Promise<void> {
@@ -32,32 +33,38 @@ async function ensureDataDir(): Promise<void> {
 }
 
 async function loadTasks(): Promise<Task[]> {
-  await ensureDataDir()
-  try {
-    const data = await fs.readFile(DATA_FILE, 'utf-8')
+  return withFileLock(DATA_FILE, async () => {
+    await ensureDataDir()
     try {
-      return JSON.parse(data)
-    } catch (parseError) {
-      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
-      console.error('[KanbanAPI] JSON parse error:', message)
-      // Return defaults on parse error
-      await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TASKS, null, 2), 'utf-8')
-      return DEFAULT_TASKS
+      const data = await fs.readFile(DATA_FILE, 'utf-8')
+      try {
+        return JSON.parse(data)
+      } catch (parseError) {
+        // File exists but contains invalid JSON - this is a corruption error
+        throw new Error('Tasks file is corrupted or contains invalid JSON')
+      }
+    } catch (error) {
+      // If file doesn't exist, initialize with defaults
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TASKS, null, 2), 'utf-8')
+        return DEFAULT_TASKS
+      }
+      // Re-throw corruption or other errors to be handled by API endpoint
+      throw error
     }
-  } catch (error) {
-    await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TASKS, null, 2), 'utf-8')
-    return DEFAULT_TASKS
-  }
+  })
 }
 
 async function saveTasks(tasks: Task[]): Promise<void> {
-  try {
-    await ensureDataDir()
-    await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2), 'utf-8')
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`Failed to save tasks: ${message}`)
-  }
+  return withFileLock(DATA_FILE, async () => {
+    try {
+      await ensureDataDir()
+      await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2), 'utf-8')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(`Failed to save tasks: ${message}`)
+    }
+  })
 }
 
 export async function GET(request: NextRequest) {
@@ -85,7 +92,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseRequestJson(request)
   if (!parsed.success) {
-    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
+    return jsonParseErrorResponse()
   }
 
   const body = parsed.body
@@ -102,7 +109,7 @@ export async function POST(request: NextRequest) {
     const tasks = await loadTasks()
     const { title, status } = parsedBody.data
     const newTask: Task = {
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       title,
       status,
     }
@@ -127,7 +134,7 @@ export async function PUT(request: NextRequest) {
 
   const parsed = await parseRequestJson(request)
   if (!parsed.success) {
-    return jsonParseErrorResponse(parsed.error || 'Failed to parse request')
+    return jsonParseErrorResponse()
   }
 
   const body = parsed.body

@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
         success: false,
         error: authResult.error || 'Unauthorized',
       },
-      { status: authResult.status }
+      { status: 401 }
     )
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
@@ -21,20 +21,25 @@ interface HealthStatus {
   alerts: string[]
 }
 
-function getCompanyBrainStats(): { count: number; latest: string | null } {
+async function getCompanyBrainStats(): Promise<{ count: number; latest: string | null }> {
   try {
     const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
-    if (!fs.existsSync(brainDir)) return { count: 0, latest: null }
+    try {
+      await fs.stat(brainDir)
+    } catch {
+      return { count: 0, latest: null }
+    }
 
-    const files = fs.readdirSync(brainDir).filter(f => f.endsWith('.json'))
+    const files = (await fs.readdir(brainDir)).filter(f => f.endsWith('.json'))
     if (files.length === 0) return { count: 0, latest: null }
 
     const latest = files.sort().pop()
     let latestTimestamp = null
     if (latest) {
       try {
-        const content = JSON.parse(fs.readFileSync(path.join(brainDir, latest), 'utf-8'))
-        latestTimestamp = content.timestamp
+        const content = await fs.readFile(path.join(brainDir, latest), 'utf-8')
+        const parsed = JSON.parse(content)
+        latestTimestamp = parsed.timestamp
       } catch {}
     }
 
@@ -44,12 +49,17 @@ function getCompanyBrainStats(): { count: number; latest: string | null } {
   }
 }
 
-function getMeetingsLogStats(): { count: number; success_count: number } {
+async function getMeetingsLogStats(): Promise<{ count: number; success_count: number }> {
   try {
     const logPath = path.join(process.cwd(), 'data', 'meetings-log.json')
-    if (!fs.existsSync(logPath)) return { count: 0, success_count: 0 }
+    try {
+      await fs.stat(logPath)
+    } catch {
+      return { count: 0, success_count: 0 }
+    }
 
-    const logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'))
+    const content = await fs.readFile(logPath, 'utf-8')
+    const logs = JSON.parse(content)
     if (!Array.isArray(logs)) return { count: 0, success_count: 0 }
 
     const successCount = logs.filter((l: any) => l.status === 'scheduled').length
@@ -59,10 +69,11 @@ function getMeetingsLogStats(): { count: number; success_count: number } {
   }
 }
 
-function getSkillRegistryStats(): number {
+async function getSkillRegistryStats(): Promise<number> {
   try {
     const regPath = path.join(process.cwd(), '..', 'skills', 'registry.json')
-    const registry = JSON.parse(fs.readFileSync(regPath, 'utf-8'))
+    const content = await fs.readFile(regPath, 'utf-8')
+    const registry = JSON.parse(content)
     return registry.meeting_skills?.length || 0
   } catch {
     return 0
@@ -105,9 +116,11 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const brainStats = getCompanyBrainStats()
-    const meetingsStats = getMeetingsLogStats()
-    const skillCount = getSkillRegistryStats()
+    const [brainStats, meetingsStats, skillCount] = await Promise.all([
+      getCompanyBrainStats(),
+      getMeetingsLogStats(),
+      getSkillRegistryStats(),
+    ])
 
     const successRate = meetingsStats.count > 0 ? meetingsStats.success_count / meetingsStats.count : 0
     const alerts = generateAlerts(meetingsStats.count, successRate, brainStats.count, skillCount)

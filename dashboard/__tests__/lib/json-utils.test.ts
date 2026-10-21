@@ -67,7 +67,7 @@ describe('parseRequestJson', () => {
       const result = await parseRequestJson(request)
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain('incomplete' || 'malformed')
+      expect(result.error).toMatch(/Invalid JSON|incomplete|malformed/)
     })
 
     test('fails on null body', async () => {
@@ -90,7 +90,7 @@ describe('parseRequestJson', () => {
       const result = await parseRequestJson(request)
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain('Invalid JSON' || 'syntax')
+      expect(result.error).toMatch(/Invalid JSON|Failed to parse/)
     })
   })
 

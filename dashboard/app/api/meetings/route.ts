@@ -3,6 +3,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { MeetingRequestSchema, MeetingTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { withFileLock } from '@/lib/file-lock'
 
 interface Meeting {
   id: string
@@ -50,19 +51,23 @@ async function loadMeetingsConfig(): Promise<Record<string, Meeting>> {
 }
 
 async function loadMeetingLogs(): Promise<MeetingLog[]> {
-  await ensureDataDir()
-  try {
-    await fs.stat(MEETINGS_LOG)
-    const data = await fs.readFile(MEETINGS_LOG, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+  return withFileLock(MEETINGS_LOG, async () => {
+    await ensureDataDir()
+    try {
+      await fs.stat(MEETINGS_LOG)
+      const data = await fs.readFile(MEETINGS_LOG, 'utf-8')
+      return JSON.parse(data)
+    } catch {
+      return []
+    }
+  })
 }
 
 async function saveMeetingLogs(logs: MeetingLog[]): Promise<void> {
-  await ensureDataDir()
-  await fs.writeFile(MEETINGS_LOG, JSON.stringify(logs, null, 2), 'utf-8')
+  return withFileLock(MEETINGS_LOG, async () => {
+    await ensureDataDir()
+    await fs.writeFile(MEETINGS_LOG, JSON.stringify(logs, null, 2), 'utf-8')
+  })
 }
 
 async function loadSkillRegistry(): Promise<SkillRegistry | null> {
@@ -76,28 +81,30 @@ async function loadSkillRegistry(): Promise<SkillRegistry | null> {
 
 async function logToBrain(log: MeetingLog): Promise<void> {
   const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
-  try {
-    await fs.mkdir(brainDir, { recursive: true })
-  } catch {
-    // Already exists
-  }
-
   const id = generateId('meeting')
   const safeType = MeetingTypeSchema.safeParse(log.meeting_type)
   const filePath = safeJoin(brainDir, `${safeType.success ? safeType.data : 'unknown'}_${id}.json`)
 
-  const brainRecord = {
-    id,
-    timestamp: log.timestamp,
-    category: 'meetings',
-    meeting_type: log.meeting_type,
-    skill_triggered: log.skill_triggered,
-    participants: log.participants || [],
-    outcomes: log.outcomes || {},
-    status: MeetingStatusSchema.parse(log.status),
-  }
+  return withFileLock(filePath, async () => {
+    try {
+      await fs.mkdir(brainDir, { recursive: true })
+    } catch {
+      // Already exists
+    }
 
-  await fs.writeFile(filePath, JSON.stringify(brainRecord, null, 2), 'utf-8')
+    const brainRecord = {
+      id,
+      timestamp: log.timestamp,
+      category: 'meetings',
+      meeting_type: log.meeting_type,
+      skill_triggered: log.skill_triggered,
+      participants: log.participants || [],
+      outcomes: log.outcomes || {},
+      status: MeetingStatusSchema.parse(log.status),
+    }
+
+    await fs.writeFile(filePath, JSON.stringify(brainRecord, null, 2), 'utf-8')
+  })
 }
 
 function parseMeetingFromMessage(message: string, registry: SkillRegistry | null): {

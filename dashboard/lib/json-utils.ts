@@ -52,27 +52,14 @@ export async function parseRequestJson(
   } catch (error) {
     // Categorize JSON parse errors
     if (error instanceof SyntaxError) {
+      // SyntaxError covers both incomplete and malformed JSON
       return {
         success: false,
         error: 'Invalid JSON syntax in request body',
       }
     }
 
-    // Handle other error types
-    const message = error instanceof Error ? error.message : 'Unknown error'
-
-    // Log for debugging (server-side only, never leaked to client)
-    if (
-      error instanceof Error &&
-      error.message.includes('Unexpected end of JSON')
-    ) {
-      return {
-        success: false,
-        error: 'Request body is incomplete or malformed',
-      }
-    }
-
-    // Generic fallback
+    // Generic fallback for unexpected error types
     return {
       success: false,
       error: 'Failed to parse request body',
@@ -84,12 +71,12 @@ export async function parseRequestJson(
  * Create a JSON parse error response with 400 status
  * Use this to return consistent error responses across all endpoints
  *
- * @param errorMessage - User-friendly error message
+ * @param errorMessage - User-friendly error message (defaults to standard message)
  * @returns NextResponse with 400 status
  */
-export function jsonParseErrorResponse(errorMessage: string): NextResponse {
+export function jsonParseErrorResponse(errorMessage?: string): NextResponse {
   return NextResponse.json(
-    { success: false, error: errorMessage },
+    { success: false, error: errorMessage || 'Invalid JSON in request body' },
     { status: 400 }
   )
 }

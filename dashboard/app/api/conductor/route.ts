@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { z } from 'zod'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { withFileLock } from '@/lib/file-lock'
 
 interface ConversationLog {
   timestamp: string
@@ -51,26 +52,30 @@ async function loadSkillRegistry(): Promise<SkillRegistry | null> {
 }
 
 async function loadLogs(): Promise<ConversationLog[]> {
-  await ensureDataDir()
-  try {
-    const data = await fs.readFile(LOG_FILE, 'utf-8')
+  return withFileLock(LOG_FILE, async () => {
+    await ensureDataDir()
     try {
-      return JSON.parse(data)
-    } catch (parseError) {
-      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
-      console.error('[ConductorAPI] JSON parse error when loading logs:', message)
+      const data = await fs.readFile(LOG_FILE, 'utf-8')
+      try {
+        return JSON.parse(data)
+      } catch (parseError) {
+        const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
+        console.error('[ConductorAPI] JSON parse error when loading logs:', message)
+        return []
+      }
+    } catch (readError) {
+      const message = readError instanceof Error ? readError.message : 'Unknown read error'
+      console.error('[ConductorAPI] Error reading logs file:', message)
       return []
     }
-  } catch (readError) {
-    const message = readError instanceof Error ? readError.message : 'Unknown read error'
-    console.error('[ConductorAPI] Error reading logs file:', message)
-    return []
-  }
+  })
 }
 
-async function saveLogs(logs: ConversationLog[]) {
-  await ensureDataDir()
-  await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), 'utf-8')
+async function saveLogs(logs: ConversationLog[]): Promise<void> {
+  return withFileLock(LOG_FILE, async () => {
+    await ensureDataDir()
+    await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), 'utf-8')
+  })
 }
 
 function findMatchingSkill(message: string, registry: SkillRegistry | null): string | null {

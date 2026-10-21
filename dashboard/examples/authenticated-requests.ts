@@ -7,7 +7,7 @@
  * 3. Handle authentication errors
  */
 
-import { createToken, JWTPayload } from '@/lib/auth'
+import { generateToken, TokenPayload } from '@/lib/auth'
 
 // ============================================================================
 // 1. CREATE TOKEN (Server-Side Only)
@@ -18,13 +18,7 @@ import { createToken, JWTPayload } from '@/lib/auth'
  * This is typically done during login/signup
  */
 export async function generateUserToken(userId: string, email: string, role: string = 'user') {
-  const payload: Omit<JWTPayload, 'iat' | 'exp'> = {
-    sub: userId,
-    email,
-    role,
-  }
-
-  return await createToken(payload)
+  return await generateToken(userId, email, role)
 }
 
 // ============================================================================

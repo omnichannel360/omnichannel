@@ -3,6 +3,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { withFileLock } from '@/lib/file-lock'
 
 interface Memory {
   id: string
@@ -18,6 +19,14 @@ interface BrainResponse {
   categories: Record<string, number>
 }
 
+interface MemoryData {
+  id?: string
+  timestamp?: string
+  action?: string
+  result?: string
+  category?: string
+}
+
 const BRAIN_DIR = path.join(process.cwd(), '..', 'company-brain')
 
 export async function GET(request: NextRequest) {
@@ -29,7 +38,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100)
 
     let files: string[] = []
     try {
@@ -50,31 +59,34 @@ export async function GET(request: NextRequest) {
     const categoryCount: Record<string, number> = {}
 
     await Promise.all(
-      files.map(async file => {
-        try {
-          const content = await fs.readFile(path.join(BRAIN_DIR, file), 'utf-8')
-          const data = JSON.parse(content)
+      files.map(file =>
+        withFileLock(path.join(BRAIN_DIR, file), async () => {
+          try {
+            const content = await fs.readFile(path.join(BRAIN_DIR, file), 'utf-8')
+            const data = JSON.parse(content)
 
-          if (Array.isArray(data)) {
-            data.forEach((mem: any) => {
-              const cat = mem.category || 'general'
-              categoryCount[cat] = (categoryCount[cat] || 0) + 1
+            if (Array.isArray(data)) {
+              data.forEach((mem: MemoryData) => {
+                const cat = mem.category || 'general'
+                categoryCount[cat] = (categoryCount[cat] || 0) + 1
 
-              if (!category || mem.category === category) {
-                memories.push({
-                  id: mem.id || crypto.randomUUID(),
-                  timestamp: mem.timestamp || new Date().toISOString(),
-                  action: mem.action || '',
-                  result: mem.result || '',
-                  category: cat,
-                })
-              }
-            })
+                if (!category || mem.category === category) {
+                  memories.push({
+                    id: mem.id || crypto.randomUUID(),
+                    timestamp: mem.timestamp || new Date().toISOString(),
+                    action: mem.action || '',
+                    result: mem.result || '',
+                    category: cat,
+                  })
+                }
+              })
+            }
+          } catch (e) {
+            const error = e instanceof Error ? e.message : String(e)
+            console.error(`Failed to parse memory file ${file}:`, error)
           }
-        } catch (e) {
-          // Skip malformed files
-        }
-      })
+        })
+      )
     )
 
     const recent = memories.sort((a, b) =>

@@ -2,12 +2,15 @@ import { NextRequest } from 'next/server'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 
 // CRITICAL: JWT_SECRET must be set in environment - do not use fallback in production
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET) {
-  throw new Error(
-    'JWT_SECRET environment variable is not set. ' +
-    'This is required for authentication to function securely.'
-  )
+const getJWTSecret = (): string => {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    throw new Error(
+      'JWT_SECRET environment variable is not set. ' +
+      'This is required for authentication to function securely.'
+    )
+  }
+  return secret
 }
 
 export interface TokenPayload extends JwtPayload {
@@ -31,8 +34,8 @@ export async function verifyToken(request: NextRequest): Promise<TokenPayload | 
     }
 
     const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
-    
+    const decoded = jwt.verify(token, getJWTSecret()) as unknown as TokenPayload
+
     return decoded
   } catch (error) {
     return null
@@ -75,7 +78,7 @@ export async function generateToken(
       email,
       role,
     },
-    JWT_SECRET,
+    getJWTSecret(),
     { expiresIn }
   )
 
@@ -96,7 +99,7 @@ export async function generateRefreshToken(
       email,
       type: 'refresh',
     },
-    JWT_SECRET,
+    getJWTSecret(),
     { expiresIn }
   )
 
