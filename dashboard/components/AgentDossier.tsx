@@ -16,7 +16,9 @@ export function AgentDossier({ agentId }: AgentDossierProps) {
             backgroundColor: '#f9fafb',
             padding: '15px',
             borderRadius: '6px',
-            space: '10px'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
           }}>
             <p><strong>ID:</strong> {agentId}</p>
             <p><strong>Type:</strong> AI Assistant</p>
