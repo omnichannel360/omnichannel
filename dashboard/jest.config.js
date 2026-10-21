@@ -29,4 +29,6 @@ module.exports = {
       statements: 80,
     },
   },
+  // NOTE: Coverage targets aligned with Omega Ultra-Sigma standard (80% minimum).
+  // Critical code paths should exceed 80% coverage. Validate with: npm run test:coverage
 };

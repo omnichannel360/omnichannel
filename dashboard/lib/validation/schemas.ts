@@ -84,7 +84,7 @@ export const PaginationSchema = z.object({
 // Auth: Login
 export const LoginRequestSchema = z.object({
   email: EmailSchema,
-  password: PasswordSchemaWeak, // Using weak schema for development
+  password: PasswordSchema, // Using strong password requirements for security
 })
 
 export type LoginRequest = z.infer<typeof LoginRequestSchema>
@@ -265,23 +265,9 @@ export const ConductorRequestSchemaComprehensive = z.object({
 
 export type ConductorRequestMessage = z.infer<typeof ConductorRequestSchemaComprehensive>
 
-// Auth Token Generation: Request body
-export const TokenGenerationSchema = z.object({
-  userId: z
-    .string()
-    .min(1, 'User ID is required')
-    .max(100, 'User ID must not exceed 100 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'User ID must contain only alphanumeric characters, underscores, and hyphens'),
-  email: EmailSchema,
-  role: z
-    .enum(['user', 'admin', 'viewer'], {
-      errorMap: () => ({ message: 'Role must be one of: user, admin, viewer' }),
-    })
-    .optional()
-    .default('user'),
-})
-
-export type TokenGeneration = z.infer<typeof TokenGenerationSchema>
+// Auth Token Generation: Request body (alias for consistency)
+export const TokenGenerationSchema = AuthTokenRequestSchema
+export type TokenGeneration = AuthTokenRequest
 
 // ============================================================================
 // ADDITIONAL ENDPOINT SCHEMAS
@@ -319,7 +305,7 @@ export type LogoutRequest = z.infer<typeof LogoutRequestSchema>
 // Auth: Register request
 export const RegisterRequestSchema = z.object({
   email: EmailSchema,
-  password: PasswordSchemaWeak, // Using weak schema for development
+  password: PasswordSchema, // Using strong password requirements for security
   name: SafeStringSchema.min(1, 'Name is required').optional(),
 })
 
@@ -486,11 +472,6 @@ export const MeetingCreateSchema = z.object({
 
 export type MeetingCreate = z.infer<typeof MeetingCreateSchema>
 
-// Auth: Register
-export const AuthRegisterSchema = z.object({
-  email: EmailSchema,
-  password: PasswordSchemaWeak,
-  name: SafeStringSchema.min(1, 'Name is required').optional(),
-})
-
-export type AuthRegister = z.infer<typeof AuthRegisterSchema>
+// Auth: Register (alias for consistency)
+export const AuthRegisterSchema = RegisterRequestSchema
+export type AuthRegister = RegisterRequest
