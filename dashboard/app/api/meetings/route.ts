@@ -130,10 +130,7 @@ export async function GET() {
     const meetings = loadMeetingsConfig()
     const logs = loadMeetingLogs()
 
-    const meetingsList = Object.entries(meetings).map(([id, meeting]) => ({
-      id,
-      ...meeting,
-    }))
+    const meetingsList = Object.values(meetings)
 
     return NextResponse.json({
       success: true,
