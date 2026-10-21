@@ -1,20 +1,26 @@
 /**
- * Next.js Middleware for Request-Level Authentication & Rate Limiting
- * Provides defense-in-depth auth protection at the edge
+ * Next.js Middleware for Request-Level Authentication
+ * Protects all API endpoints except public routes (auth, health)
  * Runs on all API requests before route handlers
  *
  * Architecture:
- * 1. Rate limiting check (applied to all routes)
- * 2. Auth verification (applied to protected routes)
- * 3. Request context attachment (headers with user info)
+ * 1. Route classification (protected vs public)
+ * 2. Token verification for protected routes
+ * 3. Role-based access control (RBAC)
+ * 4. Auth context injection via headers
+ * 5. Comprehensive error logging
+ * 6. Minimal performance impact - early return for public routes
+ *
+ * Note: Rate limiting is handled per-route in middleware, not here
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAuth, verifyToken } from './lib/auth'
-import { withRateLimit, rateLimiters } from './lib/rate-limiting'
+import jwt, { JwtPayload } from 'jsonwebtoken'
+import { logger } from './lib/logger'
 
 /**
  * Routes that require authentication (user must have valid JWT)
+ * All other /api/* routes not listed here are assumed public
  */
 const PROTECTED_ROUTES = [
   '/api/alerts',
@@ -27,90 +33,220 @@ const PROTECTED_ROUTES = [
 ]
 
 /**
- * Routes that are public and don't require authentication
- * Note: /api/health can be protected or public based on security requirements
+ * Routes that are explicitly public (no authentication required)
  */
-const PUBLIC_ROUTES = ['/api/health']
+const PUBLIC_ROUTES = [
+  '/api/health',
+  '/api/health/check',
+]
 
 /**
- * Authentication routes (public but rate limited)
- * These handle user authentication and token generation
+ * Authentication routes (public, rate-limited separately)
  */
-const AUTH_ROUTES = ['/api/auth/login', '/api/auth/verify', '/api/auth']
+const AUTH_ROUTES = [
+  '/api/auth',
+  '/api/auth/login',
+  '/api/auth/verify',
+]
 
+export type UserRole = 'admin' | 'user' | 'viewer'
+
+export interface AuthPayload extends JwtPayload {
+  sub: string
+  email: string
+  role: UserRole
+  iat: number
+  exp: number
+}
+
+/**
+ * Route access configuration
+ * Specifies which roles can access which routes
+ */
+const ROUTE_ACCESS_CONFIG: Record<string, UserRole[]> = {
+  '/api/alerts': ['admin', 'user'],
+  '/api/brain': ['admin', 'user'],
+  '/api/conductor': ['admin', 'user'],
+  '/api/kanban': ['admin', 'user'],
+  '/api/meetings': ['admin', 'user'],
+  '/api/metrics': ['admin', 'user', 'viewer'],
+  '/api/profiles': ['admin', 'user'],
+}
+
+/**
+ * Get JWT secret from environment
+ * CRITICAL: Must be set in production
+ */
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    console.error('JWT_SECRET environment variable is not set')
+    throw new Error('JWT_SECRET not configured')
+  }
+  return secret
+}
+
+/**
+ * Extract and verify JWT from Authorization header
+ */
+function verifyTokenFromRequest(authHeader: string | null): { valid: boolean; payload?: AuthPayload; error?: string } {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return {
+      valid: false,
+      error: 'Missing or malformed Authorization header',
+    }
+  }
+
+  try {
+    const token = authHeader.substring(7)
+    const decoded = jwt.verify(token, getJWTSecret()) as unknown as AuthPayload
+    return {
+      valid: true,
+      payload: decoded,
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Token verification failed'
+    return {
+      valid: false,
+      error: message,
+    }
+  }
+}
+
+/**
+ * Determine if a route requires authentication
+ */
+function isProtectedRoute(pathname: string): boolean {
+  // Check if explicitly public
+  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
+    return false
+  }
+
+  // Check if auth route (public)
+  if (AUTH_ROUTES.some(route => pathname.startsWith(route))) {
+    return false
+  }
+
+  // Check if protected
+  if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
+    return true
+  }
+
+  // Default: allow other routes (not an API route we manage)
+  return false
+}
+
+/**
+ * Check if user role has access to route
+ */
+function canAccessRoute(pathname: string, userRole: UserRole): boolean {
+  const requiredRoles = ROUTE_ACCESS_CONFIG[pathname]
+  if (!requiredRoles) {
+    return true // No specific role requirement
+  }
+  return requiredRoles.includes(userRole)
+}
+
+/**
+ * Get required roles for a route
+ */
+function getRequiredRoles(pathname: string): UserRole[] {
+  return ROUTE_ACCESS_CONFIG[pathname] || []
+}
+
+/**
+ * Main middleware function
+ * Validates authentication and role-based access for protected routes
+ * Attaches user context to request headers for handlers
+ */
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const method = request.method
 
-  // Apply rate limiting based on route
-  let rateLimitResponse: NextResponse | null = null
-
-  if (pathname.startsWith('/api/auth/login')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.login)
-  } else if (pathname.startsWith('/api/auth/verify')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.verify)
-  } else if (pathname.startsWith('/api/auth')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.auth)
-  } else if (pathname.startsWith('/api/brain')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.brain)
-  } else if (pathname.startsWith('/api/alerts')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.alerts)
-  } else if (pathname.startsWith('/api/conductor')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.conductor)
-  } else if (pathname.startsWith('/api/kanban')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.kanban)
-  } else if (pathname.startsWith('/api/meetings')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.meetings)
-  } else if (pathname.startsWith('/api/metrics')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.metrics)
-  } else if (pathname.startsWith('/api/profiles')) {
-    rateLimitResponse = await withRateLimit(request, rateLimiters.profiles)
-  }
-
-  // If rate limit exceeded, return 429
-  if (rateLimitResponse) {
-    return rateLimitResponse
-  }
-
-  // Check if route is protected
-  const isProtected = PROTECTED_ROUTES.some(route => pathname.startsWith(route))
-  const isPublic = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
-  const isAuth = AUTH_ROUTES.some(route => pathname.startsWith(route))
-
-  // Public and auth routes don't need authentication
-  if (isPublic || isAuth) {
+  // Skip middleware for non-API routes
+  if (!pathname.startsWith('/api/')) {
     return NextResponse.next()
   }
 
-  if (!isProtected) {
+  // Skip protected route check for public endpoints
+  if (!isProtectedRoute(pathname)) {
     return NextResponse.next()
   }
 
-  // Verify authentication for protected routes
-  const authResult = await verifyAuth(request)
+  // Route is protected - verify authentication
+  const authHeader = request.headers.get('authorization')
+  const tokenResult = verifyTokenFromRequest(authHeader)
 
-  if (!authResult.authenticated) {
+  if (!tokenResult.valid) {
+    logger.warn('Authentication failed', {
+      method,
+      pathname,
+      reason: tokenResult.error,
+    })
     return NextResponse.json(
       {
         success: false,
-        error: authResult.error || 'Unauthorized',
+        error: 'Unauthorized',
       },
       { status: 401 }
     )
   }
 
-  // Attach user info to request headers for use in route handlers
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-user-id', authResult.payload?.sub || '')
-  requestHeaders.set('x-user-email', authResult.payload?.email || '')
-  requestHeaders.set('x-user-role', authResult.payload?.role || '')
+  // Token valid - check role-based access
+  if (tokenResult.payload) {
+    const requiredRoles = getRequiredRoles(pathname)
+    if (requiredRoles.length > 0 && !canAccessRoute(pathname, tokenResult.payload.role)) {
+      logger.warn('Access denied - insufficient permissions', {
+        method,
+        pathname,
+        userId: tokenResult.payload.sub,
+        userRole: tokenResult.payload.role,
+        requiredRoles,
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Insufficient permissions',
+        },
+        { status: 403 }
+      )
+    }
 
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
+    // Inject auth context into headers for route handler access
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-user-id', tokenResult.payload.sub || '')
+    requestHeaders.set('x-user-email', tokenResult.payload.email || '')
+    requestHeaders.set('x-user-role', tokenResult.payload.role || '')
+    requestHeaders.set('x-auth-verified', 'true')
+
+    logger.info('Authentication successful', {
+      method,
+      pathname,
+      userId: tokenResult.payload.sub,
+      userRole: tokenResult.payload.role,
+    })
+
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
+  }
+
+  // Fallback error (should not reach here)
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'Authentication failed',
     },
-  })
+    { status: 401 }
+  )
 }
 
+/**
+ * Matcher configuration
+ * Apply middleware to all API routes
+ */
 export const config = {
   matcher: ['/api/:path*'],
 }

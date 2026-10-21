@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { atomicUpdate, atomicRead } from '@/lib/atomic-file-ops'
 import { generateId } from '@/lib/validation'
-import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { logger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { AlertCreateBodySchema, AlertUpdateBodySchema, type AlertCreateBody, type AlertUpdateBody } from '@/lib/validation/schemas'
 import path from 'path'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
-import { validateBody } from '@/lib/validation/middleware'
 import { AlertSchema, type Alert as AlertType } from '@/lib/validation/schemas'
+import { protectRouteMulti, type RouteHandler } from '@/lib/protected-route'
 
 interface Alert {
   id: string
@@ -21,179 +20,156 @@ interface Alert {
 
 const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json')
 
-export async function GET(request: NextRequest) {
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'alerts')
-  if (rateLimitError) return rateLimitError
+const alertHandlers = protectRouteMulti(
+  {
+    GET: async (request: NextRequest, { userId }) => {
+      // Apply rate limiting
+      const rateLimitError = await applyRateLimit(request, 'alerts')
+      if (rateLimitError) return rateLimitError
 
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    logger.warn('Unauthorized alerts GET attempt', {
-      method: request.method,
-      path: request.nextUrl.pathname,
-      error: auth.error,
-    })
-    return createUnauthorizedResponse(auth.error || 'Unauthorized')
-  }
+      const startTime = Date.now()
+      const logContext = createLogContext({
+        method: request.method,
+        path: request.nextUrl.pathname,
+        userId,
+        operation: 'load_alerts',
+      })
 
-  const startTime = Date.now()
-  const logContext = createLogContext({
-    method: request.method,
-    path: request.nextUrl.pathname,
-    userId: auth.userId,
-    operation: 'load_alerts',
-  })
+      try {
+        const alerts = await atomicRead<Alert[]>(ALERTS_FILE, [])
+        logger.info('Alerts loaded successfully', {
+          ...logContext,
+          statusCode: 200,
+          responseTimeMs: Date.now() - startTime,
+          alertCount: alerts.length,
+        })
+        return NextResponse.json({ success: true, alerts, total: alerts.length })
+      } catch (error) {
+        logger.error('Failed to load alerts', error, {
+          ...logContext,
+          statusCode: 500,
+          responseTimeMs: Date.now() - startTime,
+        })
+        return NextResponse.json({ success: false, error: 'Failed to load alerts' }, { status: 500 })
+      }
+    },
 
-  try {
-    const alerts = await atomicRead<Alert[]>(ALERTS_FILE, [])
-    logger.info('Alerts loaded successfully', {
-      ...logContext,
-      statusCode: 200,
-      responseTimeMs: Date.now() - startTime,
-      alertCount: alerts.length,
-    })
-    return NextResponse.json({ success: true, alerts, total: alerts.length })
-  } catch (error) {
-    logger.error('Failed to load alerts', error, {
-      ...logContext,
-      statusCode: 500,
-      responseTimeMs: Date.now() - startTime,
-    })
-    return NextResponse.json({ success: false, error: 'Failed to load alerts' }, { status: 500 })
-  }
-}
+    POST: async (request: NextRequest, { userId }) => {
+      // Apply rate limiting
+      const rateLimitError = await applyRateLimit(request, 'alerts')
+      if (rateLimitError) return rateLimitError
 
-export async function POST(request: NextRequest) {
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'alerts')
-  if (rateLimitError) return rateLimitError
+      const startTime = Date.now()
+      const logContext = createLogContext({
+        method: request.method,
+        path: request.nextUrl.pathname,
+        userId,
+        operation: 'create_alert',
+      })
 
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    logger.warn('Unauthorized alerts POST attempt', {
-      method: request.method,
-      path: request.nextUrl.pathname,
-      error: auth.error,
-    })
-    return createUnauthorizedResponse(auth.error || 'Unauthorized')
-  }
+      try {
+        const bodyResult = await validateBody<AlertCreateBody>(request, AlertCreateBodySchema)
+        if (!bodyResult.success) {
+          return bodyResult.response
+        }
 
-  const startTime = Date.now()
-  const logContext = createLogContext({
-    method: request.method,
-    path: request.nextUrl.pathname,
-    userId: auth.userId,
-    operation: 'create_alert',
-  })
+        const newAlert: Alert = {
+          id: generateId('alert'),
+          timestamp: new Date().toISOString(),
+          ...bodyResult.data,
+          status: 'active',
+        }
 
-  try {
-    const bodyResult = await validateBody<AlertCreateBody>(request, AlertCreateBodySchema)
-    if (!bodyResult.success) {
-      return bodyResult.response
-    }
+        await atomicUpdate<Alert[]>(
+          ALERTS_FILE,
+          (alerts) => [...alerts, newAlert],
+          []
+        )
 
-    const newAlert: Alert = {
-      id: generateId('alert'),
-      timestamp: new Date().toISOString(),
-      ...bodyResult.data,
-      status: 'active',
-    }
+        logger.info('Alert created successfully', {
+          ...logContext,
+          statusCode: 201,
+          responseTimeMs: Date.now() - startTime,
+          alertId: newAlert.id,
+        })
 
-    await atomicUpdate<Alert[]>(
-      ALERTS_FILE,
-      (alerts) => [...alerts, newAlert],
-      []
-    )
+        return NextResponse.json({ success: true, alert: newAlert }, { status: 201 })
+      } catch (error) {
+        let statusCode = 500
+        let errorMessage = 'Failed to create alert'
 
-    logger.info('Alert created successfully', {
-      ...logContext,
-      statusCode: 201,
-      responseTimeMs: Date.now() - startTime,
-      alertId: newAlert.id,
-    })
+        if (error instanceof SyntaxError) {
+          statusCode = 400
+          errorMessage = 'Invalid JSON in request body'
+        }
 
-    return NextResponse.json({ success: true, alert: newAlert }, { status: 201 })
-  } catch (error) {
-    let statusCode = 500
-    let errorMessage = 'Failed to create alert'
+        logger.error('Alert creation failed', error, {
+          ...logContext,
+          statusCode,
+          responseTimeMs: Date.now() - startTime,
+        })
 
-    if (error instanceof SyntaxError) {
-      statusCode = 400
-      errorMessage = 'Invalid JSON in request body'
-    }
+        return NextResponse.json({ success: false, error: errorMessage }, { status: statusCode })
+      }
+    },
 
-    logger.error('Alert creation failed', error, {
-      ...logContext,
-      statusCode,
-      responseTimeMs: Date.now() - startTime,
-    })
+    PATCH: async (request: NextRequest, { userId }) => {
+      // Apply rate limiting
+      const rateLimitError = await applyRateLimit(request, 'alerts')
+      if (rateLimitError) return rateLimitError
 
-    return NextResponse.json({ success: false, error: errorMessage }, { status: statusCode })
-  }
-}
+      const startTime = Date.now()
+      const logContext = createLogContext({
+        method: request.method,
+        path: request.nextUrl.pathname,
+        userId,
+        operation: 'update_alert',
+      })
 
-export async function PATCH(request: NextRequest) {
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'alerts')
-  if (rateLimitError) return rateLimitError
+      try {
+        const bodyResult = await validateBody<AlertUpdateBody>(request, AlertUpdateBodySchema)
+        if (!bodyResult.success) {
+          return bodyResult.response
+        }
 
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    logger.warn('Unauthorized alerts PATCH attempt', {
-      method: request.method,
-      path: request.nextUrl.pathname,
-      error: auth.error,
-    })
-    return createUnauthorizedResponse(auth.error || 'Unauthorized')
-  }
+        const { alert_id, status } = bodyResult.data
 
-  const startTime = Date.now()
-  const logContext = createLogContext({
-    method: request.method,
-    path: request.nextUrl.pathname,
-    userId: auth.userId,
-    operation: 'update_alert',
-  })
+        const result = await atomicUpdate<Alert[]>(
+          ALERTS_FILE,
+          (alerts) => {
+            const index = alerts.findIndex((a) => a.id === alert_id)
+            if (index === -1) throw new Error('Alert not found')
+            return [...alerts.slice(0, index), { ...alerts[index], status }, ...alerts.slice(index + 1)]
+          },
+          []
+        )
 
-  try {
-    const bodyResult = await validateBody<AlertUpdateBody>(request, AlertUpdateBodySchema)
-    if (!bodyResult.success) {
-      return bodyResult.response
-    }
+        const updated = result.find((a) => a.id === alert_id)
 
-    const { alert_id, status } = bodyResult.data
+        logger.info('Alert updated successfully', {
+          ...logContext,
+          statusCode: 200,
+          responseTimeMs: Date.now() - startTime,
+          alertId: alert_id,
+          newStatus: status,
+        })
 
-    const result = await atomicUpdate<Alert[]>(
-      ALERTS_FILE,
-      (alerts) => {
-        const index = alerts.findIndex((a) => a.id === alert_id)
-        if (index === -1) throw new Error('Alert not found')
-        return [...alerts.slice(0, index), { ...alerts[index], status }, ...alerts.slice(index + 1)]
-      },
-      []
-    )
+        return NextResponse.json({ success: true, alert: updated })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to update alert'
+        const statusCode = message === 'Alert not found' ? 404 : 500
 
-    const updated = result.find((a) => a.id === alert_id)
+        logger.error('Alert update failed', error, {
+          ...logContext,
+          statusCode,
+          responseTimeMs: Date.now() - startTime,
+        })
 
-    logger.info('Alert updated successfully', {
-      ...logContext,
-      statusCode: 200,
-      responseTimeMs: Date.now() - startTime,
-      alertId: alert_id,
-      newStatus: status,
-    })
+        return NextResponse.json({ success: false, error: message }, { status: statusCode })
+      }
+    },
+  },
+  { requireAuth: true, rateLimitKey: 'alerts' }
+)
 
-    return NextResponse.json({ success: true, alert: updated })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update alert'
-    const statusCode = message === 'Alert not found' ? 404 : 500
-
-    logger.error('Alert update failed', error, {
-      ...logContext,
-      statusCode,
-      responseTimeMs: Date.now() - startTime,
-    })
-
-    return NextResponse.json({ success: false, error: message }, { status: statusCode })
-  }
-}
+export const { GET, POST, PATCH } = alertHandlers

@@ -138,6 +138,7 @@ function generateAlerts(
 }
 
 export async function GET(request: NextRequest) {
+  // Health check should be public - no auth required
   // Apply rate limiting
   const rateLimitError = await applyRateLimit(request, 'health')
   if (rateLimitError) return rateLimitError
@@ -148,21 +149,11 @@ export async function GET(request: NextRequest) {
     return queryResult.response
   }
 
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    logger.warn('Unauthorized health check attempt', {
-      method: request.method,
-      path: request.nextUrl.pathname,
-      error: auth.error,
-    })
-    return createUnauthorizedResponse(auth.error || 'Authentication required')
-  }
-
   const startTime = Date.now()
   const logContext = createLogContext({
     method: request.method,
     path: request.nextUrl.pathname,
-    userId: auth.userId,
+    userId: 'system', // Health checks don't have a user
   })
 
   try {

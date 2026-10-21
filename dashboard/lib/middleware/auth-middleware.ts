@@ -2,6 +2,10 @@
  * Centralized Auth Middleware
  * Provides decorator/wrapper pattern for protecting API endpoints
  * Ensures consistent auth validation across all routes
+ *
+ * Usage:
+ * export const GET = withAuth(async (request, auth) => { ... })
+ * export const POST = withAuth(handler, { requiredRole: 'admin' })
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -26,6 +30,11 @@ export interface AuthMiddlewareOptions {
   /** Custom error message */
   errorMessage?: string
 }
+
+/**
+ * HTTP method type
+ */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'
 
 /**
  * Verify auth and return auth context
