@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   try {
     const { title, status } = parsedBody.data
     const newTask: Task = {
-      id: crypto.randomUUID(),
+      id: generateId('task'),
       title,
       status,
     }

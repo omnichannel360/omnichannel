@@ -35,8 +35,12 @@ export function generateUUIDv4(): string {
 }
 
 /**
- * Generate a unique UUID v4 identifier
- * @returns A RFC 4122 compliant UUID v4 string
+ * Generate a unique UUID v4 identifier without prefix
+ * @returns A RFC 4122 compliant UUID v4 string (e.g., '550e8400-e29b-41d4-a716-446655440000')
+ *
+ * Use this for unprefixed IDs. For prefixed IDs, use generatePrefixedId() instead.
+ *
+ * Example: const id = generateId() // "550e8400-e29b-41d4-a716-446655440000"
  */
 export function generateId(): string {
   return generateUUIDv4()

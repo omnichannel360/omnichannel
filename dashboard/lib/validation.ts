@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { generateId as generatePlainId, generatePrefixedId, generateUUIDv4 } from './uuid'
+import path from 'path'
 
 /**
  * Re-exports and wrappers for UUID generation
@@ -59,7 +60,18 @@ export const AlertUpdateSchema = z.object({
   status: AlertStatusSchema,
 })
 
-import path from 'path'
+export const TaskCreateSchema = z.object({
+  title: z.string().min(1, 'title required').max(500),
+  status: z.enum(['todo', 'in-progress', 'done']).default('todo'),
+})
+
+export const TaskUpdateSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1).max(500).optional(),
+  status: z.enum(['todo', 'in-progress', 'done']).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+})
 
 export function safeJoin(baseDir: string, filename: string): string {
   const safeName = path.basename(filename)
