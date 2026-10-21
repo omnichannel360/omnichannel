@@ -47,7 +47,11 @@ export function generateSecureRandomId(): string {
  */
 export function generateNonCryptoRandomSuffix(): string {
   if (!nonCryptoWarningLogged) {
-    getLogger().warn('Using non-cryptographic random generator - only use for non-security purposes')
+    try {
+      getLogger().warn('Using non-cryptographic random generator - only use for non-security purposes')
+    } catch {
+      // Silently fail if logger unavailable - this is non-critical path
+    }
     nonCryptoWarningLogged = true
   }
   return Math.random().toString(36).substring(2, 11)

@@ -105,19 +105,26 @@ export function withRateLimit(
 
 /**
  * Extract user ID from request (from auth token or session)
+ * SECURITY: Always validate/decode token before using for rate limiting
  */
 function extractUserId(request: NextRequest): string | undefined {
   // Try to get from Authorization header
   const authHeader = request.headers.get('authorization')
   if (authHeader?.startsWith('Bearer ')) {
-    // In production, verify and decode the token
-    // For now, just use the suffix
-    return authHeader.substring(7)
+    // SECURITY: Extract token but use the actual authenticated user ID from middleware headers
+    // (which contains the decoded, verified user ID)
+    const userIdHeader = request.headers.get('x-user-id')
+    if (userIdHeader) {
+      return userIdHeader
+    }
+    // Fallback: use IP-based limiting if user not authenticated
+    return undefined
   }
 
   // Try to get from cookie
   const sessionCookie = request.cookies.get('auth')
   if (sessionCookie?.value) {
+    // SECURITY: Only use if it's a session cookie with server-side validation
     return sessionCookie.value
   }
 

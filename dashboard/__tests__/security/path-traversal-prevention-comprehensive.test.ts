@@ -84,7 +84,7 @@ describe('PATH TRAVERSAL PREVENTION - COMPREHENSIVE SECURITY SUITE', () => {
       it('should reject non-string types', () => {
         expect(MeetingTypeSchema.safeParse(123).success).toBe(false)
         expect(MeetingTypeSchema.safeParse({}).success).toBe(false)
-        expect(MeetingTypeSchema.safeParse([])).toBe(false)
+        expect(MeetingTypeSchema.safeParse([]).success).toBe(false)
       })
     })
 

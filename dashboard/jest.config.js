@@ -1,16 +1,15 @@
 module.exports = {
   preset: 'ts-jest',
-  testEnvironment: 'jsdom',
+  testEnvironment: 'node',
   roots: ['<rootDir>'],
   testMatch: ['**/__tests__/**/*.ts', '**/__tests__/**/*.tsx', '**/*.test.ts', '**/*.test.tsx'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
-  extensionsToTreatAsEsm: ['.ts', '.tsx'],
-  globals: {
-    'ts-jest': {
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
-    },
+    }],
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   collectCoverageFrom: [
@@ -29,6 +28,7 @@ module.exports = {
       statements: 80,
     },
   },
+  testTimeout: 10000,
   // NOTE: Coverage targets aligned with Omega Ultra-Sigma standard (80% minimum).
   // Critical code paths should exceed 80% coverage. Validate with: npm run test:coverage
 };

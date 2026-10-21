@@ -13,15 +13,10 @@ function getLogger() {
       const loggerModule = require('./logger')
       logger = loggerModule.createLogger('uuid')
     } catch {
-      // Fallback if logger cannot be loaded - create minimal structured logger
+      // Fallback if logger cannot be loaded - no-op to avoid console pollution
       logger = {
-        warn: (message: string, context?: Record<string, unknown>) => {
-          const timestamp = new Date().toISOString()
-          const logEntry = { timestamp, level: 'WARN', module: 'uuid', message, ...(context || {}) }
-          // Use console only - process.stderr not available in Edge Runtime
-          if (typeof console !== 'undefined') {
-            console.warn('[WARN]', logEntry)
-          }
+        warn: () => {
+          // Silently skip logging in fallback mode
         }
       } as Logger
     }

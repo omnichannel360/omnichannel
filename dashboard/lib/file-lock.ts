@@ -104,3 +104,17 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
 
 // Alias for backwards compatibility with atomic-dir-ops
 export const withLock = withFileLock
+
+/**
+ * Clear all locks - used in tests to reset state
+ */
+export function clearAllLocks(): void {
+  locks.clear()
+}
+
+/**
+ * Get the current number of locks - used for debugging and testing
+ */
+export function getLockCount(): number {
+  return locks.size
+}
