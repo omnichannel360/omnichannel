@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { MeetingRequestSchema, MeetingTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
+import { MeetingRequestSchema, MeetingTypeSchema, SkillTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { withFileLock } from '@/lib/file-lock'
 import { ensureDataDir } from '@/lib/ensure-dir'
@@ -74,8 +74,43 @@ async function loadSkillRegistry(): Promise<SkillRegistry | null> {
 async function logToBrain(log: MeetingLog): Promise<void> {
   const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
   const id = generateId('meeting')
-  const safeType = MeetingTypeSchema.safeParse(log.meeting_type)
-  const filePath = safeJoin(brainDir, `${safeType.success ? safeType.data : 'unknown'}_${id}.json`)
+
+  // DEFENSE LAYER 1: Validate meeting_type against strict whitelist schema
+  const validatedType = MeetingTypeSchema.safeParse(log.meeting_type)
+  if (!validatedType.success) {
+    throw new Error(
+      `Invalid meeting_type: ${validatedType.error.errors.map((e) => e.message).join('; ')}`
+    )
+  }
+  const safeType = validatedType.data
+
+  // DEFENSE LAYER 2: Validate skill_triggered against strict whitelist schema
+  let safeSkill = 'unknown'
+  if (log.skill_triggered && log.skill_triggered !== 'none') {
+    const validatedSkill = SkillTypeSchema.safeParse(log.skill_triggered)
+    if (validatedSkill.success) {
+      safeSkill = validatedSkill.data
+    }
+  }
+
+  // DEFENSE LAYER 3: Use path.basename() to strip any path components
+  // This is an explicit additional security layer beyond validation
+  const basenameOnlyType = path.basename(safeType)
+  const basenameOnlySkill = path.basename(safeSkill)
+  if (basenameOnlyType !== safeType || basenameOnlySkill !== safeSkill) {
+    // If basename changes the value, it contained path separators
+    throw new Error(
+      `Input contains path traversal attempt: type=${log.meeting_type}, skill=${log.skill_triggered}`
+    )
+  }
+
+  // DEFENSE LAYER 4: Construct filename with basename-safe components
+  // Format: {type}_{skill}_{id}.json for better file organization
+  const fileName = `${basenameOnlyType}_${basenameOnlySkill}_${id}.json`
+
+  // DEFENSE LAYER 5: Use safeJoin to prevent any remaining path traversal attempts
+  // This performs resolution and containment validation (uses basename + dirname check)
+  const filePath = safeJoin(brainDir, fileName)
 
   return withFileLock(filePath, async () => {
     try {
@@ -200,11 +235,33 @@ export async function POST(request: NextRequest) {
     }
 
     const logs = await loadMeetingLogs()
+
+    // SECURITY: Validate meeting_type against whitelist schema (Layer 1)
+    const validatedMeetingType = parsed.meeting_type
+      ? MeetingTypeSchema.safeParse(parsed.meeting_type)
+      : { success: false }
+    const safeMeetingType = validatedMeetingType.success
+      ? validatedMeetingType.data
+      : 'unknown'
+
+    // SECURITY: Validate skill_triggered against whitelist schema (Layer 2)
+    let safeSkill = 'none'
+    if (parsed.skill && parsed.skill !== 'none') {
+      const validatedSkill = SkillTypeSchema.safeParse(parsed.skill)
+      if (validatedSkill.success) {
+        safeSkill = validatedSkill.data
+      } else {
+        // Invalid skill detected - use safe default
+        // Silently reject invalid skills for security (don't echo back to user)
+        safeSkill = 'unknown'
+      }
+    }
+
     const log: MeetingLog = {
       timestamp: new Date().toISOString(),
-      meeting_type: MeetingTypeSchema.safeParse(parsed.meeting_type).success ? (parsed.meeting_type as string) : 'unknown',
-      skill_triggered: parsed.skill || 'none',
-      status: parsed.skill ? 'scheduled' : 'failed',
+      meeting_type: safeMeetingType,
+      skill_triggered: safeSkill,
+      status: safeSkill !== 'unknown' && safeSkill !== 'none' ? 'scheduled' : 'failed',
       participants: participants || [],
       outcomes: {},
     }
@@ -213,15 +270,16 @@ export async function POST(request: NextRequest) {
     await logToBrain(log)
     await saveMeetingLogs(logs)
 
-    const response = parsed.skill
-      ? `Dispatching meeting skill: ${parsed.skill} for "${parsed.meeting_type}". Meeting logged and skill triggered.`
+    // SECURITY: Return only validated data in response to prevent leaking unvalidated input
+    const response = safeSkill !== 'none' && safeSkill !== 'unknown'
+      ? `Dispatching meeting skill: ${safeSkill} for "${safeMeetingType}". Meeting logged and skill triggered.`
       : `No meeting detected in message. Please specify a meeting type or use a meeting-related keyword.`
 
     return NextResponse.json({
-      success: !!parsed.skill,
+      success: safeSkill !== 'none' && safeSkill !== 'unknown',
       response,
-      meeting_type: parsed.meeting_type,
-      skill_triggered: parsed.skill,
+      meeting_type: safeMeetingType,
+      skill_triggered: safeSkill,
     })
   } catch (error) {
     return NextResponse.json(
