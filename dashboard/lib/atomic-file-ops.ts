@@ -19,7 +19,8 @@ export async function atomicRead<T>(filePath: string, fallback?: T): Promise<T> 
       try {
         return JSON.parse(content) as T
       } catch (parseError) {
-        // If JSON parsing fails and fallback provided, use it
+        // If JSON parsing fails, log corruption and use fallback if available
+        logFileCorruption(filePath, parseError)
         if (fallback !== undefined) {
           return fallback
         }

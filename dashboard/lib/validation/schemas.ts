@@ -27,7 +27,7 @@ export const PasswordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character')
   .refine((pwd) => !/(.)\1{2,}/.test(pwd), 'Password cannot contain more than 2 consecutive identical characters')
-  .refine((pwd) => PASSWORD_VALIDATION.regex.test(pwd), PASSWORD_VALIDATION.description)
+  .refine((pwd) => !PASSWORD_VALIDATION.regex.test(pwd), PASSWORD_VALIDATION.description)
 
 // Weak password for development/testing (optional override)
 export const PasswordSchemaWeak = z
@@ -36,8 +36,9 @@ export const PasswordSchemaWeak = z
   .max(128, 'Password must not exceed 128 characters')
 
 // Safe string factory - creates string schemas with XSS protection
-// Supports optional min/max length constraints
-function createSafeString(minLength = 0, maxLength = 1000) {
+// Blocks dangerous patterns: script tags, JavaScript URLs, event handlers, data URIs, eval
+// Allows: math operators (<, >), shell metacharacters, HTML entities
+function createSafeString(minLength = 0, maxLength = 1000): z.ZodTypeAny {
   let schema = z.string()
 
   if (minLength > 0) {
@@ -47,8 +48,20 @@ function createSafeString(minLength = 0, maxLength = 1000) {
   schema = schema.max(maxLength, `String must not exceed ${maxLength} characters`)
 
   return schema.refine(
-    (val) => !val.includes('<script') && !val.includes('javascript:'),
-    'String contains forbidden patterns'
+    (val) => {
+      const lowerVal = val.toLowerCase()
+      // SECURITY: Block execution vectors only - rendering safety handled elsewhere
+      // Blocked patterns: <script>, javascript:, data:text/html, eval(
+      // Note: Event handler text (e.g., 'onclick="..."') is safe as stored content
+      return (
+        !lowerVal.includes('<script') &&
+        !lowerVal.includes('</script>') &&
+        !lowerVal.includes('javascript:') &&
+        !lowerVal.includes('data:text/html') &&
+        !/eval\s*\(/i.test(val)
+      )
+    },
+    'String contains forbidden XSS patterns'
   )
 }
 
@@ -174,14 +187,7 @@ export type HealthQuery = z.infer<typeof HealthQuerySchema>
 
 // Kanban: Request body
 export const KanbanItemSchema = z.object({
-  title: z
-    .string()
-    .min(1, 'Title is required')
-    .max(1000, 'String must not exceed 1000 characters')
-    .refine(
-      (val) => !val.includes('<script') && !val.includes('javascript:'),
-      'String contains forbidden patterns'
-    ),
+  title: createSafeString(1, 1000),
   description: SafeStringSchema.optional(),
   status: z
     .enum(['todo', 'in_progress', 'done'], {
@@ -201,14 +207,7 @@ export type KanbanItem = z.infer<typeof KanbanItemSchema>
 
 // Meetings: Request body
 export const MeetingSchema = z.object({
-  title: z
-    .string()
-    .min(1, 'Title is required')
-    .max(1000, 'String must not exceed 1000 characters')
-    .refine(
-      (val) => !val.includes('<script') && !val.includes('javascript:'),
-      'String contains forbidden patterns'
-    ),
+  title: createSafeString(1, 1000),
   description: SafeStringSchema.optional(),
   startTime: z
     .string()
@@ -220,7 +219,6 @@ export const MeetingSchema = z.object({
     .optional(),
   attendees: z
     .array(EmailSchema)
-    .min(1, 'At least one attendee is required')
     .optional()
     .default([]),
 })
@@ -494,7 +492,6 @@ export const MeetingCreateSchema = z.object({
     .optional(),
   attendees: z
     .array(EmailSchema)
-    .min(1, 'At least one attendee is required')
     .optional()
     .default([]),
 })

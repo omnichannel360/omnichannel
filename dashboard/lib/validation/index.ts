@@ -496,13 +496,10 @@ export function safeJoin(baseDir: string, filePath: string): string {
 
 /**
  * Generate a secure random ID
- * Uses UUID v4 for cryptographic strength
+ * Re-exports from uuid.ts to avoid code duplication
  *
- * @param prefix - Optional prefix for the ID
- * @returns Secure random ID
+ * FIXED: Removed duplicate implementation. UUID generation is centralized in:
+ * - dashboard/lib/uuid.ts: generateId(), generatePrefixedId()
  */
-export function generateId(prefix?: string): string {
-  // FIXED: Use top-level import instead of runtime require()
-  const id = generateUUIDv4()
-  return prefix ? `${prefix}_${id}` : id
-}
+// Re-export from uuid module - single source of truth for ID generation
+export { generateId, generatePrefixedId } from '@/lib/uuid'

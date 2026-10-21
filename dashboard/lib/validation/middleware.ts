@@ -280,10 +280,10 @@ export async function validateQuery<T>(
       const trimmed = value.trim()
 
       // Try to parse as number if it looks like one (avoid parsing "NaN", "Infinity", etc)
-      if (trimmed !== '' && !isNaN(Number(trimmed)) && !['NaN', 'Infinity', '-Infinity'].includes(trimmed)) {
+      if (trimmed !== '' && !['NaN', 'Infinity', '-Infinity'].includes(trimmed)) {
         const num = Number(trimmed)
-        // Only use if it's a finite number
-        if (isFinite(num)) {
+        // Only use if it's a finite number (isNaN and isFinite both return false for non-numbers)
+        if (!isNaN(num) && isFinite(num)) {
           queryObject[key] = num
         } else {
           // Parse failed, use trimmed string
@@ -312,7 +312,8 @@ export async function validateQuery<T>(
         logger.warn('Query validation failed', {
           path: request.nextUrl.pathname,
           method: request.method,
-          query: queryObject,
+          // SECURITY: Don't log raw query parameters - may contain sensitive data
+          // queryKeys: Object.keys(queryObject), // Log keys only, not values
           errors: validationErrors,
         })
 

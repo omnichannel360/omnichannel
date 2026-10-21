@@ -60,7 +60,15 @@ export function generateUUIDv4(): string {
   // PRIORITY 3: Fallback for environments without crypto (development only)
   // This is NOT cryptographically secure, use only as last resort
   const fallbackLogger = getLogger()
-  fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. Consider using Node.js 15+ or modern browser crypto APIs.')
+  const isProduction = process.env.NODE_ENV === 'production'
+
+  if (isProduction) {
+    // SECURITY VIOLATION in production
+    fallbackLogger.error('[SECURITY VIOLATION] generateUUIDv4: Using non-secure Math.random() in production! This environment lacks crypto.randomUUID() (Node.js 15.7+) and crypto.getRandomValues(). All generated UUIDs are predictable. This is unacceptable for production. Please upgrade Node.js to 15.7+ or use a modern runtime.')
+  } else {
+    // Development environment - just a warning
+    fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. For production, ensure Node.js 15+ or modern browser crypto APIs are available.')
+  }
 
   const placeholder = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
   return placeholder.replace(/[xy]/g, function (c) {

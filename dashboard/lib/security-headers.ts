@@ -22,8 +22,8 @@ const SECURITY_HEADERS = {
   // Prevent referrer leakage
   'Referrer-Policy': 'strict-no-referrer',
 
-  // Content Security Policy - basic
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'",
+  // Content Security Policy - allows self + CDN resources for typical dashboards
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' https:; font-src 'self' data: https:; img-src 'self' data: https:",
 
   // Disable caching for sensitive endpoints
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

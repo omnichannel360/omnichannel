@@ -318,25 +318,16 @@ function generateSecureId(): string {
   try {
     // Node.js 15+ has built-in randomUUID
     return randomUUID()
-  } catch {
-    // Fallback for environments without randomUUID
-    // Generate a v4 UUID manually
-    const bytes = new Uint8Array(16)
-    for (let i = 0; i < bytes.length; i++) {
-      bytes[i] = Math.floor(Math.random() * 256)
-    }
-    // Set version (4) and variant bits
-    bytes[6] = (bytes[6] & 0x0f) | 0x40
-    bytes[8] = (bytes[8] & 0x3f) | 0x80
-
-    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
-    return [
-      hex.substring(0, 8),
-      hex.substring(8, 12),
-      hex.substring(12, 16),
-      hex.substring(16, 20),
-      hex.substring(20, 32),
-    ].join('-')
+  } catch (error) {
+    // SECURITY: Cryptographic randomness is required for UUIDs
+    // Throw error instead of falling back to Math.random() (non-cryptographic)
+    throw new Error(
+      'UUID generation failed: crypto.randomUUID not available. ' +
+      'This is a critical security failure - the system cannot generate secure identifiers. ' +
+      'Ensure Node.js crypto module is available and not disabled. ' +
+      `Original error: ${error instanceof Error ? error.message : 'Unknown'}`,
+      { cause: error }
+    )
   }
 }
 

@@ -17,7 +17,16 @@ import {
 } from './rate-limiter'
 
 // Get JWT secret from environment - matches auth.config.ts
+// SECURITY: JWT_SECRET is REQUIRED for secure token verification
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+
+// SECURITY: Validate JWT_SECRET is configured
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error(
+    'CRITICAL: JWT_SECRET or NEXTAUTH_SECRET not configured in production. ' +
+    'JWT verification will fail. Ensure environment variables are set.'
+  )
+}
 
 /**
  * Global rate limiter instances (one per preset)
@@ -158,28 +167,51 @@ function isValidSessionCookie(value: string): boolean {
 /**
  * Extract user ID from request (from auth token or session)
  * SECURITY: Always validate/decode token before using for rate limiting
+ * CRITICAL FIX: Never trust x-user-id header - it can be spoofed
+ * Only extract user ID from verified JWT or validated session cookie
  */
 function extractUserId(request: NextRequest): string | undefined {
-  // Try to get from Authorization header
+  // Try to get from Authorization header (Bearer token)
   const authHeader = request.headers.get('authorization')
   if (authHeader?.startsWith('Bearer ')) {
-    // SECURITY: Extract token but use the actual authenticated user ID from middleware headers
-    // (which contains the decoded, verified user ID)
-    const userIdHeader = request.headers.get('x-user-id')
-    if (userIdHeader) {
-      return userIdHeader
+    const token = authHeader.substring(7)
+
+    // SECURITY: Verify JWT signature and extract authenticated user ID
+    if (JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as { sub?: string }
+        if (decoded.sub) {
+          return decoded.sub
+        }
+      } catch (error) {
+        // Token invalid or expired - fall back to IP-based limiting
+        return undefined
+      }
     }
-    // Fallback: use IP-based limiting if user not authenticated
     return undefined
   }
 
-  // Try to get from cookie
+  // Try to get from session cookie
   const sessionCookie = request.cookies.get('auth')
   if (sessionCookie?.value) {
-    // SECURITY: Validate session cookie format
+    // SECURITY: Validate session cookie format and signature
     if (!isValidSessionCookie(sessionCookie.value)) {
       return undefined // Invalid format → fall back to IP-based limiting
     }
+
+    // For UUID-format sessions, cannot extract user ID without session lookup
+    // For JWT sessions, extract the user ID from the token
+    const isJWT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(sessionCookie.value)
+    if (isJWT && JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(sessionCookie.value, JWT_SECRET) as { sub?: string }
+        return decoded.sub
+      } catch {
+        return undefined
+      }
+    }
+
+    // UUID-based sessions use the UUID itself as identifier
     return sessionCookie.value
   }
 
@@ -187,8 +219,13 @@ function extractUserId(request: NextRequest): string | undefined {
 }
 
 /**
- * Validate API key format
- * Assumes keys are at least 12 characters (adjust based on your spec)
+ * Validate API key format with strict character whitelist
+ * Prevents log injection and other security issues
+ *
+ * FIXED: Explicitly blocks:
+ * - Control characters (newlines, tabs, etc)
+ * - Unicode special characters that could break parsing
+ * - Characters that cause encoding issues in logs
  */
 function isValidApiKey(key: string): boolean {
   if (!key) return false
@@ -199,8 +236,27 @@ function isValidApiKey(key: string): boolean {
   // Maximum 256 characters
   if (key.length > 256) return false
 
-  // Should be alphanumeric + underscore/hyphen (adjust if you allow symbols)
-  if (!/^[a-zA-Z0-9_-]{12,256}$/.test(key)) return false
+  // Strict whitelist: only alphanumeric, underscore, hyphen, dot
+  // Explicitly does NOT allow: space, newline, tab, quotes, brackets, etc.
+  // Regex: ^[a-zA-Z0-9._-]{12,256}$
+  if (!/^[a-zA-Z0-9._-]{12,256}$/.test(key)) return false
+
+  // Defense-in-depth: ensure no control characters or dangerous Unicode
+  // Check for any character with code < 32 (control chars) or > 127 (extended)
+  for (let i = 0; i < key.length; i++) {
+    const code = key.charCodeAt(i)
+    // Allow: 45-46 (-.), 48-57 (0-9), 65-90 (A-Z), 95 (_), 97-122 (a-z)
+    if (
+      code < 45 || // Below valid range
+      (code > 46 && code < 48) || // Between . and 0
+      (code > 57 && code < 65) || // Between 9 and A
+      (code > 90 && code < 95) || // Between Z and _
+      (code > 95 && code < 97) || // Between _ and a
+      code > 122 // Above z
+    ) {
+      return false
+    }
+  }
 
   return true
 }
