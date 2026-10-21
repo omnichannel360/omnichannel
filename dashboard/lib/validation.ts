@@ -11,14 +11,116 @@ export type AlertLevel = z.infer<typeof AlertLevelSchema>
 export type AlertStatus = z.infer<typeof AlertStatusSchema>
 
 /**
+ * Whitelist of allowed meeting types for path safety.
+ * These are the only values permitted in filenames.
+ * Any attempt to use other values will be rejected.
+ */
+export const VALID_MEETING_TYPES = new Set([
+  'planning',
+  'standup',
+  'retrospective',
+  'review',
+  'brainstorm',
+  'sync',
+  'onboarding',
+  'feedback',
+  'training',
+  'unknown',
+] as const)
+
+export type ValidMeetingType = typeof VALID_MEETING_TYPES extends Set<infer T> ? T : never
+
+/**
+ * Whitelist of allowed skill types for path safety.
+ * These are the only values permitted in skill_triggered filenames.
+ */
+export const VALID_SKILL_TYPES = new Set([
+  'none',
+  'unknown',
+  'meeting_dispatch',
+  'skill_trigger',
+  'workflow_execute',
+  'data_capture',
+  'analysis',
+  'report_generation',
+] as const)
+
+export type ValidSkillType = typeof VALID_SKILL_TYPES extends Set<infer T> ? T : never
+
+/**
  * Whitelist of characters allowed in an identifier that ends up in a filename.
  * No dots, slashes, backslashes or colons, so traversal and NTFS stream tricks are impossible.
+ * Additionally enforces against common path traversal patterns.
  */
 export const MeetingTypeSchema = z
   .string()
   .min(1)
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/, 'meeting_type may only contain letters, digits, _ and -')
+  .refine(
+    (value) => {
+      // Explicitly reject common path traversal patterns
+      const dangerousPatterns = [
+        '..',
+        '/',
+        '\\',
+        '~',
+        '$',
+        '%',
+        '*',
+        '?',
+        '"',
+        "'",
+        '<',
+        '>',
+        '|',
+        '\0',
+      ]
+      return !dangerousPatterns.some((pattern) => value.includes(pattern))
+    },
+    'meeting_type contains forbidden characters'
+  )
+  .refine(
+    (value) => VALID_MEETING_TYPES.has(value as ValidMeetingType),
+    'meeting_type must be one of the allowed types'
+  )
+
+/**
+ * Skill identifier whitelist - same restrictions as meeting_type.
+ * Prevents path traversal and injection attacks via skill names.
+ */
+export const SkillTypeSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, 'skill_triggered may only contain letters, digits, _ and -')
+  .refine(
+    (value) => {
+      // Explicitly reject common path traversal patterns
+      const dangerousPatterns = [
+        '..',
+        '/',
+        '\\',
+        '~',
+        '$',
+        '%',
+        '*',
+        '?',
+        '"',
+        "'",
+        '<',
+        '>',
+        '|',
+        '\0',
+      ]
+      return !dangerousPatterns.some((pattern) => value.includes(pattern))
+    },
+    'skill_triggered contains forbidden characters'
+  )
+  .refine(
+    (value) => VALID_SKILL_TYPES.has(value as ValidSkillType),
+    'skill_triggered must be one of the allowed types'
+  )
 
 export const MeetingRequestSchema = z
   .object({
