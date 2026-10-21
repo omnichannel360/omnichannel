@@ -6,6 +6,7 @@ import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { TaskCreateSchema, TaskUpdateSchema } from '@/lib/validation'
 import { parseRequestJson, jsonParseErrorResponse } from '@/lib/json-utils'
 import { withFileLock } from '@/lib/file-lock'
+import { ensureDataDir } from '@/lib/ensure-dir'
 
 interface Task {
   id: string
@@ -23,18 +24,9 @@ const DEFAULT_TASKS: Task[] = [
   { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
 ]
 
-async function ensureDataDir(): Promise<void> {
-  const dir = path.dirname(DATA_FILE)
-  try {
-    await fs.mkdir(dir, { recursive: true })
-  } catch {
-    // Already exists
-  }
-}
-
 async function loadTasks(): Promise<Task[]> {
   return withFileLock(DATA_FILE, async () => {
-    await ensureDataDir()
+    await ensureDataDir(path.dirname(DATA_FILE))
     try {
       const data = await fs.readFile(DATA_FILE, 'utf-8')
       try {
@@ -45,7 +37,9 @@ async function loadTasks(): Promise<Task[]> {
       }
     } catch (error) {
       // If file doesn't exist, initialize with defaults
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      const isFileNotFound = error instanceof Error &&
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+      if (isFileNotFound) {
         await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TASKS, null, 2), 'utf-8')
         return DEFAULT_TASKS
       }
@@ -58,7 +52,7 @@ async function loadTasks(): Promise<Task[]> {
 async function saveTasks(tasks: Task[]): Promise<void> {
   return withFileLock(DATA_FILE, async () => {
     try {
-      await ensureDataDir()
+      await ensureDataDir(path.dirname(DATA_FILE))
       await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2), 'utf-8')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'

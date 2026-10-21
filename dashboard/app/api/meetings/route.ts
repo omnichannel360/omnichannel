@@ -4,6 +4,7 @@ import path from 'path'
 import { MeetingRequestSchema, MeetingTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { withFileLock } from '@/lib/file-lock'
+import { ensureDataDir } from '@/lib/ensure-dir'
 
 interface Meeting {
   id: string
@@ -32,15 +33,6 @@ const MEETINGS_DATA_PATH = path.join(process.cwd(), 'data', 'meetings.json')
 const MEETINGS_LOG = path.join(process.cwd(), 'data', 'meetings-log.json')
 const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
 
-async function ensureDataDir() {
-  const dir = path.dirname(MEETINGS_LOG)
-  try {
-    await fs.mkdir(dir, { recursive: true })
-  } catch {
-    // Already exists
-  }
-}
-
 async function loadMeetingsConfig(): Promise<Record<string, Meeting>> {
   try {
     const content = await fs.readFile(MEETINGS_DATA_PATH, 'utf-8')
@@ -52,7 +44,7 @@ async function loadMeetingsConfig(): Promise<Record<string, Meeting>> {
 
 async function loadMeetingLogs(): Promise<MeetingLog[]> {
   return withFileLock(MEETINGS_LOG, async () => {
-    await ensureDataDir()
+    await ensureDataDir(path.dirname(MEETINGS_LOG))
     try {
       await fs.stat(MEETINGS_LOG)
       const data = await fs.readFile(MEETINGS_LOG, 'utf-8')
@@ -65,7 +57,7 @@ async function loadMeetingLogs(): Promise<MeetingLog[]> {
 
 async function saveMeetingLogs(logs: MeetingLog[]): Promise<void> {
   return withFileLock(MEETINGS_LOG, async () => {
-    await ensureDataDir()
+    await ensureDataDir(path.dirname(MEETINGS_LOG))
     await fs.writeFile(MEETINGS_LOG, JSON.stringify(logs, null, 2), 'utf-8')
   })
 }

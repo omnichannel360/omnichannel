@@ -65,7 +65,7 @@ async function loadLogs(): Promise<ConversationLog[]> {
 
 async function saveLogs(logs: ConversationLog[]): Promise<void> {
   return withFileLock(LOG_FILE, async () => {
-    await ensureDataDir()
+    await ensureDataDir(path.dirname(LOG_FILE))
     await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), 'utf-8')
   })
 }
