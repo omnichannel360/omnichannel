@@ -1,8 +1,21 @@
+/**
+ * Next.js Middleware for Request-Level Authentication & Rate Limiting
+ * Provides defense-in-depth auth protection at the edge
+ * Runs on all API requests before route handlers
+ *
+ * Architecture:
+ * 1. Rate limiting check (applied to all routes)
+ * 2. Auth verification (applied to protected routes)
+ * 3. Request context attachment (headers with user info)
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAuth } from './lib/auth'
+import { verifyAuth, verifyToken } from './lib/auth'
 import { withRateLimit, rateLimiters } from './lib/rate-limiting'
 
-// Routes that require authentication
+/**
+ * Routes that require authentication (user must have valid JWT)
+ */
 const PROTECTED_ROUTES = [
   '/api/alerts',
   '/api/brain',
@@ -13,10 +26,16 @@ const PROTECTED_ROUTES = [
   '/api/profiles',
 ]
 
-// Routes that are public (health check, etc.)
+/**
+ * Routes that are public and don't require authentication
+ * Note: /api/health can be protected or public based on security requirements
+ */
 const PUBLIC_ROUTES = ['/api/health']
 
-// Auth-related routes (public but rate limited)
+/**
+ * Authentication routes (public but rate limited)
+ * These handle user authentication and token generation
+ */
 const AUTH_ROUTES = ['/api/auth/login', '/api/auth/verify', '/api/auth']
 
 export async function middleware(request: NextRequest) {
