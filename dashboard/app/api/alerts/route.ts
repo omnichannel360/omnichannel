@@ -152,6 +152,7 @@ const alertHandlers = protectRouteMulti(
       } catch (error) {
         const responseTime = Date.now() - startTime
         const errorMessage = error instanceof Error ? error.message : 'Failed to create alert'
+        const errorType = error instanceof Error ? error.constructor.name : typeof error
 
         const { response, statusCode } = handleRouteError(error, requestId, {
           method: request.method,
@@ -165,6 +166,7 @@ const alertHandlers = protectRouteMulti(
           statusCode,
           responseTimeMs: responseTime,
           errorMessage,
+          errorType,
         }))
 
         response.headers.set('x-correlation-id', requestId)

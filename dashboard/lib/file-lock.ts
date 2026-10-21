@@ -18,7 +18,6 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
   }
 
   return new Promise<T>((resolve, reject) => {
-    let callbackPromise: Promise<void> | null = null
     const executeCallback = async (): Promise<void> => {
       try {
         const result = await callback()
@@ -36,10 +35,13 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
 
         const nextCallback = fileLock.queue.shift()
         if (nextCallback) {
-          // Execute next queued callback and track the promise
-          callbackPromise = nextCallback().catch((error) => {
+          // Execute next queued callback asynchronously.
+          // Note: Errors in subsequent queued callbacks are not propagated to the original caller.
+          // The executor for the current callback has already resolved/rejected.
+          // Queued callback errors are logged but don't prevent remaining callbacks from executing.
+          void nextCallback().catch((error) => {
             logger.error('Error executing queued callback', error, { filePath })
-            // Continue to next callback instead of stopping
+            // Continue to next callback instead of stopping - do not re-throw
             return Promise.resolve()
           })
         } else {
@@ -59,7 +61,7 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
       lock.locked = true
       // Initiate async execution without awaiting: the Promise will resolve/reject
       // based on the callback's completion, independent of this Promise executor
-      callbackPromise = executeCallback()
+      void executeCallback()
     }
   })
 }

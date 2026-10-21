@@ -36,8 +36,20 @@ interface Metrics {
 }
 
 /**
- * Calculate actual metrics from system data sources.
- * This function derives metrics from available data files and logs.
+ * Calculate metrics with actual data where available, defaults for others.
+ *
+ * ACTUAL DATA SOURCES:
+ * - skills_available: loaded from registry.json
+ * - avg_processing_time_ms: calculated from meetings-log.json
+ * - success_rate, error_rate: calculated from meetings-log.json
+ * - total_meetings_processed: loaded from meetings-log.json
+ *
+ * HARDCODED DEFAULTS (TODO: Connect to data sources):
+ * - revenue, costs, profit_margin: TODO - Connect to Supabase accounting
+ * - agents_deployed: TODO - Connect to agent registry
+ * - uptime_percent: TODO - Connect to uptime monitoring
+ * - active_users: TODO - Connect to session tracking
+ * - avg_task_completion_time_minutes: TODO - Calculate from meeting data
  */
 async function calculateActualMetrics(): Promise<Metrics> {
   try {

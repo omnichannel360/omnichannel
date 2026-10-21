@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
 
   // Ensure rate limit values exist after allowed check
   const remaining = rateLimitCheck.remaining ?? 0
-  const resetTime = rateLimitCheck.resetTime ?? Math.floor(Date.now() / 1000) + 3600
-  const limit = rateLimitCheck.limit ?? 100
+  const resetTime = rateLimitCheck.resetTime ?? (Date.now() + 3600 * 1000)
+  const limit = rateLimitCheck.limit ?? RATE_LIMIT_CONFIGS.auth.maxRequests
 
   const startTime = Date.now()
   const logContext = createLogContext({
