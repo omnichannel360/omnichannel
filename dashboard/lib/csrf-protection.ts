@@ -165,8 +165,8 @@ export async function validateCsrfMiddleware(
  *
  * @deprecated Use the return value from setCsrfTokenCookie() instead
  */
-export function getCsrfTokenFromResponse(response: NextResponse): string | null {
-  // This function is kept for backwards compatibility but should not be used
-  console.warn('[DEPRECATED] getCsrfTokenFromResponse() is deprecated. Use the return value from setCsrfTokenCookie() instead.')
+export function getCsrfTokenFromResponse(_response: NextResponse): string | null {
+  // This function is kept for backwards compatibility but returns null
+  // Use the return value from setCsrfTokenCookie() instead for simpler, safer code
   return null
 }
