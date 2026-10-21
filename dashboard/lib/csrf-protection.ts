@@ -29,7 +29,7 @@ export function verifyCsrfToken(
   const tokenFromHeader = request.headers.get(CSRF_HEADER_NAME)
   const cookieToken = request.cookies.get(CSRF_COOKIE_NAME)?.value
 
-  // Both token and cookie must exist
+  // Token must exist in either header or body
   if (!tokenFromHeader && !tokenFromBody) {
     return { valid: false, error: 'CSRF token missing from request' }
   }
@@ -91,11 +91,6 @@ export async function validateCsrfMiddleware(
   // Only validate state-changing requests
   const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH']
   if (!stateChangingMethods.includes(request.method)) {
-    return { valid: true }
-  }
-
-  // Allow GET for token retrieval
-  if (request.method === 'GET') {
     return { valid: true }
   }
 
