@@ -12,9 +12,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodSchema, ZodError, z } from 'zod'
+import path from 'path'
 import { createLogger } from '@/lib/logger'
 // Re-export complete sanitizeString from input-validation (includes HTML entity escaping for XSS protection)
 import { sanitizeString as completeSanitizeString } from '@/lib/input-validation'
+// FIXED: Import at top-level to avoid runtime require() and potential circular dependency
+import { generateUUIDv4 } from '@/lib/uuid'
 
 const logger = createLogger('validation-system')
 
@@ -456,7 +459,7 @@ export type MeetingRequest = z.infer<typeof MeetingRequestSchema>
  * @throws Error if path escapes base directory or is absolute
  */
 export function safeJoin(baseDir: string, filePath: string): string {
-  const path = require('path')
+  // FIXED: Use top-level import instead of runtime require()
 
   // Reject empty paths
   if (!filePath || filePath.trim() === '') {
@@ -499,8 +502,7 @@ export function safeJoin(baseDir: string, filePath: string): string {
  * @returns Secure random ID
  */
 export function generateId(prefix?: string): string {
-  // Import here to avoid circular dependency
-  const { generateUUIDv4 } = require('@/lib/uuid')
+  // FIXED: Use top-level import instead of runtime require()
   const id = generateUUIDv4()
   return prefix ? `${prefix}_${id}` : id
 }

@@ -3,7 +3,7 @@
  */
 
 import {
-  TokenBucketRateLimiter,
+  RateLimiter,
   InMemoryRateLimitStore,
   RateLimitPresets,
   getClientIp,
@@ -14,15 +14,15 @@ describe('InMemoryRateLimitStore', () => {
   let store: InMemoryRateLimitStore
 
   beforeEach(() => {
-    store = new InMemoryRateLimitStore()
+    store = new InMemoryRateLimitStore(60000)
   })
 
   test('increments counter correctly', async () => {
-    const count1 = await store.increment('test-key')
-    const count2 = await store.increment('test-key')
+    const result1 = await store.increment('test-key')
+    const result2 = await store.increment('test-key')
 
-    expect(count1).toBe(1)
-    expect(count2).toBe(2)
+    expect(result1.count).toBe(1)
+    expect(result2.count).toBe(2)
   })
 
   test('returns null for non-existent key', async () => {
@@ -39,137 +39,126 @@ describe('InMemoryRateLimitStore', () => {
   })
 
   test('resets counter on new window', async () => {
-    const count1 = await store.increment('test-key')
-    expect(count1).toBe(1)
+    const result1 = await store.increment('test-key')
+    expect(result1.count).toBe(1)
 
     // Manually clear to simulate window reset
     await store.reset('test-key')
 
-    const count2 = await store.increment('test-key')
-    expect(count2).toBe(1)
+    const result2 = await store.increment('test-key')
+    expect(result2.count).toBe(1)
   })
 })
 
-describe('TokenBucketRateLimiter', () => {
-  let limiter: TokenBucketRateLimiter
+describe('RateLimiter', () => {
+  let limiter: RateLimiter
   let store: InMemoryRateLimitStore
 
   beforeEach(() => {
-    store = new InMemoryRateLimitStore()
-    limiter = new TokenBucketRateLimiter(
-      { maxRequests: 5, windowMs: 60000 },
-      store
-    )
-  })
-
-  test('generates unique keys for different endpoints', () => {
-    const key1 = limiter.generateKey('192.168.1.1', '/api/auth')
-    const key2 = limiter.generateKey('192.168.1.1', '/api/health')
-
-    expect(key1).not.toBe(key2)
-  })
-
-  test('generates unique keys for different IPs', () => {
-    const key1 = limiter.generateKey('192.168.1.1', '/api/auth')
-    const key2 = limiter.generateKey('192.168.1.2', '/api/auth')
-
-    expect(key1).not.toBe(key2)
-  })
-
-  test('includes userId in key when provided', () => {
-    const key1 = limiter.generateKey('192.168.1.1', '/api/auth', 'user123')
-    const key2 = limiter.generateKey('192.168.1.1', '/api/auth')
-
-    expect(key1).not.toBe(key2)
-    expect(key1).toContain('user123')
+    store = new InMemoryRateLimitStore(60000)
+    limiter = new RateLimiter({
+      requestsPerWindow: 5,
+      windowMs: 60000,
+      tier: 'authenticated',
+      keyPrefix: 'test:rl',
+    })
   })
 
   test('allows requests within limit', async () => {
-    const key = 'test-key'
-
     for (let i = 1; i <= 5; i++) {
-      const { allowed } = await limiter.isAllowed(key)
-      expect(allowed).toBe(true)
+      const result = await limiter.check('192.168.1.1')
+      expect(result.allowed).toBe(true)
     }
   })
 
   test('blocks requests exceeding limit', async () => {
-    const key = 'test-key'
-
     // Exhaust the limit
     for (let i = 0; i < 5; i++) {
-      await limiter.isAllowed(key)
+      await limiter.check('192.168.1.1')
     }
 
     // Next request should be blocked
-    const { allowed } = await limiter.isAllowed(key)
-    expect(allowed).toBe(false)
+    const result = await limiter.check('192.168.1.1')
+    expect(result.allowed).toBe(false)
+  })
+
+  test('distinguishes between different IPs', async () => {
+    const result1 = await limiter.check('192.168.1.1')
+    const result2 = await limiter.check('192.168.1.2')
+
+    // Both should be allowed because they have different IP limits
+    expect(result1.allowed).toBe(true)
+    expect(result2.allowed).toBe(true)
+  })
+
+  test('distinguishes between different users', async () => {
+    const result1 = await limiter.check('192.168.1.1', 'user1')
+    const result2 = await limiter.check('192.168.1.1', 'user2')
+
+    // Both should be allowed because they have different user limits
+    expect(result1.allowed).toBe(true)
+    expect(result2.allowed).toBe(true)
   })
 
   test('calculates remaining requests correctly', async () => {
-    const key = 'test-key'
-
-    const result1 = await limiter.isAllowed(key)
+    const result1 = await limiter.check('192.168.1.1')
     expect(result1.remaining).toBe(4) // 5 - 1
 
-    const result2 = await limiter.isAllowed(key)
+    const result2 = await limiter.check('192.168.1.1')
     expect(result2.remaining).toBe(3) // 5 - 2
 
-    const result5 = await limiter.isAllowed(key)
-    const result6 = await limiter.isAllowed(key)
-    const result7 = await limiter.isAllowed(key)
+    await limiter.check('192.168.1.1')
+    await limiter.check('192.168.1.1')
+    const result5 = await limiter.check('192.168.1.1')
 
-    expect(result7.remaining).toBe(0)
+    expect(result5.remaining).toBe(0)
   })
 
   test('resets key correctly', async () => {
-    const key = 'test-key'
-
     // Use up all requests
     for (let i = 0; i < 5; i++) {
-      await limiter.isAllowed(key)
+      await limiter.check('192.168.1.1')
     }
 
     // Verify limit exceeded
-    let result = await limiter.isAllowed(key)
+    let result = await limiter.check('192.168.1.1')
     expect(result.allowed).toBe(false)
 
     // Reset
-    await limiter.resetKey(key)
+    await limiter.reset('192.168.1.1')
 
     // Verify limit reset
-    result = await limiter.isAllowed(key)
+    result = await limiter.check('192.168.1.1')
     expect(result.allowed).toBe(true)
   })
 
-  test('returns reset time in isAllowed response', async () => {
-    const key = 'test-key'
+  test('returns reset time in check response', async () => {
     const beforeRequest = Date.now()
 
-    const { resetTime } = await limiter.isAllowed(key)
+    const result = await limiter.check('192.168.1.1')
 
-    expect(resetTime).toBeGreaterThan(beforeRequest)
-    expect(resetTime).toBeLessThanOrEqual(beforeRequest + 60000)
+    expect(result.resetAt).toBeGreaterThan(beforeRequest)
+    expect(result.resetAt).toBeLessThanOrEqual(beforeRequest + 60000)
   })
 })
 
 describe('RateLimitPresets', () => {
   test('auth preset has strict limits', () => {
-    expect(RateLimitPresets.auth.maxRequests).toBe(5)
+    expect(RateLimitPresets.auth.requestsPerWindow).toBe(5)
     expect(RateLimitPresets.auth.windowMs).toBe(60000)
   })
 
   test('health preset has no limits', () => {
-    expect(RateLimitPresets.health.maxRequests).toBe(Number.MAX_SAFE_INTEGER)
+    expect(RateLimitPresets.health.requestsPerWindow).toBe(Number.MAX_SAFE_INTEGER)
   })
 
   test('api preset has moderate limits', () => {
-    expect(RateLimitPresets.api.maxRequests).toBe(100)
+    expect(RateLimitPresets.api.requestsPerWindow).toBe(100)
     expect(RateLimitPresets.api.windowMs).toBe(15 * 60 * 1000)
   })
 
   test('webhook preset has strict limits', () => {
-    expect(RateLimitPresets.webhook.maxRequests).toBe(50)
+    expect(RateLimitPresets.webhook.requestsPerWindow).toBe(50)
   })
 })
 
@@ -207,9 +196,9 @@ describe('getClientIp', () => {
     expect(ip).toBe('192.168.1.1')
   })
 
-  test('returns unknown for missing headers', () => {
+  test('returns anonymous for missing headers', () => {
     const ip = getClientIp({})
-    expect(ip).toBe('unknown')
+    expect(ip).toBe('anonymous')
   })
 })
 

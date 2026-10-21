@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Race Condition Prevention Tests
  *
  * Tests that verify atomic file operations prevent lost updates and data corruption
@@ -332,3 +332,4 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
     })
   })
 })
+

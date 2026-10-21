@@ -282,30 +282,36 @@ function generateRefreshToken(userId: string, email: string): string {
 }
 
 /**
- * Placeholder for user credential validation
- * Replace with actual implementation (database query, API call, etc.)
+ * User credential validation - CRITICAL: UNIMPLEMENTED
+ *
+ * PASSWORD-BASED AUTHENTICATION IS BROKEN - this function always returns null.
+ * Token-based authentication (via accessToken) still works.
+ *
+ * Required implementation:
+ * 1. Query database: SELECT * FROM users WHERE email = $1
+ * 2. Hash check: await bcrypt.compare(password, user.password_hash)
+ * 3. Return user on match, null on mismatch
+ *
+ * This MUST be implemented before production use.
  */
 async function validateUserCredentials(
   email: string,
   password: string
 ): Promise<{ id: string; email: string; role: 'admin' | 'user' | 'viewer' } | null> {
-  try {
-    // TODO: Implement actual credential validation
-    // This is a placeholder - replace with real user validation logic
-    // Example: query database, validate password hash, etc.
+  // CRITICAL: This function is INTENTIONALLY unimplemented to prevent bypassing auth.
+  // Returning null is CORRECT - do not return mock/default user as that would be a security breach.
 
-    logger.warn('User credential validation not implemented', {
+  logger.error(
+    'CRITICAL: Password authentication unavailable - validateUserCredentials not implemented',
+    new Error('validateUserCredentials unimplemented'),
+    {
       component: 'auth.config',
       operation: 'validateUserCredentials',
       email,
-    })
+      severity: 'CRITICAL',
+      impact: 'Password-based auth broken. Token-based auth still works.',
+    }
+  )
 
-    return null
-  } catch (error) {
-    logger.error('User credential validation error', error, {
-      component: 'auth.config',
-      operation: 'validateUserCredentials',
-    })
-    return null
-  }
+  return null // Correct: deny auth rather than silently bypass
 }

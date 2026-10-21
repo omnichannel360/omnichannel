@@ -1,8 +1,10 @@
-﻿import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { NextRequest } from 'next/server'
+﻿// FIXED: Use jest instead of vitest - jest.config.js configures jest as test runner
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
+
+// Jest globals (describe, it, expect, beforeEach, afterEach) are available globally in Jest
+// No need to import them explicitly
 
 const testDataDir = path.join(os.tmpdir(), 'api-concurrent-test')
 

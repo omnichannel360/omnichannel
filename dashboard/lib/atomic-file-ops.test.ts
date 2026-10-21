@@ -136,9 +136,8 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
       await fs.writeFile(testFile, JSON.stringify(initial))
 
       const result = await atomicUpdate(testFile, async (current) => {
-        const updated = [...(Array.isArray(current) ? current : []), 4]
-        return { updated, result: updated }
-      })
+        return [...(Array.isArray(current) ? current : []), 4]
+      }, [])
 
       expect(result).toEqual([1, 2, 3, 4])
 
@@ -156,9 +155,8 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
           .fill(null)
           .map(() =>
             atomicUpdate(testFile, async (current) => {
-              const updated = (typeof current === 'number' ? current : 0) + 1
-              return { updated, result: updated }
-            })
+              return (typeof current === 'number' ? current : 0) + 1
+            }, 0)
           )
       )
 
@@ -178,15 +176,14 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
       await fs.writeFile(testFile, JSON.stringify(initial))
 
       const result = await atomicUpdate(testFile, async (current) => {
-        const updated = {
+        return {
           ...current,
           users: (current as typeof initial).users.map(u => ({
             ...u,
             score: u.score + 10,
           })),
         }
-        return { updated, result: updated }
-      })
+      }, initial)
 
       expect(result.users[0].score).toBe(110)
       expect(result.users[1].score).toBe(105)
@@ -304,12 +301,11 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
           } else {
             // Write operation
             return atomicUpdate(testFile, async (current) => {
-              const updated = {
+              return {
                 ...(typeof current === 'object' ? current : {}),
                 version: (current as typeof initial).version + 1,
               }
-              return { updated, result: updated }
-            })
+            }, initial)
           }
         })
 

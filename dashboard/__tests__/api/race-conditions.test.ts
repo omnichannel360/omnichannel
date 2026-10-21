@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Race Condition Test Suite
  * Tests atomic operations across all file-based APIs
  * Ensures data integrity under concurrent load
@@ -113,7 +113,7 @@ describe('Race Condition Tests', () => {
 
             const updated = { ...tasks[taskIndex], status: 'in-progress' as const }
             const result = [...tasks.slice(0, taskIndex), updated, ...tasks.slice(taskIndex + 1)]
-            return { updated: result, result: updated }
+            return result
           })
         )
       }
@@ -160,11 +160,11 @@ describe('Race Condition Tests', () => {
       await Promise.all([
         atomicUpdate<TestTask[], void>(tasksFile, async (tasks) => {
           const filtered = tasks.filter(t => t.id !== 'task-1')
-          return { updated: filtered, result: undefined }
+          return filtered
         }),
         atomicUpdate<TestTask[], void>(tasksFile, async (tasks) => {
           const filtered = tasks.filter(t => t.id !== 'task-2')
-          return { updated: filtered, result: undefined }
+          return filtered
         }),
       ])
 
@@ -377,3 +377,4 @@ describe('Race Condition Tests', () => {
     })
   })
 })
+

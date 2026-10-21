@@ -231,7 +231,7 @@ const meetingHandlers = protectRouteMulti(
         // - Previous code: atomicUpdate() then logToBrain() (two separate operations)
         // - Problem: If logToBrain fails, log is already saved but brain not updated (inconsistency)
         // - Fixed: Both operations inside atomic update - fails together or succeeds together
-        const savedLogs = await atomicUpdate<MeetingLog[]>(MEETINGS_LOG, async (logs) => {
+        await atomicUpdate<MeetingLog[]>(MEETINGS_LOG, async (logs) => {
           const updated = [...logs, log]
 
           // Log to brain as part of atomic operation

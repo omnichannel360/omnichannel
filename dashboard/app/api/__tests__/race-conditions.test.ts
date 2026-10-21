@@ -155,9 +155,8 @@ describe('API Route Race Condition Integration Tests', () => {
           .map(() =>
             atomicUpdate(tasksFile, async (current) => {
               const data = current as typeof counter
-              const updated = { value: (typeof data?.value === 'number' ? data.value : 0) + 1 }
-              return { updated, result: updated.value }
-            })
+              return { value: (typeof data?.value === 'number' ? data.value : 0) + 1 }
+            }, { value: 0 })
           )
       )
 
@@ -178,13 +177,10 @@ describe('API Route Race Condition Integration Tests', () => {
           .fill(null)
           .map((_, i) =>
             atomicUpdate(path.join(brainDir, `memory-${i}.json`), async () => ({
-              updated: {
-                id: `mem-${i}`,
-                timestamp: new Date().toISOString(),
-                category: 'test',
-              },
-              result: undefined,
-            }))
+              id: `mem-${i}`,
+              timestamp: new Date().toISOString(),
+              category: 'test',
+            }), {})
           )
       )
 
@@ -199,10 +195,7 @@ describe('API Route Race Condition Integration Tests', () => {
 
       // Pre-create some files
       for (let i = 0; i < 5; i++) {
-        await atomicUpdate(path.join(brainDir, `memory-${i}.json`), async () => ({
-          updated: { id: `mem-${i}` },
-          result: undefined,
-        }))
+        await atomicUpdate(path.join(brainDir, `memory-${i}.json`), async () => ({ id: `mem-${i}` }), {})
       }
 
       // Concurrent reads and writes
@@ -216,10 +209,7 @@ describe('API Route Race Condition Integration Tests', () => {
         ...Array(3)
           .fill(null)
           .map((_, i) =>
-            atomicUpdate(path.join(brainDir, `memory-${i + 5}.json`), async () => ({
-              updated: { id: `mem-${i + 5}` },
-              result: undefined,
-            }))
+            atomicUpdate(path.join(brainDir, `memory-${i + 5}.json`), async () => ({ id: `mem-${i + 5}` }), {})
           ),
       ])
 
@@ -247,9 +237,8 @@ describe('API Route Race Condition Integration Tests', () => {
                 status: 'scheduled',
                 log_index: i,
               }
-              const updated = [...existingLogs, newLog]
-              return { updated, result: newLog }
-            })
+              return [...existingLogs, newLog]
+            }, [])
           )
       )
 
@@ -271,31 +260,19 @@ describe('API Route Race Condition Integration Tests', () => {
 
       // Initialize files
       await Promise.all([
-        atomicUpdate(alertsFile, async () => ({ updated: [], result: undefined })),
-        atomicUpdate(tasksFile, async () => ({ updated: [], result: undefined })),
+        atomicUpdate(alertsFile, async () => [], []),
+        atomicUpdate(tasksFile, async () => [], []),
       ])
 
       // Concurrent operations on different files
       await Promise.all([
         // Alert operations
-        atomicUpdate(alertsFile, async (current) => ({
-          updated: [...(Array.isArray(current) ? current : []), { id: 'a1' }],
-          result: undefined,
-        })),
-        atomicUpdate(alertsFile, async (current) => ({
-          updated: [...(Array.isArray(current) ? current : []), { id: 'a2' }],
-          result: undefined,
-        })),
+        atomicUpdate(alertsFile, async (current) => [...(Array.isArray(current) ? current : []), { id: 'a1' }], []),
+        atomicUpdate(alertsFile, async (current) => [...(Array.isArray(current) ? current : []), { id: 'a2' }], []),
 
         // Task operations
-        atomicUpdate(tasksFile, async (current) => ({
-          updated: [...(Array.isArray(current) ? current : []), { id: 't1' }],
-          result: undefined,
-        })),
-        atomicUpdate(tasksFile, async (current) => ({
-          updated: [...(Array.isArray(current) ? current : []), { id: 't2' }],
-          result: undefined,
-        })),
+        atomicUpdate(tasksFile, async (current) => [...(Array.isArray(current) ? current : []), { id: 't1' }], []),
+        atomicUpdate(tasksFile, async (current) => [...(Array.isArray(current) ? current : []), { id: 't2' }], []),
       ])
 
       // Verify both files updated
@@ -319,8 +296,8 @@ describe('API Route Race Condition Integration Tests', () => {
                 throw new Error('Simulated error')
               }
               const arr = Array.isArray(current) ? current : []
-              return { updated: [...arr, i], result: undefined }
-            })
+              return [...arr, i]
+            }, [])
           )
       )
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration Test Suite: Race Conditions Across All APIs
  * Verifies that concurrent operations across alerts, brain, kanban, and meetings
  * APIs maintain data consistency when using atomic file operations.
@@ -332,3 +332,4 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
     })
   })
 })
+

@@ -104,7 +104,13 @@ describe('UUID Generation', () => {
       prefixes.forEach(prefix => {
         const id = generatePrefixedId(prefix)
         expect(id.startsWith(`${prefix}_`)).toBe(true)
-        expect(id.split('_').length).toBe(2)
+        // Extract UUID part by removing prefix and underscore
+        const uuidPart = id.substring(prefix.length + 1)
+        // UUID should be 36 characters (standard UUID format)
+        expect(uuidPart).toHaveLength(36)
+        // UUID should match RFC 4122 v4 format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        expect(uuidPart).toMatch(uuidRegex)
       })
     })
 
