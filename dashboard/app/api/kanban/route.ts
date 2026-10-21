@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 
@@ -27,21 +27,39 @@ async function loadTasks(): Promise<Task[]> {
   try {
     await fs.access(DATA_FILE)
     const data = await fs.readFile(DATA_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
+    try {
+      return JSON.parse(data)
+    } catch (parseError) {
+      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      console.error('[KanbanAPI] JSON parse error:', message)
+      // Return defaults on parse error
+      const defaults: Task[] = [
+        { id: crypto.randomUUID(), title: 'Complete API design', status: 'done' },
+        { id: crypto.randomUUID(), title: 'Implement authentication', status: 'in-progress' },
+        { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
+      ]
+      await fs.writeFile(DATA_FILE, JSON.stringify(defaults, null, 2), 'utf-8')
+      return defaults
+    }
+  } catch (error) {
     const defaults: Task[] = [
       { id: crypto.randomUUID(), title: 'Complete API design', status: 'done' },
       { id: crypto.randomUUID(), title: 'Implement authentication', status: 'in-progress' },
       { id: crypto.randomUUID(), title: 'Write tests', status: 'todo' },
     ]
-    await fs.writeFile(DATA_FILE, JSON.stringify(defaults, null, 2))
+    await fs.writeFile(DATA_FILE, JSON.stringify(defaults, null, 2), 'utf-8')
     return defaults
   }
 }
 
-async function saveTasks(tasks: Task[]) {
-  await ensureDataDir()
-  await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2))
+async function saveTasks(tasks: Task[]): Promise<void> {
+  try {
+    await ensureDataDir()
+    await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2), 'utf-8')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`Failed to save tasks: ${message}`)
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -51,7 +69,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tasks = loadTasks()
+    const tasks = await loadTasks()
     return NextResponse.json({ success: true, data: tasks })
   } catch (error) {
     return NextResponse.json(
@@ -67,26 +85,35 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
+  let body: unknown
   try {
-    const body = await request.json()
-    const { title, status = 'todo' } = body
+    body = await request.json()
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
 
-    if (!title) {
-      return NextResponse.json(
-        { success: false, error: 'Title required' },
-        { status: 400 }
-      )
-    }
+  const { title, status = 'todo' } = body as Record<string, unknown>
 
-    const tasks = loadTasks()
+  if (!title) {
+    return NextResponse.json(
+      { success: false, error: 'Title required' },
+      { status: 400 }
+    )
+  }
+
+  try {
+    const tasks = await loadTasks()
     const newTask: Task = {
       id: Date.now().toString(),
-      title,
-      status,
+      title: String(title),
+      status: String(status) as 'todo' | 'in-progress' | 'done',
     }
 
     tasks.push(newTask)
-    saveTasks(tasks)
+    await saveTasks(tasks)
 
     return NextResponse.json({ success: true, data: newTask }, { status: 201 })
   } catch (error) {
@@ -103,18 +130,27 @@ export async function PUT(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
+  let body: unknown
   try {
-    const body = await request.json()
-    const { id, ...updates } = body
+    body = await request.json()
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'ID required' },
-        { status: 400 }
-      )
-    }
+  const { id, ...updates } = body as Record<string, unknown>
 
-    const tasks = loadTasks()
+  if (!id) {
+    return NextResponse.json(
+      { success: false, error: 'ID required' },
+      { status: 400 }
+    )
+  }
+
+  try {
+    const tasks = await loadTasks()
     const task = tasks.find(t => t.id === id)
 
     if (!task) {
@@ -125,7 +161,7 @@ export async function PUT(request: NextRequest) {
     }
 
     Object.assign(task, updates)
-    saveTasks(tasks)
+    await saveTasks(tasks)
 
     return NextResponse.json({ success: true, data: task })
   } catch (error) {
@@ -153,7 +189,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const tasks = loadTasks()
+    const tasks = await loadTasks()
     const filtered = tasks.filter(t => t.id !== id)
 
     if (filtered.length === tasks.length) {
@@ -163,7 +199,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    saveTasks(filtered)
+    await saveTasks(filtered)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json(

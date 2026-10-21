@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { AlertCreateSchema, AlertUpdateSchema, generateId } from '@/lib/validation'
@@ -15,25 +15,43 @@ interface Alert {
 
 const ALERTS_LOG = path.join(process.cwd(), 'data', 'alerts.json')
 
-function ensureAlertsFile() {
+async function ensureAlertsFile() {
   const dir = path.dirname(ALERTS_LOG)
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-  if (!fs.existsSync(ALERTS_LOG)) fs.writeFileSync(ALERTS_LOG, JSON.stringify([], null, 2))
+  try {
+    await fs.mkdir(dir, { recursive: true })
+    const exists = await fs.stat(ALERTS_LOG).catch(() => null)
+    if (!exists) {
+      await fs.writeFile(ALERTS_LOG, JSON.stringify([], null, 2), 'utf-8')
+    }
+  } catch (error) {
+    console.error('[AlertsAPI] Error ensuring alerts file:', error)
+  }
 }
 
-function loadAlerts(): Alert[] {
-  ensureAlertsFile()
+async function loadAlerts(): Promise<Alert[]> {
+  await ensureAlertsFile()
   try {
-    const data = fs.readFileSync(ALERTS_LOG, 'utf-8')
-    return JSON.parse(data)
+    const data = await fs.readFile(ALERTS_LOG, 'utf-8')
+    try {
+      return JSON.parse(data)
+    } catch (parseError) {
+      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      console.error('[AlertsAPI] JSON parse error:', message)
+      return []
+    }
   } catch {
     return []
   }
 }
 
-async function saveAlerts(alerts: Alert[]) {
-  await ensureAlertsFile()
-  await fs.writeFile(ALERTS_LOG, JSON.stringify(alerts, null, 2))
+async function saveAlerts(alerts: Alert[]): Promise<void> {
+  try {
+    await ensureAlertsFile()
+    await fs.writeFile(ALERTS_LOG, JSON.stringify(alerts, null, 2))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`Failed to save alerts: ${message}`)
+  }
 }
 
 function createAlert(level: Alert['level'], component: string, message: string): Alert {
@@ -53,7 +71,7 @@ export async function GET(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const alerts = loadAlerts()
+  const alerts = await loadAlerts()
   const activeOnly = request.nextUrl.searchParams.get('active') === 'true'
 
   return NextResponse.json({
@@ -69,7 +87,17 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const parsedBody = AlertCreateSchema.safeParse(await request.json().catch(() => null))
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
+
+  const parsedBody = AlertCreateSchema.safeParse(body)
   if (!parsedBody.success) {
     return NextResponse.json(
       { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
@@ -79,10 +107,10 @@ export async function POST(request: NextRequest) {
 
   const { level, component, message } = parsedBody.data
   const alert = createAlert(level, component, message)
-  const alerts = loadAlerts()
+  const alerts = await loadAlerts()
 
   alerts.push(alert)
-  saveAlerts(alerts)
+  await saveAlerts(alerts)
 
   return NextResponse.json({ success: true, alert }, { status: 201 })
 }
@@ -93,7 +121,17 @@ export async function PATCH(request: NextRequest) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
   }
 
-  const parsedBody = AlertUpdateSchema.safeParse(await request.json().catch(() => null))
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
+
+  const parsedBody = AlertUpdateSchema.safeParse(body)
   if (!parsedBody.success) {
     return NextResponse.json(
       { success: false, error: 'Invalid request', details: parsedBody.error.flatten().fieldErrors },
@@ -103,7 +141,7 @@ export async function PATCH(request: NextRequest) {
 
   const { alert_id, status } = parsedBody.data
 
-  const alerts = loadAlerts()
+  const alerts = await loadAlerts()
   const alert = alerts.find(a => a.id === alert_id)
 
   if (!alert) {
@@ -111,7 +149,14 @@ export async function PATCH(request: NextRequest) {
   }
 
   alert.status = status
-  saveAlerts(alerts)
+  try {
+    await saveAlerts(alerts)
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Failed to update alert' },
+      { status: 500 }
+    )
+  }
 
   return NextResponse.json({ success: true, alert })
 }
