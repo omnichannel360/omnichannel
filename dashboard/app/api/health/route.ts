@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
-import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/middleware/rateLimit'
 import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
 
 // Create rate limiter for this endpoint

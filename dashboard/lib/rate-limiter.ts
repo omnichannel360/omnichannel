@@ -1,192 +1,263 @@
 /**
- * Rate Limiter Implementation
- * Supports token bucket and sliding window algorithms
+ * Rate Limiter Implementation with Fixed Issues
+ * - Fixed: Immutability violations
+ * - Fixed: Window semantics (resetTime calculation)
+ * - Fixed: Memory leaks (interval cleanup)
+ * - Fixed: Type safety
+ * - Fixed: IP detection fallback
  */
 
+export type RateLimitTier = 'public' | 'authenticated' | 'premium'
+
+export interface RateLimitRecord {
+  count: number
+  resetTime: number
+  createdAt: number
+}
+
 export interface RateLimitConfig {
-  maxRequests: number
+  requestsPerWindow: number
   windowMs: number
-  message?: string
-  skipSuccessfulRequests?: boolean
-  skipFailedRequests?: boolean
+  tier: RateLimitTier
+  keyPrefix: string
+}
+
+export interface RateLimitResult {
+  allowed: boolean
+  remaining: number
+  resetAt: number
+  retryAfter?: number
 }
 
 export interface RateLimitStore {
-  increment(key: string): Promise<number>
+  increment(key: string): Promise<RateLimitRecord>
+  get(key: string): Promise<RateLimitRecord | null>
   reset(key: string): Promise<void>
-  get(key: string): Promise<number | null>
+  cleanup(): Promise<void>
 }
 
 /**
- * In-memory rate limit store
- * Suitable for single-server deployments
+ * In-memory rate limit store with proper immutability
+ * and automatic cleanup
  */
 export class InMemoryRateLimitStore implements RateLimitStore {
-  private store: Map<string, { count: number; resetTime: number }> = new Map()
+  private store: Map<string, RateLimitRecord> = new Map()
+  private cleanupInterval: NodeJS.Timeout | null = null
+  private readonly cleanupIntervalMs = 60000 // 1 minute
 
-  async increment(key: string): Promise<number> {
+  constructor(private readonly windowMs: number) {
+    this.startCleanup()
+  }
+
+  private startCleanup(): void {
+    this.cleanupInterval = setInterval(() => {
+      const now = Date.now()
+      const keysToDelete: string[] = []
+
+      for (const [key, record] of this.store.entries()) {
+        if (now > record.resetTime) {
+          keysToDelete.push(key)
+        }
+      }
+
+      keysToDelete.forEach((key) => this.store.delete(key))
+    }, this.cleanupIntervalMs)
+
+    // Allow process to exit even if cleanup interval is running
+    if (this.cleanupInterval.unref) {
+      this.cleanupInterval.unref()
+    }
+  }
+
+  async increment(key: string): Promise<RateLimitRecord> {
     const now = Date.now()
-    const record = this.store.get(key)
+    const existing = this.store.get(key)
 
-    if (!record || now > record.resetTime) {
-      // Reset window
-      this.store.set(key, { count: 1, resetTime: now + 60000 })
-      return 1
+    // Create new record immutably
+    const record: RateLimitRecord = existing
+      ? now > existing.resetTime
+        ? {
+            count: 1,
+            resetTime: now + this.windowMs,
+            createdAt: now,
+          }
+        : {
+            count: existing.count + 1,
+            resetTime: existing.resetTime,
+            createdAt: existing.createdAt,
+          }
+      : {
+          count: 1,
+          resetTime: now + this.windowMs,
+          createdAt: now,
+        }
+
+    this.store.set(key, record)
+    return record
+  }
+
+  async get(key: string): Promise<RateLimitRecord | null> {
+    const record = this.store.get(key)
+    const now = Date.now()
+
+    if (record && now > record.resetTime) {
+      this.store.delete(key)
+      return null
     }
 
-    record.count++
-    return record.count
+    return record || null
   }
 
   async reset(key: string): Promise<void> {
     this.store.delete(key)
   }
 
-  async get(key: string): Promise<number | null> {
-    const record = this.store.get(key)
-    if (!record) return null
-
-    const now = Date.now()
-    if (now > record.resetTime) {
-      this.store.delete(key)
-      return null
+  async cleanup(): Promise<void> {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval)
+      this.cleanupInterval = null
     }
-
-    return record.count
+    this.store.clear()
   }
 
-  // Cleanup expired entries every minute
-  startCleanup(): void {
-    setInterval(() => {
-      const now = Date.now()
-      for (const [key, record] of this.store.entries()) {
-        if (now > record.resetTime) {
-          this.store.delete(key)
-        }
-      }
-    }, 60000)
+  getSize(): number {
+    return this.store.size
   }
 }
 
 /**
- * Token Bucket Rate Limiter
- * Allows burst traffic while maintaining average rate limit
+ * Rate limiter with proper type safety and configuration
  */
-export class TokenBucketRateLimiter {
-  private config: RateLimitConfig
+export class RateLimiter {
   private store: RateLimitStore
 
-  constructor(config: RateLimitConfig, store: RateLimitStore) {
-    this.config = config
-    this.store = store
+  constructor(private readonly config: RateLimitConfig) {
+    this.store = new InMemoryRateLimitStore(config.windowMs)
   }
 
-  /**
-   * Generate rate limit key from request metadata
-   */
-  generateKey(
-    ip: string,
-    endpoint: string,
-    userId?: string
-  ): string {
-    if (userId) {
-      return `rate-limit:${endpoint}:${userId}`
-    }
-    return `rate-limit:${endpoint}:${ip}`
-  }
+  async check(ip: string, userId?: string, apiKey?: string): Promise<RateLimitResult> {
+    const key = this.buildKey(ip, userId, apiKey)
+    const record = await this.store.increment(key)
+    const now = Date.now()
 
-  /**
-   * Check if request is within rate limit
-   */
-  async isAllowed(key: string): Promise<{
-    allowed: boolean
-    remaining: number
-    resetTime: number
-  }> {
-    const count = await this.store.increment(key)
-    const remaining = Math.max(0, this.config.maxRequests - count)
-    const resetTime = Date.now() + this.config.windowMs
+    const allowed = record.count <= this.config.requestsPerWindow
+    const remaining = Math.max(0, this.config.requestsPerWindow - record.count)
+    const resetAt = record.resetTime
 
     return {
-      allowed: count <= this.config.maxRequests,
+      allowed,
       remaining,
-      resetTime,
+      resetAt,
+      retryAfter: allowed ? undefined : Math.ceil((resetAt - now) / 1000),
     }
   }
 
-  /**
-   * Get current count for a key
-   */
-  async getCount(key: string): Promise<number> {
-    const count = await this.store.get(key)
-    return count || 0
+  async reset(ip: string, userId?: string, apiKey?: string): Promise<void> {
+    const key = this.buildKey(ip, userId, apiKey)
+    await this.store.reset(key)
   }
 
-  /**
-   * Reset rate limit for a key
-   */
-  async resetKey(key: string): Promise<void> {
-    await this.store.reset(key)
+  private buildKey(ip: string, userId?: string, apiKey?: string): string {
+    const components: string[] = [this.config.keyPrefix]
+
+    if (userId) {
+      components.push('user', userId)
+    } else if (apiKey) {
+      components.push('key', apiKey)
+    } else {
+      // Use IP with validation
+      const safeIp = ip && ip.trim() ? ip : 'anonymous'
+      components.push('ip', safeIp)
+    }
+
+    return components.join(':')
+  }
+
+  async cleanup(): Promise<void> {
+    await this.store.cleanup()
   }
 }
 
 /**
  * Rate limit configuration presets for different endpoint types
  */
-export const RateLimitPresets = {
+export const RateLimitPresets: Record<string, RateLimitConfig> = {
   // Authentication endpoints - strict limits
   auth: {
-    maxRequests: 5,
+    requestsPerWindow: 5,
     windowMs: 60000, // 1 minute
-    message: 'Too many authentication attempts, please try again later',
-  } as RateLimitConfig,
+    tier: 'public',
+    keyPrefix: 'rl:auth',
+  },
 
   // Health check - no limit
   health: {
-    maxRequests: Number.MAX_SAFE_INTEGER,
+    requestsPerWindow: Number.MAX_SAFE_INTEGER,
     windowMs: 60000,
-    message: 'Rate limit exceeded',
-  } as RateLimitConfig,
+    tier: 'public',
+    keyPrefix: 'rl:health',
+  },
 
   // API endpoints - moderate limits
   api: {
-    maxRequests: 100,
+    requestsPerWindow: 100,
     windowMs: 15 * 60 * 1000, // 15 minutes
-    message: 'Too many requests, please try again later',
-  } as RateLimitConfig,
+    tier: 'authenticated',
+    keyPrefix: 'rl:api',
+  },
 
   // Public endpoints - lenient limits
   public: {
-    maxRequests: 1000,
+    requestsPerWindow: 1000,
     windowMs: 60 * 60 * 1000, // 1 hour
-    message: 'Rate limit exceeded',
-  } as RateLimitConfig,
+    tier: 'public',
+    keyPrefix: 'rl:public',
+  },
 
   // Webhook endpoints - strict limits
   webhook: {
-    maxRequests: 50,
+    requestsPerWindow: 50,
     windowMs: 60000, // 1 minute
-    message: 'Webhook rate limit exceeded',
-  } as RateLimitConfig,
+    tier: 'authenticated',
+    keyPrefix: 'rl:webhook',
+  },
+
+  // Premium tier - generous limits
+  premium: {
+    requestsPerWindow: 10000,
+    windowMs: 60 * 60 * 1000, // 1 hour
+    tier: 'premium',
+    keyPrefix: 'rl:premium',
+  },
 }
 
 /**
- * Extract client IP from request
- * Handles proxies and load balancers
+ * Extract client IP from request headers
+ * Handles proxies and load balancers safely
  */
-export function getClientIp(headers: Record<string, string | string[] | undefined>): string {
-  const forwarded = headers['x-forwarded-for']
+export function getClientIp(headers: HeadersInit | Record<string, string | string[] | undefined>): string {
+  const headerRecord: Record<string, string | string[] | undefined> = headers instanceof Headers
+    ? Object.fromEntries(headers.entries ? Array.from(headers.entries()) : Object.entries(headers))
+    : (headers as Record<string, string | string[] | undefined>)
+
+  const forwarded = headerRecord['x-forwarded-for']
   if (forwarded) {
-    const ips = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',')
-    return ips[0].trim()
+    const ipStr = typeof forwarded === 'string' ? forwarded : (Array.isArray(forwarded) ? forwarded[0] : '')
+    const ips = ipStr.split(',').map((ip) => ip.trim()).filter((ip) => ip.length > 0)
+    if (ips.length > 0) {
+      return ips[0]
+    }
   }
 
-  const realIp = headers['x-real-ip']
+  const realIp = headerRecord['x-real-ip']
   if (realIp) {
-    return typeof realIp === 'string' ? realIp : realIp[0]
+    const ip = typeof realIp === 'string' ? realIp : (Array.isArray(realIp) ? realIp[0] : '')
+    if (ip && ip.trim()) {
+      return ip.trim()
+    }
   }
 
-  return 'unknown'
+  return 'anonymous'
 }
 
 /**
@@ -199,8 +270,8 @@ export function createRateLimitHeaders(
 ): Record<string, string> {
   return {
     'RateLimit-Limit': String(limit),
-    'RateLimit-Remaining': String(remaining),
+    'RateLimit-Remaining': String(Math.max(0, remaining)),
     'RateLimit-Reset': String(Math.ceil(resetTime / 1000)),
-    'Retry-After': String(Math.ceil((resetTime - Date.now()) / 1000)),
+    'Retry-After': String(Math.max(1, Math.ceil((resetTime - Date.now()) / 1000))),
   }
 }

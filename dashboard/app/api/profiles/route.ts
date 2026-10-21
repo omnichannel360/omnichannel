@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface AgentProfile {
   name: string
@@ -21,6 +22,10 @@ function inferRoleFromName(name: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'profiles')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')

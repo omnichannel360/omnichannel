@@ -5,6 +5,7 @@ import { MeetingRequestSchema, MeetingTypeSchema, SkillTypeSchema, MeetingStatus
 import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
 import { withFileLock } from '@/lib/file-lock'
+import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 
 interface Meeting {
   id: string
@@ -147,6 +148,10 @@ function parseMeetingFromMessage(message: string, registry: SkillRegistry | null
 }
 
 export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'meetings')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')
@@ -178,6 +183,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitError = await applyRateLimit(request, 'meetings')
+  if (rateLimitError) return rateLimitError
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated) {
     return createUnauthorizedResponse(auth.error || 'Authentication required')

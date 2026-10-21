@@ -13,28 +13,15 @@ export function generateUUIDv4(): string {
     array[6] = (array[6] & 0x0f) | 0x40
     array[8] = (array[8] & 0x3f) | 0x80
 
+    // Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    const hex = Array.from(array, b => b.toString(16).padStart(2, '0')).join('')
     return [
-      array[0].toString(16).padStart(2, '0'),
-      array[1].toString(16).padStart(2, '0'),
-      array[2].toString(16).padStart(2, '0'),
-      array[3].toString(16).padStart(2, '0'),
-      array[4].toString(16).padStart(2, '0'),
-      array[5].toString(16).padStart(2, '0'),
-      array[6].toString(16).padStart(2, '0'),
-      array[7].toString(16).padStart(2, '0'),
-      '-',
-      array[8].toString(16).padStart(2, '0'),
-      array[9].toString(16).padStart(2, '0'),
-      '-',
-      array[10].toString(16).padStart(2, '0'),
-      array[11].toString(16).padStart(2, '0'),
-      '-',
-      array[12].toString(16).padStart(2, '0'),
-      array[13].toString(16).padStart(2, '0'),
-      '-',
-      array[14].toString(16).padStart(2, '0'),
-      array[15].toString(16).padStart(2, '0'),
-    ].join('')
+      hex.substring(0, 8),
+      hex.substring(8, 12),
+      hex.substring(12, 16),
+      hex.substring(16, 20),
+      hex.substring(20, 32),
+    ].join('-')
   }
 
   // Fallback for environments without crypto.getRandomValues
