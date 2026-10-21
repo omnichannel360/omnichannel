@@ -9,6 +9,16 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import jwt from 'jsonwebtoken'
 import { logger } from './lib/logger'
 
+/**
+ * JWT payload type for decoded tokens
+ * Ensures type-safe JWT verification without `as any` assertions
+ */
+interface JWTPayload {
+  sub: string
+  email: string
+  role: 'admin' | 'user' | 'viewer'
+}
+
 declare module 'next-auth' {
   interface Session {
     user: {
@@ -78,7 +88,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           // If tokens are provided directly (from existing JWT flow)
           if (credentials?.accessToken) {
-            const decoded = jwt.verify(credentials.accessToken, JWT_SECRET) as any
+            const decoded = jwt.verify(credentials.accessToken, JWT_SECRET) as JWTPayload
 
             return {
               id: decoded.sub,
