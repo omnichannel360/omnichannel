@@ -132,11 +132,10 @@ export async function validateCsrfMiddleware(
       } catch (error) {
         // Body parse error - token MUST be in header (not in body)
         // Log for audit/security monitoring
-        const parseError = error instanceof Error ? error.message : 'Unknown parse error'
-        console.warn('[CSRF] Request body parse failed, enforcing header token validation', {
+        logger.warn('Request body parse failed, enforcing header token validation', {
           method: request.method,
           path: request.nextUrl.pathname,
-          error: parseError
+          error: error instanceof Error ? error.message : 'Unknown parse error'
         })
         // tokenFromBody remains null - CSRF verification will require header token
       }

@@ -92,18 +92,14 @@ async function logToBrain(log: MeetingLog): Promise<void> {
   const fileName = `${safeType}_${safeSkill}_${id}.json`
 
   // DEFENSE LAYER 4: Explicit basename validation (defense-in-depth)
-  // Ensures fileName contains NO directory separators
-  // This prevents attackers from injecting ../ or other path traversal attempts
-  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('..')) {
-    throw new Error(`Invalid filename: contains path separators`)
-  }
-  if (path.dirname(fileName) !== '.') {
-    throw new Error(`Invalid filename: constructed path component detected`)
-  }
+  // DEFENSE: Prevent path traversal by ensuring resolved path stays within base directory
+  // Use path.resolve() to normalize the path and then verify it's within brainDir
+  const filePath = path.resolve(brainDir, fileName)
 
-  // DEFENSE LAYER 5: Use safeJoin to prevent any path traversal attempts
-  // This performs final validation (containment check)
-  const filePath = safeJoin(brainDir, fileName)
+  // Ensure the resolved path starts with the base directory (prevents ../ escapes)
+  if (!filePath.startsWith(path.resolve(brainDir) + path.sep) && filePath !== path.resolve(brainDir)) {
+    throw new Error(`Invalid filename: path traversal detected`)
+  }
 
   const brainRecord = {
     id,

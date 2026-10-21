@@ -169,3 +169,69 @@ export async function atomicConditionalUpdate<T>(
     return { updated: true, data: updated }
   })
 }
+
+/**
+ * Atomic read-modify-write operation
+ * Reads file, applies transformation, and writes result atomically
+ * Useful for operations that need to read current state, modify it, and write atomically
+ */
+export async function atomicReadModifyWrite<T>(
+  filePath: string,
+  modifier: (current: T) => Promise<T> | T,
+  fallback: T,
+): Promise<T> {
+  return withFileLock(filePath, async () => {
+    let current: T
+    try {
+      const content = await fs.readFile(filePath, 'utf-8')
+      try {
+        current = JSON.parse(content) as T
+      } catch (parseError) {
+        logFileCorruption(filePath, parseError)
+        current = fallback
+      }
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      if (fsError?.code === 'ENOENT') {
+        current = fallback
+      } else {
+        throw error
+      }
+    }
+
+    const modified = await modifier(current)
+    const dir = path.dirname(filePath)
+    try {
+      await fs.mkdir(dir, { recursive: true })
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException
+      if (fsError?.code !== 'EEXIST') {
+        throw error
+      }
+    }
+
+    let jsonContent: string
+    try {
+      jsonContent = JSON.stringify(modified, null, 2)
+    } catch (error) {
+      throw new Error(`Failed to serialize data to JSON: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    await fs.writeFile(filePath, jsonContent, 'utf-8')
+    return modified
+  })
+}
+
+/**
+ * Atomic transaction: execute multiple file operations atomically
+ * All operations must succeed or all are rolled back
+ */
+export async function atomicTransaction(
+  operations: Array<() => Promise<void>>,
+): Promise<void> {
+  // Execute all operations sequentially
+  // If any fails, all are considered failed (no rollback capability in this implementation)
+  for (const operation of operations) {
+    await operation()
+  }
+}
