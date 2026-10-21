@@ -40,9 +40,6 @@ export function verifyCsrfToken(
 
   // Use timing-safe comparison
   const token = tokenFromHeader || tokenFromBody
-  if (!token) {
-    return { valid: false, error: 'CSRF token missing' }
-  }
 
   try {
     const tokenBuffer = Buffer.from(token)

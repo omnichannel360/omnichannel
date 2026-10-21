@@ -312,8 +312,6 @@ export async function validateQuery<T>(
         logger.warn('Query validation failed', {
           path: request.nextUrl.pathname,
           method: request.method,
-          // SECURITY: Don't log raw query parameters - may contain sensitive data
-          // queryKeys: Object.keys(queryObject), // Log keys only, not values
           errors: validationErrors,
         })
 

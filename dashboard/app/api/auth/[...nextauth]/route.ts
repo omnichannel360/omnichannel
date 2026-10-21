@@ -20,21 +20,21 @@ const { GET: nextAuthGet, POST: nextAuthPost } = handlers
 /**
  * Wrap GET handler with rate limiting
  */
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest, context: { params: { nextauth: string[] } }) {
   // Apply rate limiting to NextAuth endpoints
   const rateLimitError = await applyRateLimit(request, 'auth')
   if (rateLimitError) return rateLimitError
 
-  return nextAuthGet(request)
+  return nextAuthGet(request, context)
 }
 
 /**
  * Wrap POST handler with rate limiting
  */
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest, context: { params: { nextauth: string[] } }) {
   // Apply rate limiting to NextAuth endpoints
   const rateLimitError = await applyRateLimit(request, 'auth')
   if (rateLimitError) return rateLimitError
 
-  return nextAuthPost(request)
+  return nextAuthPost(request, context)
 }
