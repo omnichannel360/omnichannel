@@ -1,5 +1,7 @@
 'use client'
 
+import { useMemo } from 'react'
+
 interface AgentDossierProps {
   agentId: string
 }
@@ -11,20 +13,82 @@ interface AgentMetrics {
   lastActive: string
 }
 
+interface ActivityLog {
+  id: string
+  message: string
+  timestamp: string
+  type: 'success' | 'processing' | 'info'
+}
+
+interface MetricCardProps {
+  label: string
+  value: string | number
+  className: string
+  borderColor?: string
+}
+
+// Extracted component to eliminate duplication
+function MetricCard({ label, value, className, borderColor = 'border-gray-200' }: MetricCardProps): JSX.Element {
+  return (
+    <div className={`${className} rounded-lg p-4 border ${borderColor}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide mb-1">
+        {label}
+      </p>
+      <p className="text-2xl font-bold">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+// Memoized function for status color - moved outside component
+function getStatusColor(successRate: number): string {
+  // Input validation: handle edge cases
+  if (typeof successRate !== 'number' || isNaN(successRate) || !isFinite(successRate)) {
+    return 'text-red-600'
+  }
+
+  // Clamp to valid percentage range
+  const validRate = Math.max(0, Math.min(100, successRate))
+
+  if (validRate >= 95) return 'text-green-600'
+  if (validRate >= 85) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
 export function AgentDossier({ agentId }: AgentDossierProps) {
-  // Mock data - replace with real data source
-  const metrics: AgentMetrics = {
+  // TODO: Replace with real data source fetching based on agentId
+  // This would typically be a useFetch hook or server component data
+  const metrics: AgentMetrics = useMemo(() => ({
     tasksCompleted: 127,
     successRate: 94.2,
     averageResponseTime: 1.2,
     lastActive: '2 minutes ago'
-  }
+  }), [agentId])
 
-  const getStatusColor = (successRate: number): string => {
-    if (successRate >= 95) return 'text-green-600'
-    if (successRate >= 85) return 'text-yellow-600'
-    return 'text-red-600'
-  }
+  // TODO: Replace with real activity data fetching based on agentId
+  const activities: ActivityLog[] = useMemo(() => [
+    {
+      id: 'activity-1',
+      message: 'Task #127 completed successfully',
+      timestamp: '5 minutes ago',
+      type: 'success'
+    },
+    {
+      id: 'activity-2',
+      message: 'Started processing Task #128',
+      timestamp: '2 minutes ago',
+      type: 'processing'
+    },
+    {
+      id: 'activity-3',
+      message: 'Connected to orchestrator',
+      timestamp: '10 minutes ago',
+      type: 'info'
+    }
+  ], [agentId])
+
+  const statusColorClass = getStatusColor(metrics.successRate)
 
   return (
     <article className="w-full max-w-2xl mx-auto p-6">
@@ -40,7 +104,11 @@ export function AgentDossier({ agentId }: AgentDossierProps) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 bg-green-500 rounded-full"></span>
+            <span
+              className="inline-block w-3 h-3 bg-green-500 rounded-full"
+              aria-label="Agent status: Active"
+              role="img"
+            ></span>
             <span className="text-sm font-medium text-gray-700">Active</span>
           </div>
         </div>
@@ -48,35 +116,28 @@ export function AgentDossier({ agentId }: AgentDossierProps) {
 
       {/* Metrics Grid */}
       <section className="grid grid-cols-3 gap-4 mb-6">
-        {/* Tasks Completed */}
-        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">
-            Tasks Completed
-          </p>
-          <p className="text-2xl font-bold text-blue-900">
-            {metrics.tasksCompleted}
-          </p>
-        </div>
+        <MetricCard
+          label="Tasks Completed"
+          value={metrics.tasksCompleted}
+          className="bg-blue-50 text-blue-900"
+          borderColor="border-blue-200"
+        />
 
-        {/* Success Rate */}
         <div className="bg-green-50 rounded-lg p-4 border border-green-200">
           <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">
             Success Rate
           </p>
-          <p className={`text-2xl font-bold ${getStatusColor(metrics.successRate)}`}>
+          <p className={`text-2xl font-bold ${statusColorClass}`}>
             {metrics.successRate}%
           </p>
         </div>
 
-        {/* Avg Response Time */}
-        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-          <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">
-            Avg Response (s)
-          </p>
-          <p className="text-2xl font-bold text-purple-900">
-            {metrics.averageResponseTime}
-          </p>
-        </div>
+        <MetricCard
+          label="Avg Response (s)"
+          value={metrics.averageResponseTime}
+          className="bg-purple-50 text-purple-900"
+          borderColor="border-purple-200"
+        />
       </section>
 
       {/* Performance Details */}
@@ -110,33 +171,44 @@ export function AgentDossier({ agentId }: AgentDossierProps) {
           Recent Activities
         </h2>
         <div className="space-y-3">
-          <div className="flex items-start gap-3 p-3 bg-green-50 rounded border border-green-200">
-            <span className="inline-block w-2 h-2 bg-green-600 rounded-full mt-2"></span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">
-                Task #127 completed successfully
-              </p>
-              <p className="text-xs text-gray-600 mt-1">5 minutes ago</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-blue-50 rounded border border-blue-200">
-            <span className="inline-block w-2 h-2 bg-blue-600 rounded-full mt-2"></span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">
-                Started processing Task #128
-              </p>
-              <p className="text-xs text-gray-600 mt-1">2 minutes ago</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-gray-50 rounded border border-gray-200">
-            <span className="inline-block w-2 h-2 bg-gray-400 rounded-full mt-2"></span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">
-                Connected to orchestrator
-              </p>
-              <p className="text-xs text-gray-600 mt-1">10 minutes ago</p>
-            </div>
-          </div>
+          {activities.map((activity) => {
+            const bgColorMap = {
+              success: 'bg-green-50 border-green-200',
+              processing: 'bg-blue-50 border-blue-200',
+              info: 'bg-gray-50 border-gray-200'
+            }
+
+            const dotColorMap = {
+              success: 'bg-green-600',
+              processing: 'bg-blue-600',
+              info: 'bg-gray-400'
+            }
+
+            const statusLabelMap = {
+              success: 'Success',
+              processing: 'Processing',
+              info: 'Information'
+            }
+
+            return (
+              <div
+                key={activity.id}
+                className={`flex items-start gap-3 p-3 rounded border ${bgColorMap[activity.type]}`}
+              >
+                <span
+                  className={`inline-block w-2 h-2 ${dotColorMap[activity.type]} rounded-full mt-2`}
+                  aria-label={`Activity status: ${statusLabelMap[activity.type]}`}
+                  role="img"
+                ></span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    {activity.message}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">{activity.timestamp}</p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </section>
     </article>
