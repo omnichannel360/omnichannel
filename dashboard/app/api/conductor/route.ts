@@ -1,13 +1,21 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { withFileLock } from '@/lib/file-lock'
 import { ensureDataDir } from '@/lib/ensure-dir'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { createLogger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { ConductorRequestSchemaComprehensive, type ConductorRequestMessage } from '@/lib/validation/schemas'
+import { protectRouteMulti } from '@/lib/protected-route'
+import {
+  extractCorrelationFromRequest,
+  createErrorResponse,
+  createSuccessResponse,
+  ERROR_CODES,
+  formatErrorLog,
+  getErrorDetails,
+} from '@/lib/error-handling'
 
 const logger = createLogger('conductor-api')
 
@@ -26,24 +34,31 @@ interface SkillRegistry {
 const LOG_FILE = path.join(process.cwd(), 'data', 'conductor-logs.json')
 const SKILL_REGISTRY_PATH = path.join(process.cwd(), '..', 'skills', 'registry.json')
 
-async function loadSkillRegistry(): Promise<SkillRegistry | null> {
+async function loadSkillRegistry(requestId: string): Promise<SkillRegistry | null> {
   try {
     const data = await fs.readFile(SKILL_REGISTRY_PATH, 'utf-8')
     try {
       return JSON.parse(data)
     } catch (parseError) {
-      const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
-      console.error('[ConductorAPI] JSON parse error when loading skill registry:', message)
+      logger.error('Failed to parse skill registry', parseError, {
+        requestId,
+        operation: 'parse_skill_registry',
+        path: SKILL_REGISTRY_PATH,
+      })
       return null
     }
   } catch (readError) {
-    const message = readError instanceof Error ? readError.message : 'Unknown read error'
-    console.debug('[ConductorAPI] Skill registry file not found or unreadable:', message)
+    logger.warn('Failed to load skill registry', {
+      requestId,
+      operation: 'load_skill_registry',
+      path: SKILL_REGISTRY_PATH,
+      error: readError instanceof Error ? readError.message : String(readError),
+    })
     return null
   }
 }
 
-async function loadLogs(): Promise<ConversationLog[]> {
+async function loadLogs(requestId: string): Promise<ConversationLog[]> {
   return withFileLock(LOG_FILE, async () => {
     await ensureDataDir(path.dirname(LOG_FILE))
     try {
@@ -51,13 +66,19 @@ async function loadLogs(): Promise<ConversationLog[]> {
       try {
         return JSON.parse(data)
       } catch (parseError) {
-        const message = parseError instanceof Error ? parseError.message : 'Unknown parse error'
-        console.error('[ConductorAPI] JSON parse error when loading logs:', message)
+        logger.error('Failed to parse conductor logs', parseError, {
+          requestId,
+          operation: 'parse_conductor_logs',
+          path: LOG_FILE,
+        })
         return []
       }
     } catch (readError) {
-      const message = readError instanceof Error ? readError.message : 'Unknown read error'
-      console.error('[ConductorAPI] Error reading logs file:', message)
+      logger.error('Failed to read conductor logs', readError, {
+        requestId,
+        operation: 'read_conductor_logs',
+        path: LOG_FILE,
+      })
       return []
     }
   })
@@ -104,157 +125,142 @@ function parseTaskFromMessage(message: string): {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const startTime = Date.now()
-  const logContext = createLogContext({
-    method: request.method,
-    path: request.nextUrl.pathname,
-    operation: 'dispatch_task',
-  })
+const conductorHandlers = protectRouteMulti(
+  {
+    POST: async (request: NextRequest, { userId }) => {
+      const startTime = Date.now()
+      const logContext = createLogContext({
+        method: request.method,
+        path: request.nextUrl.pathname,
+        operation: 'dispatch_task',
+      })
 
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'conductor')
-  if (rateLimitError) {
-    logger.warn('Rate limit exceeded for conductor', {
-      ...logContext,
-      statusCode: 429,
-      responseTimeMs: Date.now() - startTime,
-    })
-    return rateLimitError
-  }
+      // Apply rate limiting
+      const rateLimitError = await applyRateLimit(request, 'conductor')
+      if (rateLimitError) {
+        logger.warn('Rate limit exceeded for conductor', {
+          ...logContext,
+          statusCode: 429,
+          responseTimeMs: Date.now() - startTime,
+        })
+        return rateLimitError
+      }
 
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    logger.warn('Unauthorized conductor access attempt', {
-      ...logContext,
-      statusCode: 401,
-      responseTimeMs: Date.now() - startTime,
-      error: auth.error,
-    })
-    return createUnauthorizedResponse(auth.error || 'Authentication required')
-  }
+      try {
+        // Validate request body with comprehensive Zod schema
+        const bodyResult = await validateBody<ConductorRequestMessage>(request, ConductorRequestSchemaComprehensive)
+        if (!bodyResult.success) {
+          return bodyResult.response
+        }
 
-  try {
-    // Validate request body with comprehensive Zod schema
-    const bodyResult = await validateBody<ConductorRequestMessage>(request, ConductorRequestSchemaComprehensive)
-    if (!bodyResult.success) {
-      return bodyResult.response
-    }
+        const { message } = bodyResult.data
 
-    const { message } = bodyResult.data
+        const registry = await loadSkillRegistry()
+        const skillId = findMatchingSkill(message, registry)
+        const task = parseTaskFromMessage(message)
 
-    const registry = await loadSkillRegistry()
-    const skillId = findMatchingSkill(message, registry)
-    const task = parseTaskFromMessage(message)
+        let response: string
+        let dispatchedSkills: string[] = []
+        let dispatchedAgents: string[] = []
 
-    let response: string
-    let dispatchedSkills: string[] = []
-    let dispatchedAgents: string[] = []
+        if (skillId) {
+          response = `Dispatching meeting skill: "${skillId}". Task logged and skill triggered.`
+          dispatchedSkills = [skillId]
+        } else if (task.agents.length > 0 && task.agents[0] !== 'conductor') {
+          response = `Dispatching "${task.action}" to: ${task.agents.join(', ')}. Task logged and agents notified.`
+          dispatchedAgents = task.agents
+        } else {
+          response = `Processing: ${task.action}. No specific agents assigned. Awaiting clarification.`
+        }
 
-    if (skillId) {
-      response = `Dispatching meeting skill: "${skillId}". Task logged and skill triggered.`
-      dispatchedSkills = [skillId]
-    } else if (task.agents.length > 0 && task.agents[0] !== 'conductor') {
-      response = `Dispatching "${task.action}" to: ${task.agents.join(', ')}. Task logged and agents notified.`
-      dispatchedAgents = task.agents
-    } else {
-      response = `Processing: ${task.action}. No specific agents assigned. Awaiting clarification.`
-    }
+        const logs = await loadLogs()
+        logs.push({
+          timestamp: new Date().toISOString(),
+          userMessage: message,
+          conductorResponse: response,
+          dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
+          dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
+        })
+        await saveLogs(logs)
 
-    const logs = await loadLogs()
-    logs.push({
-      timestamp: new Date().toISOString(),
-      userMessage: message,
-      conductorResponse: response,
-      dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
-      dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
-    })
-    await saveLogs(logs)
+        logger.info('Task dispatched successfully', {
+          ...logContext,
+          userId,
+          statusCode: 200,
+          responseTimeMs: Date.now() - startTime,
+          taskAction: task.action,
+          agentCount: dispatchedAgents.length,
+          skillCount: dispatchedSkills.length,
+        })
 
-    logger.info('Task dispatched successfully', {
-      ...logContext,
-      userId: auth.userId,
-      statusCode: 200,
-      responseTimeMs: Date.now() - startTime,
-      taskAction: task.action,
-      agentCount: dispatchedAgents.length,
-      skillCount: dispatchedSkills.length,
-    })
+        return NextResponse.json({
+          success: true,
+          response,
+          dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
+          dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
+        })
+      } catch (error) {
+        logger.error('Task dispatch failed', error, {
+          ...logContext,
+          userId,
+          statusCode: 500,
+          responseTimeMs: Date.now() - startTime,
+        })
+        return NextResponse.json(
+          { success: false, error: 'Failed to process request' },
+          { status: 500 }
+        )
+      }
+    },
 
-    return NextResponse.json({
-      success: true,
-      response,
-      dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
-      dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
-    })
-  } catch (error) {
-    logger.error('Task dispatch failed', error, {
-      ...logContext,
-      userId: auth.userId,
-      statusCode: 500,
-      responseTimeMs: Date.now() - startTime,
-    })
-    return NextResponse.json(
-      { success: false, error: 'Failed to process request' },
-      { status: 500 }
-    )
-  }
-}
+    GET: async (request: NextRequest, { userId }) => {
+      const startTime = Date.now()
+      const logContext = createLogContext({
+        method: request.method,
+        path: request.nextUrl.pathname,
+        operation: 'load_conductor_logs',
+      })
 
-export async function GET(request: NextRequest) {
-  const startTime = Date.now()
-  const logContext = createLogContext({
-    method: request.method,
-    path: request.nextUrl.pathname,
-    operation: 'load_conductor_logs',
-  })
+      // Apply rate limiting
+      const rateLimitError = await applyRateLimit(request, 'conductor')
+      if (rateLimitError) {
+        logger.warn('Rate limit exceeded for conductor logs', {
+          ...logContext,
+          statusCode: 429,
+          responseTimeMs: Date.now() - startTime,
+        })
+        return rateLimitError
+      }
 
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'conductor')
-  if (rateLimitError) {
-    logger.warn('Rate limit exceeded for conductor logs', {
-      ...logContext,
-      statusCode: 429,
-      responseTimeMs: Date.now() - startTime,
-    })
-    return rateLimitError
-  }
+      try {
+        const logs = await loadLogs()
+        logger.info('Conductor logs loaded successfully', {
+          ...logContext,
+          userId,
+          statusCode: 200,
+          responseTimeMs: Date.now() - startTime,
+          logCount: logs.length,
+        })
+        return NextResponse.json({
+          success: true,
+          data: logs,
+          meta: { total: logs.length },
+        })
+      } catch (error) {
+        logger.error('Failed to load conductor logs', error, {
+          ...logContext,
+          userId,
+          statusCode: 500,
+          responseTimeMs: Date.now() - startTime,
+        })
+        return NextResponse.json(
+          { success: false, error: 'Failed to load logs' },
+          { status: 500 }
+        )
+      }
+    },
+  },
+  { requireAuth: true, rateLimitKey: 'conductor' }
+)
 
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    logger.warn('Unauthorized conductor logs access attempt', {
-      ...logContext,
-      statusCode: 401,
-      responseTimeMs: Date.now() - startTime,
-      error: auth.error,
-    })
-    return createUnauthorizedResponse(auth.error || 'Authentication required')
-  }
-
-  try {
-    const logs = await loadLogs()
-    logger.info('Conductor logs loaded successfully', {
-      ...logContext,
-      userId: auth.userId,
-      statusCode: 200,
-      responseTimeMs: Date.now() - startTime,
-      logCount: logs.length,
-    })
-    return NextResponse.json({
-      success: true,
-      data: logs,
-      meta: { total: logs.length },
-    })
-  } catch (error) {
-    logger.error('Failed to load conductor logs', error, {
-      ...logContext,
-      userId: auth.userId,
-      statusCode: 500,
-      responseTimeMs: Date.now() - startTime,
-    })
-    return NextResponse.json(
-      { success: false, error: 'Failed to load logs' },
-      { status: 500 }
-    )
-  }
-}
+export const { POST, GET } = conductorHandlers

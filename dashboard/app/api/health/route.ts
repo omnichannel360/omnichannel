@@ -5,9 +5,18 @@ import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { HealthStatusResponseSchema, HealthComponentSchema, HealthQuerySchema } from '@/lib/validation'
 import { validateQuery } from '@/lib/validation/middleware'
-import { logger, createLogContext, LogContext } from '@/lib/logger'
+import { createLogger, createLogContext, LogContext } from '@/lib/logger'
 import { asyncRoute } from '@/lib/async-route'
-import { getOrCreateCorrelationId } from '@/lib/middleware/error-context'
+import {
+  getOrCreateCorrelationId,
+  createErrorResponse,
+  formatErrorLog,
+  ERROR_CODES,
+  createSuccessResponse,
+  getErrorDetails,
+} from '@/lib/error-handling'
+
+const logger = createLogger('health-api')
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy'
@@ -28,11 +37,18 @@ interface HealthStatus {
 }
 
 async function getCompanyBrainStats(): Promise<{ count: number; latest: string | null }> {
+  // IMPORTANT: correlationId parameter is required for all logging calls
   try {
     const brainDir = path.join(process.cwd(), '..', 'company-brain', 'meetings')
     try {
       await fs.stat(brainDir)
-    } catch {
+    } catch (error) {
+      logger.warn('Company brain directory not found', {
+        requestId: correlationId,
+        component: 'company_brain',
+        operation: 'stat_directory',
+        path: brainDir,
+      })
       return { count: 0, latest: null }
     }
 
@@ -48,8 +64,11 @@ async function getCompanyBrainStats(): Promise<{ count: number; latest: string |
         latestTimestamp = parsed.timestamp
       } catch (error) {
         logger.warn('Failed to parse company brain latest file', {
+          requestId: correlationId,
           component: 'company_brain',
           operation: 'parse_latest_timestamp',
+          file: latest,
+          error: error instanceof Error ? error.message : String(error),
         })
       }
     }
@@ -57,6 +76,7 @@ async function getCompanyBrainStats(): Promise<{ count: number; latest: string |
     return { count: files.length, latest: latestTimestamp }
   } catch (error) {
     logger.error('Failed to get company brain stats', error, {
+      requestId: correlationId,
       component: 'company_brain',
       operation: 'get_stats',
     })
@@ -64,12 +84,18 @@ async function getCompanyBrainStats(): Promise<{ count: number; latest: string |
   }
 }
 
-async function getMeetingsLogStats(): Promise<{ count: number; success_count: number }> {
+async function getMeetingsLogStats(correlationId: string): Promise<{ count: number; success_count: number }> {
   try {
     const logPath = path.join(process.cwd(), 'data', 'meetings-log.json')
     try {
       await fs.stat(logPath)
-    } catch {
+    } catch (error) {
+      logger.warn('Meetings log file not found', {
+        requestId: correlationId,
+        component: 'meetings_api',
+        operation: 'stat_file',
+        path: logPath,
+      })
       return { count: 0, success_count: 0 }
     }
 
@@ -77,6 +103,7 @@ async function getMeetingsLogStats(): Promise<{ count: number; success_count: nu
     const logs = JSON.parse(content)
     if (!Array.isArray(logs)) {
       logger.warn('Meetings log is not an array', {
+        requestId: correlationId,
         component: 'meetings_api',
         operation: 'parse_log',
         actualType: typeof logs,
@@ -88,14 +115,16 @@ async function getMeetingsLogStats(): Promise<{ count: number; success_count: nu
     return { count: logs.length, success_count: successCount }
   } catch (error) {
     logger.error('Failed to get meetings log stats', error, {
+      requestId: correlationId,
       component: 'meetings_api',
       operation: 'get_stats',
+      error: error instanceof Error ? error.message : String(error),
     })
     return { count: 0, success_count: 0 }
   }
 }
 
-async function getSkillRegistryStats(): Promise<number> {
+async function getSkillRegistryStats(correlationId: string): Promise<number> {
   try {
     const regPath = path.join(process.cwd(), '..', 'skills', 'registry.json')
     const content = await fs.readFile(regPath, 'utf-8')
@@ -103,8 +132,10 @@ async function getSkillRegistryStats(): Promise<number> {
     return registry.meeting_skills?.length || 0
   } catch (error) {
     logger.error('Failed to load skill registry', error, {
+      requestId: correlationId,
       component: 'skill_registry',
       operation: 'load_registry',
+      error: error instanceof Error ? error.message : String(error),
     })
     return 0
   }
@@ -138,14 +169,31 @@ function generateAlerts(
 }
 
 export async function GET(request: NextRequest) {
+  // Generate correlation ID for tracing
+  const correlationId = getOrCreateCorrelationId(request.headers.get('x-correlation-id'))
+
   // Health check should be public - no auth required
   // Apply rate limiting
   const rateLimitError = await applyRateLimit(request, 'health')
-  if (rateLimitError) return rateLimitError
+  if (rateLimitError) {
+    logger.warn('Rate limit exceeded for health check', {
+      requestId: correlationId,
+      method: request.method,
+      path: request.nextUrl.pathname,
+      statusCode: 429,
+    })
+    return rateLimitError
+  }
 
   // Validate query parameters
   const queryResult = await validateQuery(request, HealthQuerySchema)
   if (!queryResult.success) {
+    logger.warn('Health check query validation failed', {
+      requestId: correlationId,
+      method: request.method,
+      path: request.nextUrl.pathname,
+      error: queryResult.error?.toString() || 'Unknown validation error',
+    })
     return queryResult.response
   }
 
@@ -158,9 +206,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const [brainStats, meetingsStats, skillCount] = await Promise.all([
-      getCompanyBrainStats(),
-      getMeetingsLogStats(),
-      getSkillRegistryStats(),
+      getCompanyBrainStats(correlationId),
+      getMeetingsLogStats(correlationId),
+      getSkillRegistryStats(correlationId),
     ])
 
     const successRate = meetingsStats.count > 0 ? meetingsStats.success_count / meetingsStats.count : 0
@@ -201,19 +249,39 @@ export async function GET(request: NextRequest) {
     // Validate response against schema
     const validated = HealthStatusResponseSchema.safeParse(status)
     if (!validated.success) {
-      logger.error('Health response validation failed', new Error(JSON.stringify(validated.error)), {
-        ...logContext,
-        statusCode: 500,
-        responseTimeMs: Date.now() - startTime,
-      })
-      return NextResponse.json(
-        { success: false, error: 'Health check response validation failed' },
-        { status: 500 }
+      logger.error(
+        'Health response validation failed',
+        new Error(JSON.stringify(validated.error)),
+        formatErrorLog('Schema validation failed for health response', validated.error, {
+          requestId: correlationId,
+          ...logContext,
+          statusCode: 500,
+          responseTimeMs: Date.now() - startTime,
+          validationDetails: validated.error.issues.map(issue => ({
+            path: issue.path.join('.'),
+            message: issue.message,
+            code: issue.code,
+          })),
+        })
+      )
+
+      return createErrorResponse(
+        'Health check response validation failed',
+        ERROR_CODES.INTERNAL_ERROR,
+        correlationId,
+        500,
+        {
+          validationErrors: validated.error.issues.map(issue => ({
+            path: issue.path.join('.'),
+            message: issue.message,
+          })),
+        }
       )
     }
 
     const httpStatus = status.status === 'healthy' ? 200 : status.status === 'degraded' ? 200 : 503
     logger.info('Health check completed', {
+      requestId: correlationId,
       ...logContext,
       statusCode: httpStatus,
       responseTimeMs: Date.now() - startTime,
@@ -221,28 +289,31 @@ export async function GET(request: NextRequest) {
       alertCount: alerts.length,
     })
 
-    return NextResponse.json(validated.data, {
+    const response = NextResponse.json(validated.data, {
       status: httpStatus,
     })
+    response.headers.set('x-correlation-id', correlationId)
+    return response
   } catch (error) {
     const responseTimeMs = Date.now() - startTime
-    logger.error('Health check failed', error, {
-      ...logContext,
-      statusCode: 500,
-      responseTimeMs,
-      operation: 'health_check',
-    })
+    logger.error(
+      'Health check failed',
+      error,
+      formatErrorLog('Unhandled error during health check', error, {
+        requestId: correlationId,
+        ...logContext,
+        statusCode: 500,
+        responseTimeMs,
+        operation: 'health_check',
+      })
+    )
 
-    return NextResponse.json(
-      {
-        status: 'unhealthy',
-        timestamp: new Date().toISOString(),
-        error: 'Failed to check health',
-        components: {},
-        metrics: {},
-        alerts: ['❌ Health check failed'],
-      },
-      { status: 500 }
+    return createErrorResponse(
+      'Failed to check health',
+      ERROR_CODES.INTERNAL_ERROR,
+      correlationId,
+      500,
+      { responseTimeMs }
     )
   }
 }

@@ -8,6 +8,12 @@ import path from 'path'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { AlertSchema, type Alert as AlertType } from '@/lib/validation/schemas'
 import { protectRouteMulti, type RouteHandler } from '@/lib/protected-route'
+import {
+  extractCorrelationFromRequest,
+  createSuccessResponse,
+  handleRouteError,
+  formatErrorLog,
+} from '@/lib/error-handling'
 
 interface Alert {
   id: string
@@ -23,54 +29,85 @@ const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json')
 const alertHandlers = protectRouteMulti(
   {
     GET: async (request: NextRequest, { userId }) => {
+      const requestId = extractCorrelationFromRequest(request.headers)
+      const startTime = Date.now()
+
       // Apply rate limiting
       const rateLimitError = await applyRateLimit(request, 'alerts')
       if (rateLimitError) return rateLimitError
 
-      const startTime = Date.now()
       const logContext = createLogContext({
         method: request.method,
         path: request.nextUrl.pathname,
         userId,
         operation: 'load_alerts',
+        requestId,
       })
 
       try {
         const alerts = await atomicRead<Alert[]>(ALERTS_FILE, [])
+        const responseTime = Date.now() - startTime
+
         logger.info('Alerts loaded successfully', {
           ...logContext,
           statusCode: 200,
-          responseTimeMs: Date.now() - startTime,
+          responseTimeMs: responseTime,
           alertCount: alerts.length,
         })
-        return NextResponse.json({ success: true, alerts, total: alerts.length })
+
+        const response = NextResponse.json(
+          createSuccessResponse({ alerts, total: alerts.length }, requestId)
+        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       } catch (error) {
-        logger.error('Failed to load alerts', error, {
-          ...logContext,
-          statusCode: 500,
-          responseTimeMs: Date.now() - startTime,
+        const responseTime = Date.now() - startTime
+        const { response, statusCode } = handleRouteError(error, requestId, {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          userId,
+          operation: 'load_alerts',
         })
-        return NextResponse.json({ success: false, error: 'Failed to load alerts' }, { status: 500 })
+
+        logger.error('Failed to load alerts', error, formatErrorLog('Load alerts error', error, {
+          ...logContext,
+          statusCode,
+          responseTimeMs: responseTime,
+        }))
+
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
     },
 
     POST: async (request: NextRequest, { userId }) => {
+      const requestId = extractCorrelationFromRequest(request.headers)
+      const startTime = Date.now()
+
       // Apply rate limiting
       const rateLimitError = await applyRateLimit(request, 'alerts')
       if (rateLimitError) return rateLimitError
 
-      const startTime = Date.now()
       const logContext = createLogContext({
         method: request.method,
         path: request.nextUrl.pathname,
         userId,
         operation: 'create_alert',
+        requestId,
       })
 
       try {
         const bodyResult = await validateBody<AlertCreateBody>(request, AlertCreateBodySchema)
         if (!bodyResult.success) {
-          return bodyResult.response
+          const validationError = bodyResult.response as NextResponse
+          logger.warn('Alert creation validation failed', {
+            ...logContext,
+            statusCode: validationError.status,
+            responseTimeMs: Date.now() - startTime,
+          })
+          const resp = validationError.clone()
+          resp.headers.set('x-correlation-id', requestId)
+          return resp
         }
 
         const newAlert: Alert = {
@@ -86,50 +123,68 @@ const alertHandlers = protectRouteMulti(
           []
         )
 
+        const responseTime = Date.now() - startTime
         logger.info('Alert created successfully', {
           ...logContext,
           statusCode: 201,
-          responseTimeMs: Date.now() - startTime,
+          responseTimeMs: responseTime,
           alertId: newAlert.id,
         })
 
-        return NextResponse.json({ success: true, alert: newAlert }, { status: 201 })
+        const response = NextResponse.json(
+          createSuccessResponse({ alert: newAlert }, requestId),
+          { status: 201 }
+        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       } catch (error) {
-        let statusCode = 500
-        let errorMessage = 'Failed to create alert'
-
-        if (error instanceof SyntaxError) {
-          statusCode = 400
-          errorMessage = 'Invalid JSON in request body'
-        }
-
-        logger.error('Alert creation failed', error, {
-          ...logContext,
-          statusCode,
-          responseTimeMs: Date.now() - startTime,
+        const responseTime = Date.now() - startTime
+        const { response, statusCode } = handleRouteError(error, requestId, {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          userId,
+          operation: 'create_alert',
         })
 
-        return NextResponse.json({ success: false, error: errorMessage }, { status: statusCode })
+        logger.error('Alert creation failed', error, formatErrorLog('Create alert error', error, {
+          ...logContext,
+          statusCode,
+          responseTimeMs: responseTime,
+        }))
+
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
     },
 
     PATCH: async (request: NextRequest, { userId }) => {
+      const requestId = extractCorrelationFromRequest(request.headers)
+      const startTime = Date.now()
+
       // Apply rate limiting
       const rateLimitError = await applyRateLimit(request, 'alerts')
       if (rateLimitError) return rateLimitError
 
-      const startTime = Date.now()
       const logContext = createLogContext({
         method: request.method,
         path: request.nextUrl.pathname,
         userId,
         operation: 'update_alert',
+        requestId,
       })
 
       try {
         const bodyResult = await validateBody<AlertUpdateBody>(request, AlertUpdateBodySchema)
         if (!bodyResult.success) {
-          return bodyResult.response
+          const validationError = bodyResult.response as NextResponse
+          logger.warn('Alert update validation failed', {
+            ...logContext,
+            statusCode: validationError.status,
+            responseTimeMs: Date.now() - startTime,
+          })
+          const resp = validationError.clone()
+          resp.headers.set('x-correlation-id', requestId)
+          return resp
         }
 
         const { alert_id, status } = bodyResult.data
@@ -145,27 +200,38 @@ const alertHandlers = protectRouteMulti(
         )
 
         const updated = result.find((a) => a.id === alert_id)
+        const responseTime = Date.now() - startTime
 
         logger.info('Alert updated successfully', {
           ...logContext,
           statusCode: 200,
-          responseTimeMs: Date.now() - startTime,
+          responseTimeMs: responseTime,
           alertId: alert_id,
           newStatus: status,
         })
 
-        return NextResponse.json({ success: true, alert: updated })
+        const response = NextResponse.json(
+          createSuccessResponse({ alert: updated }, requestId)
+        )
+        response.headers.set('x-correlation-id', requestId)
+        return response
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to update alert'
-        const statusCode = message === 'Alert not found' ? 404 : 500
-
-        logger.error('Alert update failed', error, {
-          ...logContext,
-          statusCode,
-          responseTimeMs: Date.now() - startTime,
+        const responseTime = Date.now() - startTime
+        const { response, statusCode } = handleRouteError(error, requestId, {
+          method: request.method,
+          path: request.nextUrl.pathname,
+          userId,
+          operation: 'update_alert',
         })
 
-        return NextResponse.json({ success: false, error: message }, { status: statusCode })
+        logger.error('Alert update failed', error, formatErrorLog('Update alert error', error, {
+          ...logContext,
+          statusCode,
+          responseTimeMs: responseTime,
+        }))
+
+        response.headers.set('x-correlation-id', requestId)
+        return response
       }
     },
   },

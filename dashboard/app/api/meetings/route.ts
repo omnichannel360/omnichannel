@@ -4,10 +4,10 @@ import path from 'path'
 import { MeetingRequestSchema, MeetingTypeSchema, SkillTypeSchema, MeetingStatusSchema, generateId, safeJoin } from '@/lib/validation'
 import { validateBody } from '@/lib/validation/middleware'
 import { MeetingSchema, type Meeting as MeetingType } from '@/lib/validation/schemas'
-import { verifyAuth, createUnauthorizedResponse } from '@/lib/auth'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
 import { withFileLock } from '@/lib/file-lock'
 import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { protectRouteMulti } from '@/lib/protected-route'
 
 interface Meeting {
   id: string
@@ -149,129 +149,126 @@ function parseMeetingFromMessage(message: string, registry: SkillRegistry | null
   }
 }
 
-export async function GET(request: NextRequest) {
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'meetings')
-  if (rateLimitError) return rateLimitError
+const meetingHandlers = protectRouteMulti(
+  {
+    GET: async (request: NextRequest, { userId }) => {
+      // Apply rate limiting
+      const rateLimitError = await applyRateLimit(request, 'meetings')
+      if (rateLimitError) return rateLimitError
 
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    return createUnauthorizedResponse(auth.error || 'Authentication required')
-  }
+      try {
+        const meetings = await loadMeetingsConfig()
+        const logs = await loadMeetingLogs()
 
-  try {
-    const meetings = await loadMeetingsConfig()
-    const logs = await loadMeetingLogs()
+        const meetingsList = Object.values(meetings)
 
-    const meetingsList = Object.values(meetings)
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        meetings: meetingsList,
-        recentLogs: logs.slice(-10),
-      },
-      meta: {
-        total_meetings: meetingsList.length,
-        recent_logs: logs.length,
-      },
-    })
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Failed to load meetings' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function POST(request: NextRequest) {
-  // Apply rate limiting
-  const rateLimitError = await applyRateLimit(request, 'meetings')
-  if (rateLimitError) return rateLimitError
-
-  const auth = await verifyAuth(request)
-  if (!auth.authenticated) {
-    return createUnauthorizedResponse(auth.error || 'Authentication required')
-  }
-
-  try {
-    const bodyResult = await validateBody<any>(request, MeetingRequestSchema)
-    if (!bodyResult.success) {
-      return bodyResult.response
-    }
-    const { message, meeting_type, participants } = bodyResult.data
-
-    const registry = await loadSkillRegistry()
-
-    let parsed: { meeting_type: string | null; skill: string | null; description: string } = {
-      meeting_type: meeting_type || null,
-      skill: null,
-      description: message || '',
-    }
-
-    if (message) {
-      parsed = parseMeetingFromMessage(message, registry)
-    }
-
-    // SECURITY: Validate meeting_type against whitelist schema (Layer 1)
-    const validatedMeetingType = parsed.meeting_type
-      ? MeetingTypeSchema.safeParse(parsed.meeting_type)
-      : { success: false }
-    const safeMeetingType = validatedMeetingType.success
-      ? validatedMeetingType.data
-      : 'unknown'
-
-    // SECURITY: Validate skill_triggered against whitelist schema (Layer 2)
-    let safeSkill = 'none'
-    if (parsed.skill && parsed.skill !== 'none') {
-      const validatedSkill = SkillTypeSchema.safeParse(parsed.skill)
-      if (validatedSkill.success) {
-        safeSkill = validatedSkill.data
-      } else {
-        // Invalid skill detected - use safe default
-        // Silently reject invalid skills for security (don't echo back to user)
-        safeSkill = 'unknown'
+        return NextResponse.json({
+          success: true,
+          data: {
+            meetings: meetingsList,
+            recentLogs: logs.slice(-10),
+          },
+          meta: {
+            total_meetings: meetingsList.length,
+            recent_logs: logs.length,
+          },
+        })
+      } catch (error) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to load meetings' },
+          { status: 500 }
+        )
       }
-    }
+    },
 
-    const log: MeetingLog = {
-      timestamp: new Date().toISOString(),
-      meeting_type: safeMeetingType,
-      skill_triggered: safeSkill,
-      status: safeSkill !== 'unknown' && safeSkill !== 'none' ? 'scheduled' : 'failed',
-      participants: participants || [],
-      outcomes: {},
-    }
+    POST: async (request: NextRequest, { userId }) => {
+      // Apply rate limiting
+      const rateLimitError = await applyRateLimit(request, 'meetings')
+      if (rateLimitError) return rateLimitError
 
-    // FIX: ATOMIC OPERATION across both systems
-    // - Previous code: atomicUpdate() then logToBrain() (two separate operations)
-    // - Problem: If logToBrain fails, log is already saved but brain not updated (inconsistency)
-    // - Fixed: Both operations inside atomic update - fails together or succeeds together
-    const savedLog = await atomicUpdate<MeetingLog[], MeetingLog>(MEETINGS_LOG, async (logs) => {
-      const updated = [...logs, log]
+      try {
+        const bodyResult = await validateBody<any>(request, MeetingRequestSchema)
+        if (!bodyResult.success) {
+          return bodyResult.response
+        }
+        const { message, meeting_type, participants } = bodyResult.data
 
-      // Log to brain as part of atomic operation
-      // If logToBrain throws, entire atomicUpdate fails (no partial write)
-      await logToBrain(log)
+        const registry = await loadSkillRegistry()
 
-      return { updated, result: log }
-    })
+        let parsed: { meeting_type: string | null; skill: string | null; description: string } = {
+          meeting_type: meeting_type || null,
+          skill: null,
+          description: message || '',
+        }
 
-    // SECURITY: Return only validated data in response to prevent leaking unvalidated input
-    const response = safeSkill !== 'none' && safeSkill !== 'unknown'
-      ? `Dispatching meeting skill: ${safeSkill} for "${safeMeetingType}". Meeting logged and skill triggered.`
-      : `No meeting detected in message. Please specify a meeting type or use a meeting-related keyword.`
+        if (message) {
+          parsed = parseMeetingFromMessage(message, registry)
+        }
 
-    return NextResponse.json({
-      success: safeSkill !== 'none' && safeSkill !== 'unknown',
-      response,
-      meeting_type: safeMeetingType,
-      skill_triggered: safeSkill,
-    })
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Failed to process meeting request' },
-      { status: 500 }
-    )
-  }
-}
+        // SECURITY: Validate meeting_type against whitelist schema (Layer 1)
+        const validatedMeetingType = parsed.meeting_type
+          ? MeetingTypeSchema.safeParse(parsed.meeting_type)
+          : { success: false }
+        const safeMeetingType = validatedMeetingType.success
+          ? validatedMeetingType.data
+          : 'unknown'
+
+        // SECURITY: Validate skill_triggered against whitelist schema (Layer 2)
+        let safeSkill = 'none'
+        if (parsed.skill && parsed.skill !== 'none') {
+          const validatedSkill = SkillTypeSchema.safeParse(parsed.skill)
+          if (validatedSkill.success) {
+            safeSkill = validatedSkill.data
+          } else {
+            // Invalid skill detected - use safe default
+            // Silently reject invalid skills for security (don't echo back to user)
+            safeSkill = 'unknown'
+          }
+        }
+
+        const log: MeetingLog = {
+          timestamp: new Date().toISOString(),
+          meeting_type: safeMeetingType,
+          skill_triggered: safeSkill,
+          status: safeSkill !== 'unknown' && safeSkill !== 'none' ? 'scheduled' : 'failed',
+          participants: participants || [],
+          outcomes: {},
+        }
+
+        // FIX: ATOMIC OPERATION across both systems
+        // - Previous code: atomicUpdate() then logToBrain() (two separate operations)
+        // - Problem: If logToBrain fails, log is already saved but brain not updated (inconsistency)
+        // - Fixed: Both operations inside atomic update - fails together or succeeds together
+        const savedLog = await atomicUpdate<MeetingLog[], MeetingLog>(MEETINGS_LOG, async (logs) => {
+          const updated = [...logs, log]
+
+          // Log to brain as part of atomic operation
+          // If logToBrain throws, entire atomicUpdate fails (no partial write)
+          await logToBrain(log)
+
+          return { updated, result: log }
+        })
+
+        // SECURITY: Return only validated data in response to prevent leaking unvalidated input
+        const response = safeSkill !== 'none' && safeSkill !== 'unknown'
+          ? `Dispatching meeting skill: ${safeSkill} for "${safeMeetingType}". Meeting logged and skill triggered.`
+          : `No meeting detected in message. Please specify a meeting type or use a meeting-related keyword.`
+
+        return NextResponse.json({
+          success: safeSkill !== 'none' && safeSkill !== 'unknown',
+          response,
+          meeting_type: safeMeetingType,
+          skill_triggered: safeSkill,
+        })
+      } catch (error) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to process meeting request' },
+          { status: 500 }
+        )
+      }
+    },
+  },
+  { requireAuth: true, rateLimitKey: 'meetings' }
+)
+
+export const { GET, POST } = meetingHandlers

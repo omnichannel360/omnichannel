@@ -4,6 +4,11 @@ import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } fr
 import { logger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { TokenGenerationSchema, type TokenGeneration } from '@/lib/validation/schemas'
+import {
+  extractCorrelationFromRequest,
+  handleRouteError,
+  createSuccessResponse,
+} from '@/lib/error-handling'
 
 // Create rate limiter for this endpoint
 const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.auth)
@@ -16,6 +21,8 @@ const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.auth)
  * @returns { accessToken: string, refreshToken: string, expiresIn: number }
  */
 export async function POST(request: NextRequest) {
+  const requestId = extractCorrelationFromRequest(request.headers)
+
   // Apply rate limiting
   const rateLimitCheck = await rateLimitMiddleware(request)
   if (!rateLimitCheck.allowed) {
@@ -27,6 +34,7 @@ export async function POST(request: NextRequest) {
     method: request.method,
     path: request.nextUrl.pathname,
     operation: 'auth_token_generation',
+    requestId,
   })
 
   try {
@@ -49,12 +57,18 @@ export async function POST(request: NextRequest) {
       responseTimeMs: Date.now() - startTime,
     })
 
-    let response = NextResponse.json({
-      accessToken,
-      refreshToken,
-      expiresIn: 24 * 60 * 60, // 24 hours in seconds
-      tokenType: 'Bearer',
-    })
+    const successData = createSuccessResponse(
+      {
+        accessToken,
+        refreshToken,
+        expiresIn: 24 * 60 * 60, // 24 hours in seconds
+        tokenType: 'Bearer',
+      },
+      requestId
+    )
+
+    let response = NextResponse.json(successData)
+    response.headers.set('x-correlation-id', requestId)
 
     // Add rate limit headers to successful response
     response = addRateLimitHeaders(
@@ -66,17 +80,18 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to generate tokens'
-    logger.error('Auth token generation failed', error, {
-      ...logContext,
-      statusCode: 500,
-      responseTimeMs: Date.now() - startTime,
+    const responseTime = Date.now() - startTime
+    const { response, statusCode } = handleRouteError(error, requestId, {
+      method: request.method,
+      path: request.nextUrl.pathname,
+      operation: 'auth_token_generation',
     })
 
-    const response = NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    logger.error('Auth token generation failed', error, {
+      ...logContext,
+      statusCode,
+      responseTimeMs: responseTime,
+    })
 
     // Add rate limit headers even on error
     return addRateLimitHeaders(

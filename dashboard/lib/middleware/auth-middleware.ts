@@ -3,6 +3,12 @@
  * Provides decorator/wrapper pattern for protecting API endpoints
  * Ensures consistent auth validation across all routes
  *
+ * Features:
+ * - Correlation ID propagation
+ * - Structured error responses
+ * - Comprehensive logging with context
+ * - Role-based access control (RBAC)
+ *
  * Usage:
  * export const GET = withAuth(async (request, auth) => { ... })
  * export const POST = withAuth(handler, { requiredRole: 'admin' })
@@ -11,6 +17,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth, createUnauthorizedResponse, TokenPayload } from '@/lib/auth'
 import { createLogger, createLogContext, LogContext } from '@/lib/logger'
+import {
+  getOrCreateCorrelationId,
+  createErrorResponse,
+  ERROR_CODES,
+  formatErrorLog,
+} from '@/lib/error-handling'
 
 const logger = createLogger('auth-middleware')
 
@@ -38,39 +50,73 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 
 
 /**
  * Verify auth and return auth context
- * Logs unauthorized attempts
+ * Logs unauthorized attempts with correlation ID
  */
-export async function requireAuth(request: NextRequest): Promise<{
+export async function requireAuth(
+  request: NextRequest,
+  correlationId: string
+): Promise<{
   authenticated: boolean
   payload?: TokenPayload
   error?: string
   response?: NextResponse
 }> {
-  const auth = await verifyAuth(request)
+  try {
+    const auth = await verifyAuth(request)
 
-  if (!auth.authenticated) {
-    const logContext = createLogContext({
-      method: request.method,
-      path: request.nextUrl.pathname,
-      operation: 'auth_verification_failed',
-    })
+    if (!auth.authenticated) {
+      const logContext = createLogContext({
+        method: request.method,
+        path: request.nextUrl.pathname,
+        operation: 'auth_verification_failed',
+      })
 
-    logger.warn('Unauthorized access attempt', {
-      ...logContext,
-      error: auth.error,
-      statusCode: 401,
-    })
+      logger.warn(
+        'Unauthorized access attempt',
+        formatErrorLog('Authentication verification failed', new Error(auth.error || 'Unknown error'), {
+          requestId: correlationId,
+          ...logContext,
+          statusCode: 401,
+        })
+      )
+
+      return {
+        authenticated: false,
+        error: auth.error || 'Authentication required',
+        response: createErrorResponse(
+          'Authentication required',
+          ERROR_CODES.AUTH_INVALID,
+          correlationId,
+          401
+        ),
+      }
+    }
+
+    return {
+      authenticated: true,
+      payload: auth.payload,
+    }
+  } catch (error) {
+    logger.error(
+      'Auth verification error',
+      error,
+      formatErrorLog('Auth verification threw error', error, {
+        requestId: correlationId,
+        method: request.method,
+        path: request.nextUrl.pathname,
+      })
+    )
 
     return {
       authenticated: false,
-      error: auth.error || 'Authentication required',
-      response: createUnauthorizedResponse(auth.error || 'Authentication required'),
+      error: 'Authentication verification failed',
+      response: createErrorResponse(
+        'Authentication verification failed',
+        ERROR_CODES.AUTH_INVALID,
+        correlationId,
+        401
+      ),
     }
-  }
-
-  return {
-    authenticated: true,
-    payload: auth.payload,
   }
 }
 
@@ -115,45 +161,78 @@ export function checkRole(
  * ```
  */
 export function withAuth<T extends NextRequest>(
-  handler: (request: T, auth: { payload: TokenPayload; userId: string }) => Promise<NextResponse>,
+  handler: (request: T, auth: { payload: TokenPayload; userId: string; correlationId: string }) => Promise<NextResponse>,
   options: AuthMiddlewareOptions = {}
 ) {
   return async (request: T): Promise<NextResponse> => {
-    // Check if endpoint is public
-    if (options.publicEndpoints?.includes(request.nextUrl.pathname)) {
-      return handler(request, { payload: {} as TokenPayload, userId: 'anonymous' })
-    }
+    // Extract or generate correlation ID
+    const correlationId = getOrCreateCorrelationId(request.headers.get('x-correlation-id'))
 
-    // Verify authentication
-    const auth = await requireAuth(request)
-    if (!auth.authenticated) {
-      return auth.response!
-    }
+    try {
+      // Check if endpoint is public
+      if (options.publicEndpoints?.includes(request.nextUrl.pathname)) {
+        return handler(request, {
+          payload: {} as TokenPayload,
+          userId: 'anonymous',
+          correlationId,
+        })
+      }
 
-    // Check role-based access control
-    if (options.requiredRole) {
-      const roleCheck = checkRole(auth.payload, options.requiredRole)
-      if (!roleCheck.allowed) {
-        logger.warn('Insufficient permissions', {
+      // Verify authentication
+      const auth = await requireAuth(request, correlationId)
+      if (!auth.authenticated) {
+        return auth.response!
+      }
+
+      // Check role-based access control
+      if (options.requiredRole) {
+        const roleCheck = checkRole(auth.payload, options.requiredRole)
+        if (!roleCheck.allowed) {
+          logger.warn(
+            'Access denied - insufficient permissions',
+            formatErrorLog('Role check failed', new Error(roleCheck.error || 'Unknown error'), {
+              requestId: correlationId,
+              method: request.method,
+              path: request.nextUrl.pathname,
+              userId: auth.payload?.sub,
+              requiredRole: options.requiredRole,
+              userRole: auth.payload?.role,
+            })
+          )
+
+          return createErrorResponse(
+            roleCheck.error || 'Insufficient permissions',
+            ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+            correlationId,
+            403
+          )
+        }
+      }
+
+      // Call handler with authenticated context
+      return handler(request, {
+        payload: auth.payload!,
+        userId: auth.payload?.sub || '',
+        correlationId,
+      })
+    } catch (error) {
+      logger.error(
+        'Auth middleware error',
+        error,
+        formatErrorLog('Unhandled error in auth middleware', error, {
+          requestId: correlationId,
           method: request.method,
           path: request.nextUrl.pathname,
-          userId: auth.payload?.sub,
-          requiredRole: options.requiredRole,
-          userRole: auth.payload?.role,
         })
+      )
 
-        return NextResponse.json(
-          { error: roleCheck.error },
-          { status: 403 }
-        )
-      }
+      return createErrorResponse(
+        'Authentication failed',
+        ERROR_CODES.AUTH_INVALID,
+        correlationId,
+        401
+      )
     }
-
-    // Call handler with authenticated context
-    return handler(request, {
-      payload: auth.payload!,
-      userId: auth.payload?.sub || '',
-    })
   }
 }
 
