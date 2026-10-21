@@ -54,11 +54,11 @@ export function generateUUIDv4(): string {
   }
 
   if (nodeCrypto?.randomUUID && typeof nodeCrypto.randomUUID === 'function') {
-    if (typeof randomUUID === 'function') {
-      return randomUUID()
+    try {
+      return nodeCrypto.randomUUID()
+    } catch {
+      // Fall through to next option
     }
-  } catch {
-    // Fall through to next option
   }
 
   // PRIORITY 2: Use browser/universal crypto.getRandomValues (modern browsers)

@@ -83,6 +83,25 @@ function createSafeString(minLength = 0, maxLength = 1000): z.ZodTypeAny {
         return false
       }
 
+      // Check URL-decoded dangerous patterns (catches obfuscation like java%73cript:)
+      try {
+        const decoded = decodeURIComponent(lowerVal)
+        if (decoded.includes('javascript:')) {
+          return false
+        }
+        if (decoded.includes('<script')) {
+          return false
+        }
+        if (decoded.includes('</script>')) {
+          return false
+        }
+        if (decoded.includes('data:text/html')) {
+          return false
+        }
+      } catch {
+        // Malformed URL encoding is benign in this context - let it through
+      }
+
       return true
     },
     'String contains forbidden XSS patterns'

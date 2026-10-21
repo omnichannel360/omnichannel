@@ -3,7 +3,8 @@
  * Re-exports from uuid.ts to avoid duplication
  * All ID generation uses generateUUIDv4() implementation
  *
- * FIXED: Removed dynamic require() - use static imports with fallback console for circular dep safety
+ * NOTE: Uses dynamic require() for logger to avoid circular dependency.
+ * Fallback console implementation available for scenarios where logger cannot be loaded.
  */
 
 import type { Logger } from './logger'
@@ -33,6 +34,9 @@ const createFallbackLogger = (): Logger => ({
   },
 })
 
+// Cache fallback logger to avoid recreating on each call
+let fallbackLoggerCache: Logger | null = null
+
 let logger: Logger | null = null
 let nonCryptoWarningLogged = false
 
@@ -51,7 +55,13 @@ function getLogger(): Logger {
       // Circular dependency detected - use fallback
     }
   }
-  return logger ?? createFallbackLogger()
+  if (!logger) {
+    if (!fallbackLoggerCache) {
+      fallbackLoggerCache = createFallbackLogger()
+    }
+    return fallbackLoggerCache
+  }
+  return logger
 }
 
 export { generateUUIDv4, generateId, generatePrefixedId } from './uuid'

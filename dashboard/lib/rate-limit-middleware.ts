@@ -119,12 +119,13 @@ export function withRateLimit(
 /**
  * Validate session cookie format AND signature
  * FIXED: Verifies JWT signatures to ensure cookie was issued by server
- * Accepts UUID (for legacy sessions) or cryptographically signed JWT
+ * SECURITY FIX: NEVER accept bare UUID sessions - they can be forged
  *
  * SECURITY: Defense-in-depth
- * 1. Check format (UUID or JWT-like)
- * 2. If JWT: verify signature and expiration with JWT_SECRET
+ * 1. Check JWT format (3 parts separated by dots)
+ * 2. Verify JWT signature and expiration with JWT_SECRET
  * 3. Reject forged/tampered tokens
+ * 4. Reject bare UUIDs (they have no cryptographic verification)
  */
 function isValidSessionCookie(value: string): boolean {
   if (!value) return false
@@ -132,17 +133,11 @@ function isValidSessionCookie(value: string): boolean {
   // Maximum reasonable length (512 chars)
   if (value.length > 512) return false
 
-  // Check format: UUID or JWT (3 parts separated by dots)
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
-  if (isUUID) {
-    // UUID format is acceptable for legacy/session token tracking
-    return true
-  }
-
-  // For JWT format: verify signature and structure
+  // Check format: JWT only (3 parts separated by dots)
+  // SECURITY FIX: Do NOT accept bare UUIDs - they can be forged without verification
   const isJWTFormat = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value)
   if (!isJWTFormat) {
-    // Not UUID, not valid JWT format
+    // Not valid JWT format - reject (including bare UUIDs)
     return false
   }
 
@@ -168,7 +163,8 @@ function isValidSessionCookie(value: string): boolean {
  * Extract user ID from request (from auth token or session)
  * SECURITY: Always validate/decode token before using for rate limiting
  * CRITICAL FIX: Never trust x-user-id header - it can be spoofed
- * Only extract user ID from verified JWT or validated session cookie
+ * CRITICAL FIX: Never use bare UUID as user ID - UUIDs can be forged
+ * Only extract user ID from verified JWT with cryptographic signature
  */
 function extractUserId(request: NextRequest): string | undefined {
   // Try to get from Authorization header (Bearer token)
@@ -199,20 +195,18 @@ function extractUserId(request: NextRequest): string | undefined {
       return undefined // Invalid format → fall back to IP-based limiting
     }
 
-    // For UUID-format sessions, cannot extract user ID without session lookup
-    // For JWT sessions, extract the user ID from the token
-    const isJWT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(sessionCookie.value)
-    if (isJWT && JWT_SECRET) {
+    // Extract user ID from JWT session cookie
+    // SECURITY FIX: isValidSessionCookie now only accepts JWT format (not bare UUIDs)
+    if (JWT_SECRET) {
       try {
         const decoded = jwt.verify(sessionCookie.value, JWT_SECRET) as { sub?: string }
-        return decoded.sub
+        if (decoded.sub) {
+          return decoded.sub
+        }
       } catch {
         return undefined
       }
     }
-
-    // UUID-based sessions use the UUID itself as identifier
-    return sessionCookie.value
   }
 
   return undefined
