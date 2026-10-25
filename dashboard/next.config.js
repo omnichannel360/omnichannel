@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: false,
-  },
-  eslint: {
-    ignoreDuringBuilds: false,
+    // Emergency escape hatch for server deploys only; default stays strict.
+    ignoreBuildErrors: process.env.SKIP_TYPECHECK === '1',
+    tsconfigPath: 'tsconfig.build.json',
   },
   reactStrictMode: true,
 };

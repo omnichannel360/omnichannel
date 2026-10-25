@@ -92,8 +92,7 @@ export function generateUUIDv4(): string {
   } else {
     // Development environment - just a warning, then use fallback
     fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. For production, ensure Node.js 15+ or modern browser crypto APIs are available.', {
-      component: 'uuid',
-      nodeVersion: process.version
+      component: 'uuid'
     })
   }
 
