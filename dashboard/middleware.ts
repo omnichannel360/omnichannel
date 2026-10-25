@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import jwt, { JwtPayload } from 'jsonwebtoken'
+import { jwtVerify, type JWTPayload } from 'jose'
 import { logger } from './lib/logger'
 import {
   getOrCreateCorrelationId,
@@ -57,7 +57,11 @@ const AUTH_ROUTES = [
 
 export type UserRole = 'admin' | 'user' | 'viewer'
 
-export interface AuthPayload extends JwtPayload {
+export const SESSION_COOKIE = 'oc_session'
+
+const PUBLIC_PAGES = ['/login']
+
+export interface AuthPayload extends JWTPayload {
   sub: string
   email: string
   role: UserRole
@@ -96,14 +100,26 @@ function getJWTSecret(): string {
 }
 
 /**
- * Extract and verify JWT from Authorization header
+ * Token from Authorization header, falling back to the session cookie (browser UI).
  */
-function verifyTokenFromRequest(authHeader: string | null): {
+function extractToken(request: NextRequest): { token?: string; fromCookie: boolean } {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return { token: authHeader.substring(7), fromCookie: false }
+  }
+  const cookie = request.cookies.get(SESSION_COOKIE)?.value
+  return { token: cookie || undefined, fromCookie: Boolean(cookie) }
+}
+
+/**
+ * Verify JWT with jose: jsonwebtoken relies on Node crypto and fails in the Edge runtime.
+ */
+async function verifyToken(token: string | undefined): Promise<{
   valid: boolean
   payload?: AuthPayload
   error?: string
-} {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+}> {
+  if (!token) {
     return {
       valid: false,
       error: 'Missing or malformed Authorization header',
@@ -111,11 +127,11 @@ function verifyTokenFromRequest(authHeader: string | null): {
   }
 
   try {
-    const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, getJWTSecret()) as unknown as AuthPayload
+    const secret = new TextEncoder().encode(getJWTSecret())
+    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] })
     return {
       valid: true,
-      payload: decoded,
+      payload: payload as AuthPayload,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Token verification failed'
@@ -187,8 +203,16 @@ export async function middleware(request: NextRequest) {
   // Generate or extract correlation ID for request tracing
   const correlationId = getOrCreateCorrelationId(request.headers.get('x-correlation-id'))
 
-  // Skip middleware for non-API routes
+  // Dashboard pages: require a valid session cookie, otherwise send to /login
   if (!pathname.startsWith('/api/')) {
+    if (!PUBLIC_PAGES.includes(pathname)) {
+      const session = await verifyToken(request.cookies.get(SESSION_COOKIE)?.value)
+      if (!session.valid) {
+        const loginUrl = new URL('/login', request.url)
+        if (pathname !== '/') loginUrl.searchParams.set('next', pathname)
+        return NextResponse.redirect(loginUrl)
+      }
+    }
     const response = NextResponse.next()
     response.headers.set('x-correlation-id', correlationId)
     return response
@@ -202,8 +226,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Route is protected - verify authentication
-  const authHeader = request.headers.get('authorization')
-  const tokenResult = verifyTokenFromRequest(authHeader)
+  const { token, fromCookie } = extractToken(request)
+  const tokenResult = await verifyToken(token)
 
   if (!tokenResult.valid) {
     logger.warn(
@@ -255,6 +279,10 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-user-role', tokenResult.payload.role || '')
     requestHeaders.set('x-auth-verified', 'true')
     requestHeaders.set('x-correlation-id', correlationId)
+    // Route handlers re-verify via the Authorization header; forward cookie sessions as Bearer
+    if (fromCookie && token) {
+      requestHeaders.set('authorization', `Bearer ${token}`)
+    }
 
     logger.info('Authentication successful', {
       requestId: correlationId,
@@ -295,5 +323,5 @@ export async function middleware(request: NextRequest) {
  * Apply middleware to all API routes
  */
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|css|js)$).*)'],
 }

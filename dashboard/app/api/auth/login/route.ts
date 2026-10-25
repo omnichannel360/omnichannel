@@ -162,6 +162,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
       { status: 200 }
     )
 
+    // Browser session for the dashboard UI (API clients keep using the Bearer token)
+    response.cookies.set('oc_session', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60,
+    })
+
     // SECURITY: Add security headers
     response.headers.set('X-Content-Type-Options', 'nosniff')
     response.headers.set('X-Frame-Options', 'DENY')
