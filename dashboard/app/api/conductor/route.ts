@@ -133,7 +133,7 @@ const conductorHandlers = protectRouteMulti(
   {
     POST: async (request: NextRequest, { userId }) => {
       const startTime = Date.now()
-      const requestId = extractCorrelationFromRequest(request)
+      const requestId = extractCorrelationFromRequest(request.headers)
       const logContext = createLogContext({
         method: request.method,
         path: request.nextUrl.pathname,
@@ -226,7 +226,7 @@ const conductorHandlers = protectRouteMulti(
 
     GET: async (request: NextRequest, { userId }) => {
       const startTime = Date.now()
-      const requestId = extractCorrelationFromRequest(request)
+      const requestId = extractCorrelationFromRequest(request.headers)
       const logContext = createLogContext({
         method: request.method,
         path: request.nextUrl.pathname,
