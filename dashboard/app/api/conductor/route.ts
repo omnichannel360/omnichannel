@@ -8,6 +8,7 @@ import { createLogger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { ConductorRequestSchemaComprehensive, type ConductorRequestMessage } from '@/lib/validation/schemas'
 import { protectRouteMulti } from '@/lib/protected-route'
+import { dispatchToGitHub } from '@/lib/github-dispatch'
 import {
   extractCorrelationFromRequest,
   createErrorResponse,
@@ -164,18 +165,22 @@ const conductorHandlers = protectRouteMulti(
         const skillId = findMatchingSkill(message, registry)
         const task = parseTaskFromMessage(message)
 
-        let response: string
-        let dispatchedSkills: string[] = []
-        let dispatchedAgents: string[] = []
+        const dispatchedSkills: string[] = skillId ? [skillId] : []
+        const dispatchedAgents: string[] = []
+        const requester = request.headers.get('x-user-email') || userId || ''
+        const dispatch = await dispatchToGitHub(message, requester)
 
-        if (skillId) {
-          response = `Dispatching meeting skill: "${skillId}". Task logged and skill triggered.`
-          dispatchedSkills = [skillId]
-        } else if (task.agents.length > 0 && task.agents[0] !== 'conductor') {
-          response = `Dispatching "${task.action}" to: ${task.agents.join(', ')}. Task logged and agents notified.`
-          dispatchedAgents = task.agents
+        let response: string
+        let issueUrl: string | undefined
+        if (dispatch.status === 'created') {
+          issueUrl = dispatch.url
+          dispatchedAgents.push('engineer-agent')
+          response = `Created issue #${dispatch.number} in ${dispatch.repo}. The engineer agent will pick it up and open a PR: ${dispatch.url}`
+        } else if (dispatch.status === 'not_configured') {
+          response = 'Logged only. No agent runner is connected yet (set AGENT_GITHUB_TOKEN and AGENT_GITHUB_REPO on the server).'
         } else {
-          response = `Processing: ${task.action}. No specific agents assigned. Awaiting clarification.`
+          logger.warn('GitHub dispatch failed', { ...logContext, reason: dispatch.reason })
+          response = `Logged, but creating the GitHub issue failed (${dispatch.reason}). Nothing was dispatched.`
         }
 
         const logs = await loadLogs(requestId)
@@ -201,6 +206,7 @@ const conductorHandlers = protectRouteMulti(
         return NextResponse.json({
           success: true,
           response,
+          issueUrl,
           dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
           dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
         })
