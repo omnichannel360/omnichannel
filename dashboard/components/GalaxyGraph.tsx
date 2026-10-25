@@ -1,225 +1,145 @@
 'use client'
 
-import React, { useEffect, useState, ReactNode } from 'react'
+import React, { useEffect, useMemo, useRef, useState, ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 
-interface Node {
+// Canvas library touches window; load it in the browser only.
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false })
+
+type NodeType = 'person' | 'team' | 'agent'
+
+interface GraphNode {
   id: string
   name: string
-  type: 'person' | 'team' | 'project'
+  type: NodeType
 }
 
-interface Link {
+interface GraphLink {
   source: string
   target: string
 }
 
-interface ApiResponse {
-  success: boolean
-  error?: string
-  meta?: {
-    total?: number
+interface Profile {
+  name: string
+  role?: string
+}
+
+const BASE_NODES: GraphNode[] = [
+  { id: 'james', name: 'James Duran', type: 'person' },
+  { id: 'eng', name: 'Engineering', type: 'team' },
+  { id: 'growth', name: 'Growth', type: 'team' },
+  { id: 'ops', name: 'Operations', type: 'team' },
+]
+
+const BASE_LINKS: GraphLink[] = [
+  { source: 'james', target: 'eng' },
+  { source: 'james', target: 'growth' },
+  { source: 'james', target: 'ops' },
+]
+
+const NODE_COLORS: Record<NodeType, string> = { person: '#6366f1', team: '#10b981', agent: '#f59e0b' }
+const NODE_SIZES: Record<NodeType, number> = { person: 9, team: 7, agent: 5 }
+
+function teamForRole(role: string = ''): string {
+  const r = role.toLowerCase()
+  if (/(eng|dev|code|tech|qa|data)/.test(r)) return 'eng'
+  if (/(market|sales|growth|seo|content)/.test(r)) return 'growth'
+  return 'ops'
+}
+
+export function buildGraph(profiles: Profile[]): { nodes: GraphNode[]; links: GraphLink[] } {
+  const agents = profiles.map((p, i) => ({ id: `agent-${i}-${p.name}`, name: p.name, type: 'agent' as const, role: p.role }))
+  return {
+    nodes: [...BASE_NODES, ...agents.map(({ id, name, type }) => ({ id, name, type }))],
+    links: [...BASE_LINKS, ...agents.map(a => ({ source: teamForRole(a.role), target: a.id }))],
   }
 }
 
-/**
- * Sanitizes error message to prevent XSS attacks.
- *
- * Defense Strategy:
- * 1. Type validation: only accept strings
- * 2. Length validation: prevent DoS via excessively long messages (256 char limit)
- * 3. Pattern-based sanitization: remove 5 categories of XSS patterns
- *    - HTML tags: <script>, <img>, etc.
- *    - JavaScript protocol: javascript:alert()
- *    - Event handlers: onerror=, onload=, etc.
- *    - Data URLs: data:text/html
- *    - VBScript: vbscript:
- *
- * Note: After sanitization, React JSX auto-escapes all text content,
- * providing defense-in-depth protection.
- */
-function sanitizeErrorMessage(message: string): string {
-  // Ensure we have a string
-  if (typeof message !== 'string') {
-    return 'Unknown error'
-  }
-
-  // Apply length limit first to prevent processing oversized input
-  const maxLength = 256
-  let result = message.slice(0, maxLength)
-
-  // Define XSS patterns to remove
-  const xssPatterns = [
-    /<[^>]*>/g, // HTML tags
-    /javascript:/gi, // javascript: protocol
-    /on\w+\s*=/gi, // Event handlers (onload, onerror, onclick, etc.)
-    /data:text\/html/gi, // data: URLs containing HTML
-    /vbscript:/gi, // VBScript protocol
-  ]
-
-  // Apply all sanitization patterns
-  result = xssPatterns.reduce((acc, pattern) => acc.replace(pattern, ''), result)
-
-  // Return sanitized message, or fallback if empty
-  return result.trim() || 'An error occurred'
-}
-
-/**
- * Safely extracts error message from various sources.
- *
- * XSS Prevention Strategy:
- * ✓ Never use innerHTML or dangerouslySetInnerHTML
- * ✓ Never use direct document.innerHTML DOM manipulation
- * ✓ React's JSX automatically escapes text content (prevents XSS)
- * ✓ Type validation: safely extract strings from Error objects
- * ✓ Length limits: prevent UI overflow attacks
- * ✓ Pattern-based sanitization: remove XSS attack vectors
- *
- * This function handles extraction and sanitization. Rendering is done by React,
- * which escapes all text content automatically (defense-in-depth).
- */
-function getErrorMessage(error: unknown): string {
-  let message = 'Unable to load agent data'
-
-  // Safe extraction from Error instances
-  if (error instanceof Error) {
-    message = error.message
-  }
-  // Safe extraction from string types
-  else if (typeof error === 'string') {
-    message = error
-  }
-  // Safe extraction from objects with message property
-  else if (error !== null && typeof error === 'object') {
-    const obj = error as Record<string, unknown>
-    if (typeof obj.message === 'string') {
-      message = obj.message
-    }
-  }
-
-  // Sanitize the extracted message before returning
-  return sanitizeErrorMessage(message)
-}
-
-interface StatsDisplayProps {
-  nodeCount: number
-  totalNodes: number
-  totalLinks: number
-  error: string | null
-}
-
-/**
- * Displays statistics as text-only content using React's safe rendering.
- *
- * XSS Safety: React automatically escapes all text content in JSX.
- * This component never uses innerHTML or dangerouslySetInnerHTML.
- * All user-provided data (errors) are rendered as text, not HTML.
- */
-function StatsDisplay({
-  nodeCount,
-  totalNodes,
-  totalLinks,
-  error,
-}: StatsDisplayProps): ReactNode {
-  const stats = `Agents: ${nodeCount} | Base Nodes: ${totalNodes} | Links: ${totalLinks}`
-
-  return (
-    <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>
-      <p>Galaxy Graph Visualization</p>
-      <p style={{ fontSize: 12, color: '#999' }}>
-        {/* React escapes all text content—safe to render statistics */}
-        {stats}
-      </p>
-      {error && (
-        <p style={{ fontSize: 12, color: '#d32f2f', marginTop: 8 }}>
-          {/* React escapes all text content—safe to render error state */}
-          Error: {error}
-        </p>
-      )}
-    </div>
-  )
+function useContainerSize(): [React.RefObject<HTMLDivElement | null>, { width: number; height: number }] {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setSize({ width: Math.floor(width), height: Math.floor(height) })
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, size]
 }
 
 export function GalaxyGraph(): ReactNode {
-  const [nodeCount, setNodeCount] = useState(4)
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Static node definitions (no dynamic user-provided content)
-  const nodes: Node[] = [
-    { id: 'james', name: 'James Duran', type: 'person' },
-    { id: 'eng', name: 'Engineering', type: 'team' },
-    { id: 'growth', name: 'Growth', type: 'team' },
-    { id: 'ops', name: 'Operations', type: 'team' },
-  ]
-
-  // Static link definitions
-  const links: Link[] = [
-    { source: 'james', target: 'eng' },
-    { source: 'james', target: 'growth' },
-    { source: 'james', target: 'ops' },
-  ]
+  const [containerRef, size] = useContainerSize()
 
   useEffect(() => {
-    // Use AbortController to clean up requests on unmount
     const controller = new AbortController()
-
-    const fetchProfiles = async (): Promise<void> => {
-      try {
-        const response = await fetch('/api/profiles', { signal: controller.signal })
-
-        if (!response.ok) {
-          setError('Failed to load agent data')
-          return
-        }
-
-        const data: ApiResponse = await response.json()
-
-        if (data.success && data.meta?.total) {
-          setNodeCount(data.meta.total)
-          setError(null)
-        } else if (data.error) {
-          // Extract and truncate error, but let React handle rendering
-          const errorMessage = getErrorMessage(data.error)
-          setError(errorMessage)
-        }
-      } catch (err: unknown) {
-        // Don't update state if request was aborted (component unmounted)
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return
-        }
-
-        // Safe error extraction
-        const errorMessage = getErrorMessage(err)
-        setError(errorMessage)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchProfiles()
-
-    // Cleanup: cancel ongoing request on unmount to prevent state updates
-    return (): void => {
-      controller.abort()
-    }
+    fetch('/api/profiles', { signal: controller.signal })
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('Failed to load agent data'))))
+      .then(data => setProfiles(Array.isArray(data?.data) ? (data.data as Profile[]) : []))
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        setError(err instanceof Error ? err.message.slice(0, 100) : 'Failed to load agent data')
+      })
+    return () => controller.abort()
   }, [])
 
-  if (isLoading) {
-    return (
-      <div style={{ width: '100%', height: '100%', padding: 20, textAlign: 'center', color: '#999' }}>
-        <p>Loading galaxy graph...</p>
-      </div>
-    )
-  }
+  const graph = useMemo(() => buildGraph(profiles), [profiles])
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
-      <StatsDisplay
-        nodeCount={nodeCount}
-        totalNodes={nodes.length}
-        totalLinks={links.length}
-        error={error}
-      />
+    <div className="flex h-full flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 text-xs text-gray-500">
+        <span>
+          Agents: {profiles.length} | Base Nodes: {BASE_NODES.length} | Links: {graph.links.length}
+        </span>
+        <span className="flex gap-3">
+          {(Object.keys(NODE_COLORS) as NodeType[]).map(t => (
+            <span key={t} className="flex items-center gap-1 capitalize">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: NODE_COLORS[t] }} />
+              {t}
+            </span>
+          ))}
+        </span>
+      </div>
+      {error && <p className="pb-2 text-xs text-red-600">Error: {error}</p>}
+      <div ref={containerRef} className="relative flex-1 overflow-hidden rounded-md bg-slate-50">
+        {size.width > 0 && (
+          <ForceGraph2D
+            graphData={graph}
+            width={size.width}
+            height={size.height}
+            cooldownTicks={120}
+            linkColor={() => '#cbd5e1'}
+            linkWidth={1.5}
+            nodeRelSize={1}
+            nodeCanvasObject={(node, ctx, scale) => {
+              const n = node as GraphNode & { x?: number; y?: number }
+              const r = NODE_SIZES[n.type]
+              ctx.beginPath()
+              ctx.arc(n.x ?? 0, n.y ?? 0, r, 0, 2 * Math.PI)
+              ctx.fillStyle = NODE_COLORS[n.type]
+              ctx.fill()
+              const fontSize = Math.max(12 / scale, 3)
+              ctx.font = `${fontSize}px sans-serif`
+              ctx.textAlign = 'center'
+              ctx.textBaseline = 'top'
+              ctx.fillStyle = '#1f2937'
+              ctx.fillText(n.name, n.x ?? 0, (n.y ?? 0) + r + 2)
+            }}
+            nodePointerAreaPaint={(node, color, ctx) => {
+              const n = node as GraphNode & { x?: number; y?: number }
+              ctx.fillStyle = color
+              ctx.beginPath()
+              ctx.arc(n.x ?? 0, n.y ?? 0, NODE_SIZES[n.type] + 2, 0, 2 * Math.PI)
+              ctx.fill()
+            }}
+          />
+        )}
+      </div>
     </div>
   )
 }

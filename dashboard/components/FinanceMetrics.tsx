@@ -1,15 +1,18 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { StatCard, ErrorState } from './StatCard'
 
-interface Metric {
-  label: string
-  value: string
-  trend: number
+interface Finance {
+  revenue: number
+  costs: number
+  profit_margin: number
 }
 
+const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+
 export function FinanceMetrics() {
-  const [metrics, setMetrics] = useState<Metric[]>([])
+  const [finance, setFinance] = useState<Finance | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -18,48 +21,28 @@ export function FinanceMetrics() {
       .then(res => res.json())
       .then(data => {
         if (data.success && data.data?.finance) {
-          const fin = data.data.finance
-          setMetrics([
-            { label: 'Revenue', value: `$${(fin.revenue / 1000).toFixed(0)}k`, trend: 12.5 },
-            { label: 'Expenses', value: `$${(fin.expenses / 1000).toFixed(0)}k`, trend: -8.2 },
-            { label: 'Profit', value: `$${(fin.profit / 1000).toFixed(0)}k`, trend: 3.1 },
-            { label: 'Burn Rate', value: `${fin.burn_rate.toFixed(1)}%`, trend: 2.0 }
-          ])
+          setFinance(data.data.finance as Finance)
         } else {
-          setError(data.error)
+          setError(data.error || 'Finance metrics unavailable')
         }
       })
-      .catch(err => setError(err.message))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Request failed'))
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) {
-    return <div style={{ padding: '20px' }}>Loading metrics...</div>
-  }
+  if (loading) return <div className="p-5 text-gray-500">Loading metrics...</div>
+  if (error || !finance) return <ErrorState message={error || 'No data'} />
 
-  if (error) {
-    return <div style={{ padding: '20px', color: 'red' }}>Error: {error}</div>
-  }
+  const revenue = Number(finance.revenue) || 0
+  const costs = Number(finance.costs) || 0
+  const margin = Number(finance.profit_margin) || 0
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
-      {metrics.map(metric => (
-        <div key={metric.label} style={{
-          backgroundColor: '#f9fafb',
-          padding: '15px',
-          borderRadius: '8px',
-          borderLeft: '4px solid #10b981'
-        }}>
-          <p style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>{metric.label}</p>
-          <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>{metric.value}</h3>
-          <p style={{
-            fontSize: '12px',
-            color: metric.trend > 0 ? '#059669' : '#dc2626'
-          }}>
-            {metric.trend > 0 ? '↑' : '↓'} {Math.abs(metric.trend).toFixed(1)}%
-          </p>
-        </div>
-      ))}
+    <div className="grid grid-cols-2 gap-4">
+      <StatCard label="Revenue" value={usd.format(revenue)} />
+      <StatCard label="Costs" value={usd.format(costs)} accent="#f59e0b" />
+      <StatCard label="Profit" value={usd.format(revenue - costs)} accent="#3b82f6" />
+      <StatCard label="Profit margin" value={`${(margin * 100).toFixed(1)}%`} accent="#8b5cf6" />
     </div>
   )
 }

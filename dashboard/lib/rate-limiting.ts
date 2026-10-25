@@ -141,6 +141,8 @@ export function userKeyGenerator(request: NextRequest): string {
 /**
  * Create a rate limiter function
  */
+let limiterSequence = 0
+
 export function createRateLimiter(config: RateLimitConfig) {
   const {
     maxRequests,
@@ -149,9 +151,11 @@ export function createRateLimiter(config: RateLimitConfig) {
     skipSuccessfulRequests = false,
     skipFailedRequests = false,
   } = config
+  // All limiters share one store; namespace keys so one endpoint's traffic can't exhaust another's quota
+  const namespace = `rl${++limiterSequence}`
 
   return async (request: NextRequest): Promise<NextResponse | null> => {
-    const key = keyGenerator(request)
+    const key = `${namespace}:${keyGenerator(request)}`
     const store = getStore()
     const entry = store.increment(key, windowMs)
 
