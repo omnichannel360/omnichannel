@@ -102,10 +102,10 @@ describe('Input Validation Integration Tests', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should trim whitespace from password', () => {
+    it('should preserve whitespace in password (passwords are not trimmed)', () => {
       const result = PasswordSchemaWeak.safeParse('  password123  ')
       expect(result.success).toBe(true)
-      expect(result.data).toBe('ValidPass@123')
+      expect(result.data).toBe('  password123  ')
     })
   })
 
@@ -204,14 +204,14 @@ describe('Input Validation Integration Tests', () => {
 
     it('should reject limit above maximum', () => {
       const result = BrainQuerySchema.safeParse({
-        limit: 1000,
+        limit: 100,
       })
-      expect(result.success).toBe(true) // 1000 is max
+      expect(result.success).toBe(true) // 100 is max
     })
 
     it('should reject limit above maximum', () => {
       const result = BrainQuerySchema.safeParse({
-        limit: 1001,
+        limit: 101,
       })
       expect(result.success).toBe(false)
     })
@@ -493,7 +493,7 @@ describe('Input Validation Integration Tests', () => {
 
     it('should prevent null byte injection', () => {
       const result = SafeStringSchema.safeParse('test\x00injection')
-      expect(result.success).toBe(true) // String is valid but null bytes are handled
+      expect(result.success).toBe(false) // Null bytes are rejected by SafeString
     })
 
     it('should prevent path traversal in category', () => {
@@ -512,12 +512,17 @@ describe('Input Validation Integration Tests', () => {
    * Type Coercion Tests
    */
   describe('Type Coercion', () => {
-    it('should handle string to number coercion for limit', () => {
-      const result = BrainQuerySchema.safeParse({
-        limit: '20', // string
-      })
+    it('should handle string to number coercion for limit', async () => {
+      // The schema expects a number; coercion of query strings happens in validateQuery
+      expect(BrainQuerySchema.safeParse({ limit: '20' }).success).toBe(false)
+
+      const request = new NextRequest('http://localhost/api/brain?limit=20')
+      const result = await validateQuery<{ limit: number }>(request, BrainQuerySchema)
       expect(result.success).toBe(true)
-      expect(typeof result.data?.limit).toBe('number')
+      if (result.success) {
+        expect(result.data.limit).toBe(20)
+        expect(typeof result.data.limit).toBe('number')
+      }
     })
 
     it('should handle boolean string coercion', () => {
@@ -552,7 +557,7 @@ describe('Input Validation Integration Tests', () => {
 
     it('should handle maximum valid limit', () => {
       const result = BrainQuerySchema.safeParse({
-        limit: 1000,
+        limit: 100,
       })
       expect(result.success).toBe(true)
     })

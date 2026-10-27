@@ -42,6 +42,11 @@ function createSafeString(minLength = 0, maxLength = 1000): z.ZodTypeAny {
 
   return schema.refine(
     (val) => {
+      // SECURITY: Reject null bytes (null-byte injection / string truncation)
+      if (val.includes('\0')) {
+        return false
+      }
+
       const lowerVal = val.toLowerCase()
       // SECURITY: Block execution vectors - rendering safety handled elsewhere
       // Remove whitespace from potentially dangerous patterns to catch obfuscation
@@ -174,7 +179,7 @@ export const PaginationSchema = z.object({
 export const LoginRequestSchema = z.object({
   email: EmailSchema,
   password: PasswordSchema, // Using strong password requirements for security
-})
+}).strict() // Reject unknown fields
 
 export type LoginRequest = z.infer<typeof LoginRequestSchema>
 
@@ -198,7 +203,7 @@ export const BrainQuerySchema = z.object({
     .max(100, 'Limit must not exceed 100')
     .optional()
     .default(20),
-})
+}).strict() // Reject unknown query parameters
 
 export type BrainQuery = z.infer<typeof BrainQuerySchema>
 

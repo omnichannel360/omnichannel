@@ -37,7 +37,7 @@ describe('JSON Parsing Error Handling', () => {
 
       const data = await response.json()
       expect(data.success).toBe(false)
-      expect(data.error).toBe('Invalid JSON in request body')
+      expect(data.error).toContain('Invalid JSON in request body') // validateBody appends parser detail
     })
 
     it('should return 400 on missing required fields', async () => {
@@ -55,7 +55,7 @@ describe('JSON Parsing Error Handling', () => {
 
       const data = await response.json()
       expect(data.success).toBe(false)
-      expect(data.error).toBe('Invalid request')
+      expect(data.error).toBe('Request validation failed')
     })
 
     it('should return 400 on invalid enum value', async () => {
@@ -95,7 +95,7 @@ describe('JSON Parsing Error Handling', () => {
       expect(response.status).toBe(400)
 
       const data = await response.json()
-      expect(data.error).toBe('Invalid JSON in request body')
+      expect(data.error).toContain('Invalid JSON in request body') // validateBody appends parser detail
     })
 
     it('should return 400 on missing title', async () => {
@@ -151,7 +151,7 @@ describe('JSON Parsing Error Handling', () => {
       expect(response.status).toBe(400)
 
       const data = await response.json()
-      expect(data.error).toBe('Invalid JSON in request body')
+      expect(data.error).toContain('Invalid JSON in request body') // validateBody appends parser detail
     })
 
     it('should return 400 on missing message', async () => {
