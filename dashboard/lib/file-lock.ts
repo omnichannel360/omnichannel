@@ -13,6 +13,36 @@ interface FileLock {
 
 const locks = new Map<string, FileLock>()
 
+/**
+ * Hand the lock to the next queued callback, or release it when the queue is empty.
+ * Must run exactly once per callback that held the lock, including timed-out waiters.
+ */
+function releaseLock(filePath: string): void {
+  const fileLock = locks.get(filePath)
+
+  if (!fileLock) {
+    // Should never happen, but log if it does - indicates internal error
+    logger.error('Lock was deleted during execution', new Error('Lock deleted'), { filePath })
+    return
+  }
+
+  fileLock.lastAccessTime = Date.now()
+  const nextCallback = fileLock.queue.shift()
+
+  if (nextCallback) {
+    // Execute next queued callback asynchronously
+    // Errors in queued callbacks are logged but don't prevent remaining callbacks
+    void nextCallback().catch((error) => {
+      logger.error('Error executing queued callback', error, { filePath })
+      // Continue to next callback - do not re-throw
+    })
+  } else {
+    fileLock.locked = false
+    // Clean up lock entry when queue is empty to prevent memory leak
+    locks.delete(filePath)
+  }
+}
+
 export async function withFileLock<T>(filePath: string, callback: () => Promise<T>, timeoutMs: number = DEFAULT_LOCK_TIMEOUT_MS): Promise<T> {
   let lock = locks.get(filePath)
   const enqueuedAt = Date.now()
@@ -25,29 +55,37 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
   return new Promise<T>((resolve, reject) => {
     // Track if the promise has already settled to prevent double settlement
     let settled = false
+    let waitTimer: ReturnType<typeof setTimeout> | undefined
+
+    const acquisitionTimeout = (): Error =>
+      new Error(`Lock acquisition timeout after ${timeoutMs}ms for file: ${filePath}`)
 
     const executeCallback = async (): Promise<void> => {
+      if (waitTimer) clearTimeout(waitTimer)
+
       // Calculate remaining timeout based on when callback was queued
       const elapsedMs = Date.now() - enqueuedAt
       const remainingMs = timeoutMs - elapsedMs
 
-      // If timeout already exceeded while waiting in queue, reject without executing
-      if (remainingMs <= 0) {
+      // Timed out while waiting: skip the callback but still pass the lock on
+      if (settled || remainingMs <= 0) {
         if (!settled) {
           settled = true
-          reject(new Error(`Lock acquisition timeout after ${timeoutMs}ms for file: ${filePath}`))
+          reject(acquisitionTimeout())
         }
+        releaseLock(filePath)
         return
       }
 
+      let executionTimer: ReturnType<typeof setTimeout> | undefined
       try {
         // Use Promise.race to ensure timeout actually interrupts execution
         // This prevents the race condition where callback continues after timeout
-        const timeoutPromise = new Promise<T>((_, reject) =>
-          setTimeout(() => {
-            reject(new Error(`Lock execution timeout after ${timeoutMs}ms for file: ${filePath}`))
+        const timeoutPromise = new Promise<T>((_, rejectTimeout) => {
+          executionTimer = setTimeout(() => {
+            rejectTimeout(new Error(`Lock execution timeout after ${timeoutMs}ms for file: ${filePath}`))
           }, remainingMs)
-        )
+        })
 
         const result = await Promise.race([callback(), timeoutPromise])
 
@@ -61,38 +99,22 @@ export async function withFileLock<T>(filePath: string, callback: () => Promise<
           reject(error)
         }
       } finally {
-        // Lock is guaranteed to exist: created above or retrieved from map
-        const fileLock = locks.get(filePath)
-
-        if (!fileLock) {
-          // Should never happen, but log if it does - indicates internal error
-          logger.error('Lock was deleted during execution', new Error('Lock deleted'), { filePath })
-          return
-        }
-
-        fileLock.lastAccessTime = Date.now()
-        const nextCallback = fileLock.queue.shift()
-
-        if (nextCallback) {
-          // Execute next queued callback asynchronously
-          // Errors in queued callbacks are logged but don't prevent remaining callbacks
-          void nextCallback().catch((error) => {
-            logger.error('Error executing queued callback', error, { filePath })
-            // Continue to next callback - do not re-throw
-          })
-        } else {
-          fileLock.locked = false
-          // Clean up lock entry when queue is empty to prevent memory leak
-          if (fileLock.queue.length === 0) {
-            locks.delete(filePath)
-          }
-        }
+        if (executionTimer) clearTimeout(executionTimer)
+        releaseLock(filePath)
       }
     }
 
     // Atomically check and set lock state to prevent race conditions
     if (lock.locked) {
       lock.queue.push(executeCallback)
+      // Enforce the acquisition timeout while queued; the entry stays in the queue
+      // and releases the lock immediately when its turn comes
+      waitTimer = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          reject(acquisitionTimeout())
+        }
+      }, timeoutMs)
     } else {
       lock.locked = true
       // Initiate async execution without awaiting: the Promise will resolve/reject
