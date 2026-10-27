@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
@@ -405,5 +405,91 @@ describe('file-lock', () => {
 
       expect(outcome).toBe('acquired')
     })
+  })
+})
+
+describe('atomic-file-ops crash atomicity', () => {
+  let testDir: string
+
+  beforeEach(async () => {
+    clearAllLocks()
+    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'omni-test-'))
+  })
+
+  afterEach(async () => {
+    jest.restoreAllMocks()
+    clearAllLocks()
+    await fs.rm(testDir, { recursive: true, force: true })
+  })
+
+  // Simulates a crash/ENOSPC mid-write: half the bytes land, then the write fails
+  function failWritesHalfway(): void {
+    const realWriteFile = fs.writeFile.bind(fs)
+    jest.spyOn(fs, 'writeFile').mockImplementation(async (target, content) => {
+      const text = String(content)
+      await realWriteFile(target, text.slice(0, Math.floor(text.length / 2)), 'utf-8')
+      throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+    })
+  }
+
+  const writers: Array<[string, (file: string) => Promise<unknown>]> = [
+    ['atomicWrite', (file) => atomicWrite(file, { version: 2 })],
+    ['atomicUpdate', (file) => atomicUpdate(file, () => ({ version: 2 }), { version: 0 })],
+  ]
+
+  it.each(writers)('%s leaves the previous file intact when the write fails midway', async (_name, write) => {
+    const testFile = path.join(testDir, 'state.json')
+    const original = JSON.stringify({ version: 1, items: Array.from({ length: 50 }, (_, i) => i) })
+    await fs.writeFile(testFile, original, 'utf-8')
+
+    failWritesHalfway()
+    await expect(write(testFile)).rejects.toThrow('ENOSPC')
+    jest.restoreAllMocks()
+
+    expect(await fs.readFile(testFile, 'utf-8')).toBe(original)
+    expect(await fs.readdir(testDir)).toEqual(['state.json'])
+  })
+})
+
+describe('atomic-file-ops rename handling', () => {
+  let testDir: string
+
+  beforeEach(async () => {
+    clearAllLocks()
+    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'omni-test-'))
+  })
+
+  afterEach(async () => {
+    jest.restoreAllMocks()
+    clearAllLocks()
+    await fs.rm(testDir, { recursive: true, force: true })
+  })
+
+  it('retries a transient EPERM from rename and completes the write', async () => {
+    const testFile = path.join(testDir, 'state.json')
+    const realRename = fs.rename.bind(fs)
+    let calls = 0
+    jest.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+      calls++
+      if (calls === 1) throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' })
+      return realRename(from, to)
+    })
+
+    await atomicWrite(testFile, { ok: true })
+
+    expect(calls).toBe(2)
+    expect(JSON.parse(await fs.readFile(testFile, 'utf-8'))).toEqual({ ok: true })
+    expect(await fs.readdir(testDir)).toEqual(['state.json'])
+  })
+
+  it('removes the temp file and keeps the original when rename keeps failing', async () => {
+    const testFile = path.join(testDir, 'state.json')
+    await fs.writeFile(testFile, '{"version":1}', 'utf-8')
+    jest.spyOn(fs, 'rename').mockRejectedValue(Object.assign(new Error('EBUSY: resource busy'), { code: 'EBUSY' }))
+
+    await expect(atomicWrite(testFile, { version: 2 })).rejects.toThrow('EBUSY')
+
+    expect(await fs.readFile(testFile, 'utf-8')).toBe('{"version":1}')
+    expect(await fs.readdir(testDir)).toEqual(['state.json'])
   })
 })
