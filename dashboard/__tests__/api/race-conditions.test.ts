@@ -2,12 +2,15 @@
  * Race Condition Test Suite
  * Tests atomic operations across all file-based APIs
  * Ensures data integrity under concurrent load
+ *
+ * Every test runs in its own fresh temp dir (never dashboard/data).
  */
 
+import os from 'os'
 import path from 'path'
 import { promises as fs } from 'fs'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
-import { clearAllLocks, cleanupStaleLocks } from '@/lib/file-lock'
+import { clearAllLocks, getLockCount } from '@/lib/file-lock'
 
 interface TestAlert {
   id: string
@@ -25,61 +28,44 @@ interface TestTask {
 }
 
 describe('Race Condition Tests', () => {
-  const testDir = path.join(process.cwd(), 'data', 'test-race-conditions')
-  const alertsFile = path.join(testDir, 'alerts.json')
-  const tasksFile = path.join(testDir, 'tasks.json')
-
-  beforeAll(async () => {
-    try {
-      await fs.mkdir(testDir, { recursive: true })
-    } catch {
-      // Already exists
-    }
-  })
+  let testDir: string
+  let alertsFile: string
+  let tasksFile: string
 
   beforeEach(async () => {
     clearAllLocks()
-    try {
-      await fs.unlink(alertsFile)
-    } catch {
-      // File doesn't exist
-    }
-    try {
-      await fs.unlink(tasksFile)
-    } catch {
-      // File doesn't exist
-    }
-
+    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'omni-test-'))
+    alertsFile = path.join(testDir, 'alerts.json')
+    tasksFile = path.join(testDir, 'tasks.json')
   })
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearAllLocks()
-    try {
-      await fs.rm(testDir, { recursive: true, force: true })
-    } catch {
-      // Cleanup failed
-    }
+    await fs.rm(testDir, { recursive: true, force: true })
   })
 
   describe('Concurrent Operations', () => {
     it('POST alerts concurrently - 10 operations', async () => {
       const concurrency = 10
-      const promises: Promise<TestAlert>[] = []
+      const promises: Promise<TestAlert[]>[] = []
 
       for (let i = 0; i < concurrency; i++) {
         promises.push(
-          atomicUpdate<TestAlert[], TestAlert>(alertsFile, async (alerts) => {
-            const newAlert: TestAlert = {
-              id: `alert-${i}`,
-              timestamp: new Date().toISOString(),
-              level: 'warning',
-              component: `component-${i}`,
-              message: `Concurrent alert ${i}`,
-              status: 'active',
-            }
-            const updated = [...alerts, newAlert]
-            return { updated, result: newAlert }
-          })
+          atomicUpdate<TestAlert[]>(
+            alertsFile,
+            async (alerts) => {
+              const newAlert: TestAlert = {
+                id: `alert-${i}`,
+                timestamp: new Date().toISOString(),
+                level: 'warning',
+                component: `component-${i}`,
+                message: `Concurrent alert ${i}`,
+                status: 'active',
+              }
+              return [...alerts, newAlert]
+            },
+            []
+          )
         )
       }
 
@@ -101,21 +87,24 @@ describe('Race Condition Tests', () => {
 
       await atomicWrite<TestTask[]>(tasksFile, initialTasks)
 
-      const modifyPromises: Promise<TestTask>[] = []
+      const modifyPromises: Promise<TestTask[]>[] = []
 
       for (let i = 0; i < 10; i++) {
         modifyPromises.push(
-          atomicUpdate<TestTask[], TestTask>(tasksFile, async (tasks) => {
-            const taskIndex = tasks.findIndex(t => t.id === `task-${i % 5}`)
+          atomicUpdate<TestTask[]>(
+            tasksFile,
+            async (tasks) => {
+              const taskIndex = tasks.findIndex(t => t.id === `task-${i % 5}`)
 
-            if (taskIndex === -1) {
-              throw new Error('Task not found')
-            }
+              if (taskIndex === -1) {
+                throw new Error('Task not found')
+              }
 
-            const updated = { ...tasks[taskIndex], status: 'in-progress' as const }
-            const result = [...tasks.slice(0, taskIndex), updated, ...tasks.slice(taskIndex + 1)]
-            return result
-          })
+              const updated = { ...tasks[taskIndex], status: 'in-progress' as const }
+              return [...tasks.slice(0, taskIndex), updated, ...tasks.slice(taskIndex + 1)]
+            },
+            []
+          )
         )
       }
 
@@ -137,10 +126,7 @@ describe('Race Condition Tests', () => {
       await atomicWrite<Counter>(file, { count: 0 })
 
       const promises = Array.from({ length: 10 }, () =>
-        atomicUpdate<Counter, Counter>(file, async (data) => {
-          const updated = { count: data.count + 1 }
-          return { updated, result: updated }
-        })
+        atomicUpdate<Counter>(file, async (data) => ({ count: data.count + 1 }), { count: 0 })
       )
 
       await Promise.all(promises)
@@ -159,14 +145,8 @@ describe('Race Condition Tests', () => {
       await atomicWrite<TestTask[]>(tasksFile, tasks)
 
       await Promise.all([
-        atomicUpdate<TestTask[], void>(tasksFile, async (tasks) => {
-          const filtered = tasks.filter(t => t.id !== 'task-1')
-          return filtered
-        }),
-        atomicUpdate<TestTask[], void>(tasksFile, async (tasks) => {
-          const filtered = tasks.filter(t => t.id !== 'task-2')
-          return filtered
-        }),
+        atomicUpdate<TestTask[]>(tasksFile, async (current) => current.filter(t => t.id !== 'task-1'), []),
+        atomicUpdate<TestTask[]>(tasksFile, async (current) => current.filter(t => t.id !== 'task-2'), []),
       ])
 
       const final = await atomicRead<TestTask[]>(tasksFile)
@@ -176,21 +156,25 @@ describe('Race Condition Tests', () => {
 
     it('high concurrency stress test - 50 concurrent writes', async () => {
       const concurrency = 50
-      const promises: Promise<TestAlert>[] = []
+      const promises: Promise<TestAlert[]>[] = []
 
       for (let i = 0; i < concurrency; i++) {
         promises.push(
-          atomicUpdate<TestAlert[], TestAlert>(alertsFile, async (alerts) => {
-            const alert: TestAlert = {
-              id: `alert-${i}`,
-              timestamp: new Date().toISOString(),
-              level: 'info',
-              component: 'test',
-              message: `Alert ${i}`,
-              status: 'active',
-            }
-            return { updated: [...alerts, alert], result: alert }
-          })
+          atomicUpdate<TestAlert[]>(
+            alertsFile,
+            async (alerts) => {
+              const alert: TestAlert = {
+                id: `alert-${i}`,
+                timestamp: new Date().toISOString(),
+                level: 'info',
+                component: 'test',
+                message: `Alert ${i}`,
+                status: 'active',
+              }
+              return [...alerts, alert]
+            },
+            []
+          )
         )
       }
 
@@ -205,18 +189,22 @@ describe('Race Condition Tests', () => {
 
     it('extreme stress test - 100 concurrent operations', async () => {
       const concurrency = 100
-      const promises: Promise<TestTask>[] = []
+      const promises: Promise<TestTask[]>[] = []
 
       for (let i = 0; i < concurrency; i++) {
         promises.push(
-          atomicUpdate<TestTask[], TestTask>(tasksFile, async (tasks) => {
-            const task: TestTask = {
-              id: `task-${i}`,
-              title: `Task ${i}`,
-              status: 'todo',
-            }
-            return { updated: [...tasks, task], result: task }
-          })
+          atomicUpdate<TestTask[]>(
+            tasksFile,
+            async (tasks) => {
+              const task: TestTask = {
+                id: `task-${i}`,
+                title: `Task ${i}`,
+                status: 'todo',
+              }
+              return [...tasks, task]
+            },
+            []
+          )
         )
       }
 
@@ -229,7 +217,7 @@ describe('Race Condition Tests', () => {
       // Verify no duplicates
       const ids = new Set(final.map(t => t.id))
       expect(ids.size).toBe(concurrency)
-    })
+    }, 30000) // 100 serialized read+write cycles; Windows temp-dir I/O is slow
 
     it('mixed concurrent operations - reads and writes', async () => {
       const writeFile = path.join(testDir, 'mixed-ops.json')
@@ -251,14 +239,18 @@ describe('Race Condition Tests', () => {
       // 20 write operations
       for (let i = 0; i < 20; i++) {
         operations.push(
-          atomicUpdate<TestTask[], TestTask>(writeFile, async (tasks) => {
-            const newTask: TestTask = {
-              id: `new-task-${i}`,
-              title: `New Task ${i}`,
-              status: 'in-progress',
-            }
-            return { updated: [...tasks, newTask], result: newTask }
-          })
+          atomicUpdate<TestTask[]>(
+            writeFile,
+            async (tasks) => {
+              const newTask: TestTask = {
+                id: `new-task-${i}`,
+                title: `New Task ${i}`,
+                status: 'in-progress',
+              }
+              return [...tasks, newTask]
+            },
+            []
+          )
         )
       }
 
@@ -275,19 +267,25 @@ describe('Race Condition Tests', () => {
       // Mix of successful and failing operations
       for (let i = 0; i < 10; i++) {
         promises.push(
-          atomicUpdate<TestTask[], string | null>(errorFile, async (tasks) => {
-            // Every 3rd operation fails
-            if (i % 3 === 0) {
-              throw new Error(`Intentional error at operation ${i}`)
-            }
+          atomicUpdate<TestTask[]>(
+            errorFile,
+            async (tasks) => {
+              // Every 3rd operation fails
+              if (i % 3 === 0) {
+                throw new Error(`Intentional error at operation ${i}`)
+              }
 
-            const task: TestTask = {
-              id: `task-${i}`,
-              title: `Task ${i}`,
-              status: 'todo',
-            }
-            return { updated: [...tasks, task], result: 'success' }
-          }).catch(() => null)
+              const task: TestTask = {
+                id: `task-${i}`,
+                title: `Task ${i}`,
+                status: 'todo',
+              }
+              return [...tasks, task]
+            },
+            []
+          )
+            .then(() => 'success')
+            .catch(() => null)
         )
       }
 
@@ -303,22 +301,28 @@ describe('Race Condition Tests', () => {
       // Verify the file only contains successful writes
       const final = await atomicRead<TestTask[]>(errorFile)
       expect(final.length).toBeLessThanOrEqual(10)
+      expect(final.length).toBe(successes)
+      expect(getLockCount()).toBe(0)
     })
 
     it('rapid fire writes - 30 operations in quick succession', async () => {
       const rapidFile = path.join(testDir, 'rapid-writes.json')
-      const promises: Promise<TestTask>[] = []
+      const promises: Promise<TestTask[]>[] = []
 
       // Fire off 30 operations as fast as possible
       for (let i = 0; i < 30; i++) {
-        const promise = atomicUpdate<TestTask[], TestTask>(rapidFile, async (tasks) => {
-          const task: TestTask = {
-            id: `task-${i}`,
-            title: `Rapid Task ${i}`,
-            status: 'todo',
-          }
-          return { updated: [...tasks, task], result: task }
-        })
+        const promise = atomicUpdate<TestTask[]>(
+          rapidFile,
+          async (tasks) => {
+            const task: TestTask = {
+              id: `task-${i}`,
+              title: `Rapid Task ${i}`,
+              status: 'todo',
+            }
+            return [...tasks, task]
+          },
+          []
+        )
         promises.push(promise)
       }
 
@@ -339,15 +343,18 @@ describe('Race Condition Tests', () => {
     it('concurrent file locks are serialized', async () => {
       const lockFile = path.join(testDir, 'lock-test.json')
       const executionOrder: number[] = []
-      const lockMutex = { locked: false }
 
       const promises = Array.from({ length: 5 }, (_, index) =>
-        atomicUpdate<{ index: number }[], void>(lockFile, async (data) => {
-          // Simulate work while locked
-          await new Promise(resolve => setTimeout(resolve, 10))
-          executionOrder.push(index)
-          return { updated: [...data, { index }], result: undefined }
-        })
+        atomicUpdate<{ index: number }[]>(
+          lockFile,
+          async (data) => {
+            // Simulate work while locked
+            await new Promise(resolve => setTimeout(resolve, 10))
+            executionOrder.push(index)
+            return [...data, { index }]
+          },
+          []
+        )
       )
 
       await Promise.all(promises)
@@ -364,18 +371,17 @@ describe('Race Condition Tests', () => {
       await atomicWrite<{ count: number }>(lockTestFile, { count: 0 })
 
       // Simulate stale lock cleanup
-      await cleanupStaleLocks(path.join(process.cwd(), '.test-locks'), 100)
+      clearAllLocks()
+      expect(getLockCount()).toBe(0)
 
       // Operations should still work even if locks were cleaned
-      const result = await atomicUpdate<{ count: number }, { count: number }>(
+      const result = await atomicUpdate<{ count: number }>(
         lockTestFile,
-        async (data) => {
-          return { updated: { count: data.count + 1 }, result: { count: data.count + 1 } }
-        }
+        async (data) => ({ count: data.count + 1 }),
+        { count: 0 }
       )
 
       expect(result.count).toBe(1)
     })
   })
 })
-

@@ -46,3 +46,20 @@ expect.extend({
 
 // Global test timeout
 jest.setTimeout(10000)
+
+// Minimal jsdom polyfills for browser APIs jsdom does not implement.
+// Guarded so node-environment suites are unaffected.
+if (typeof window !== 'undefined') {
+  if (typeof globalThis.ResizeObserver === 'undefined') {
+    class ResizeObserverStub {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver
+  }
+
+  if (typeof Element.prototype.scrollIntoView !== 'function') {
+    Element.prototype.scrollIntoView = jest.fn()
+  }
+}

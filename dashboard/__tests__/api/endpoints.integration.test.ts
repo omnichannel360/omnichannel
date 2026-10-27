@@ -1,16 +1,22 @@
-import { createToken } from '@/lib/auth'
+import jwt from 'jsonwebtoken'
+import { NextRequest } from 'next/server'
+import { generateToken } from '@/lib/auth'
+import { middleware } from '@/middleware'
 
+/**
+ * Previously these hit a live server on localhost:3000 via fetch. They now drive the
+ * Edge middleware (middleware.ts) directly, which is where the API auth gate lives.
+ */
 describe('Protected API Endpoints Integration Tests', () => {
   const apiUrl = 'http://localhost:3000'
   let authToken: string
 
+  const callMiddleware = (path: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}) =>
+    middleware(new NextRequest(new URL(`${apiUrl}${path}`), init))
+
   beforeEach(async () => {
     // Create a test token
-    authToken = await createToken({
-      sub: 'test-user-123',
-      email: 'testuser@example.com',
-      role: 'admin',
-    })
+    authToken = await generateToken('test-user-123', 'testuser@example.com', 'admin')
   })
 
   describe('Authentication Requirements', () => {
@@ -26,9 +32,7 @@ describe('Protected API Endpoints Integration Tests', () => {
 
     protectedEndpoints.forEach(({ path, method }) => {
       it(`should reject ${method} ${path} without authentication`, async () => {
-        const response = await fetch(`${apiUrl}${path}`, {
-          method,
-        })
+        const response = await callMiddleware(path, { method })
 
         expect(response.status).toBe(401)
         const data = await response.json()
@@ -37,7 +41,7 @@ describe('Protected API Endpoints Integration Tests', () => {
       })
 
       it(`should accept ${method} ${path} with valid token`, async () => {
-        const response = await fetch(`${apiUrl}${path}`, {
+        const response = await callMiddleware(path, {
           method,
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -49,7 +53,7 @@ describe('Protected API Endpoints Integration Tests', () => {
       })
 
       it(`should reject ${method} ${path} with invalid token`, async () => {
-        const response = await fetch(`${apiUrl}${path}`, {
+        const response = await callMiddleware(path, {
           method,
           headers: {
             authorization: 'Bearer invalid-token-xyz',
@@ -60,7 +64,7 @@ describe('Protected API Endpoints Integration Tests', () => {
       })
 
       it(`should reject ${method} ${path} with malformed auth header`, async () => {
-        const response = await fetch(`${apiUrl}${path}`, {
+        const response = await callMiddleware(path, {
           method,
           headers: {
             authorization: 'InvalidFormat token123',
@@ -74,12 +78,12 @@ describe('Protected API Endpoints Integration Tests', () => {
 
   describe('Public Endpoints', () => {
     it('should allow GET /api/health without authentication', async () => {
-      const response = await fetch(`${apiUrl}/api/health`)
+      const response = await callMiddleware('/api/health')
       expect(response.status).not.toBe(401)
     })
 
     it('should allow POST /api/auth without authentication', async () => {
-      const response = await fetch(`${apiUrl}/api/auth`, {
+      const response = await callMiddleware('/api/auth', {
         method: 'POST',
         body: JSON.stringify({
           username: 'test',
@@ -94,17 +98,30 @@ describe('Protected API Endpoints Integration Tests', () => {
 
   describe('Token Validation', () => {
     it('should extract user info from token', async () => {
-      // The middleware should attach user info to headers
-      // This would be verified in actual integration tests
       expect(authToken).toBeDefined()
       expect(authToken.split('.').length).toBe(3)
+
+      // The middleware attaches user info to the forwarded request headers
+      const response = await callMiddleware('/api/alerts', {
+        headers: { authorization: `Bearer ${authToken}` },
+      })
+      expect(response.headers.get('x-middleware-request-x-user-id')).toBe('test-user-123')
+      expect(response.headers.get('x-middleware-request-x-user-email')).toBe('testuser@example.com')
+      expect(response.headers.get('x-middleware-request-x-user-role')).toBe('admin')
+      expect(response.headers.get('x-middleware-request-x-auth-verified')).toBe('true')
     })
 
     it('should handle token expiration gracefully', async () => {
-      // Expired tokens should return 401
-      const response = await fetch(`${apiUrl}/api/alerts`, {
+      // Expired tokens should return 401: correctly signed, but exp is in the past
+      const now = Math.floor(Date.now() / 1000)
+      const expiredToken = jwt.sign(
+        { sub: 'test-user-123', email: 'testuser@example.com', role: 'admin', iat: now - 7200, exp: now - 3600 },
+        process.env.JWT_SECRET as string
+      )
+
+      const response = await callMiddleware('/api/alerts', {
         headers: {
-          authorization: 'Bearer expired.token.here',
+          authorization: `Bearer ${expiredToken}`,
         },
       })
 

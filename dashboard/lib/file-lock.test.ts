@@ -1,159 +1,219 @@
 /**
  * Comprehensive tests for file locking mechanism
  * Verifies race condition fixes and proper lock behavior
+ *
+ * The lock is an in-process, per-path FIFO queue (see lib/file-lock.ts):
+ * withFileLock / withLock serialize callbacks per path, clearAllLocks resets
+ * all lock state, getLockCount reports the number of live lock entries.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import {
-  acquireLock,
-  tryAcquireLock,
-  releaseLock,
-  withLock,
-  cleanupStaleLocks,
-} from './file-lock'
+import { withFileLock, withLock, clearAllLocks, getLockCount } from './file-lock'
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
+
+interface Deferred {
+  promise: Promise<void>
+  resolve: () => void
+}
+
+function createDeferred(): Deferred {
+  let resolve!: () => void
+  const promise = new Promise<void>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Holds the lock on filePath until the returned release() is called. */
+async function holdLock(filePath: string): Promise<{ release: () => void; done: Promise<void> }> {
+  const acquired = createDeferred()
+  const held = createDeferred()
+  const done = withFileLock(filePath, async () => {
+    acquired.resolve()
+    await held.promise
+  })
+  await acquired.promise
+  return { release: held.resolve, done }
+}
 
 describe('File Locking - Race Condition Prevention', () => {
   let testDir: string
   let testFile: string
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `file-lock-test-${Date.now()}`)
+    clearAllLocks()
+    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'omni-test-'))
     testFile = path.join(testDir, 'test.txt')
-    await fs.mkdir(testDir, { recursive: true })
   })
 
   afterEach(async () => {
-    try {
-      await fs.rm(testDir, { recursive: true, force: true })
-    } catch {
-      // Ignore cleanup errors
-    }
-    // Clean up stale locks
-    await cleanupStaleLocks()
+    clearAllLocks()
+    await fs.rm(testDir, { recursive: true, force: true })
   })
 
   describe('Sequential Lock Acquisition', () => {
     it('should acquire and release locks sequentially without race conditions', async () => {
-      const lock1 = await acquireLock(testFile)
-      expect(lock1).toBeDefined()
-      expect(lock1.path).toBe(testFile)
-
-      await releaseLock(lock1)
+      const first = await withFileLock(testFile, async () => {
+        expect(getLockCount()).toBe(1)
+        return 'first'
+      })
+      expect(first).toBe('first')
+      expect(getLockCount()).toBe(0)
 
       // Second lock should succeed immediately
-      const lock2 = await acquireLock(testFile, { timeout: 1000 })
-      expect(lock2).toBeDefined()
-      await releaseLock(lock2)
+      const second = await withFileLock(testFile, async () => 'second', 1000)
+      expect(second).toBe('second')
+      expect(getLockCount()).toBe(0)
     })
 
     it('should prevent concurrent lock acquisition with proper queue ordering', async () => {
-      const order: number[] = []
+      const order: string[] = []
+      const makeCallback = (id: number) => async (): Promise<void> => {
+        order.push(`start-${id}`)
+        await sleep(20)
+        order.push(`end-${id}`)
+      }
 
-      const lock1Promise = acquireLock(testFile, { timeout: 5000 })
-      const lock2Promise = acquireLock(testFile, { timeout: 5000 })
-      const lock3Promise = acquireLock(testFile, { timeout: 5000 })
+      await Promise.all([
+        withFileLock(testFile, makeCallback(1), 5000),
+        withFileLock(testFile, makeCallback(2), 5000),
+        withFileLock(testFile, makeCallback(3), 5000),
+      ])
 
-      const [lock1, lock2, lock3] = await Promise.all([lock1Promise, lock2Promise, lock3Promise])
-
-      // All locks should be acquired (queued)
-      expect([lock1, lock2, lock3].every(l => l !== null)).toBe(true)
-
-      // Release in order
-      await releaseLock(lock1)
-      await releaseLock(lock2)
-      await releaseLock(lock3)
+      // FIFO order, no overlap
+      expect(order).toEqual(['start-1', 'end-1', 'start-2', 'end-2', 'start-3', 'end-3'])
+      expect(getLockCount()).toBe(0)
     })
 
     it('should handle many concurrent lock requests without data loss', async () => {
       const concurrentRequests = 20
-      const locks = await Promise.all(
-        Array(concurrentRequests)
-          .fill(null)
-          .map(() => acquireLock(testFile, { timeout: 10000 }))
+      let counter = 0
+
+      const results = await Promise.all(
+        Array.from({ length: concurrentRequests }, () =>
+          withFileLock(
+            testFile,
+            async () => {
+              // Read-yield-write: loses updates unless calls are serialized
+              const current = counter
+              await sleep(1)
+              counter = current + 1
+              return counter
+            },
+            10000
+          )
+        )
       )
 
-      expect(locks).toHaveLength(concurrentRequests)
-      locks.forEach(lock => {
-        expect(lock).toBeDefined()
-      })
-
-      // Release all locks
-      await Promise.all(locks.map(lock => releaseLock(lock)))
+      expect(results).toHaveLength(concurrentRequests)
+      expect(counter).toBe(concurrentRequests)
+      expect([...results].sort((a, b) => a - b)).toEqual(
+        Array.from({ length: concurrentRequests }, (_, i) => i + 1)
+      )
+      expect(getLockCount()).toBe(0)
     })
   })
 
   describe('Timeout Mechanism', () => {
     it('should timeout if lock cannot be acquired within specified time', async () => {
-      const lock1 = await acquireLock(testFile, { timeout: 500, retryDelay: 50 })
+      const holder = await holdLock(testFile)
+      let waiterRan = false
 
-      // Try to acquire with very short timeout
-      const lock2Promise = tryAcquireLock(testFile, 100)
+      // Waiter with a 100ms acquisition timeout while the lock is still held
+      const waiter = withFileLock(
+        testFile,
+        async () => {
+          waiterRan = true
+        },
+        100
+      ).then(
+        () => 'acquired' as const,
+        (error: Error) => error
+      )
 
-      // Timeout should occur
-      const lock2 = await lock2Promise
-      expect(lock2).toBeNull()
+      const outcome = await Promise.race([waiter, sleep(1000).then(() => 'still-waiting' as const)])
 
-      await releaseLock(lock1)
+      holder.release()
+      await holder.done
+      await waiter
+
+      // Timeout should occur while the holder still owns the lock
+      expect(outcome).toBeInstanceOf(Error)
+      expect((outcome as Error).message).toContain('Lock acquisition timeout')
+      expect(waiterRan).toBe(false)
     })
 
     it('should recover from timeout and allow subsequent acquisition', async () => {
-      const lock1 = await acquireLock(testFile, { timeout: 500, retryDelay: 50 })
+      const holder = await holdLock(testFile)
+      let waiterRan = false
 
-      const failedLock = await tryAcquireLock(testFile, 100)
-      expect(failedLock).toBeNull()
+      const waiter = withFileLock(
+        testFile,
+        async () => {
+          waiterRan = true
+        },
+        100
+      )
+      const waiterResult = waiter.catch((error: Error) => error)
 
-      await releaseLock(lock1)
+      await sleep(200)
+      holder.release()
+      await holder.done
+
+      const failure = await waiterResult
+      expect(failure).toBeInstanceOf(Error)
+      expect((failure as Error).message).toContain('Lock acquisition timeout')
+      expect(waiterRan).toBe(false)
+      expect(getLockCount()).toBe(0)
 
       // Should be able to acquire now
-      const lock2 = await acquireLock(testFile, { timeout: 1000 })
-      expect(lock2).toBeDefined()
-      await releaseLock(lock2)
+      const result = await withFileLock(testFile, async () => 'reacquired', 1000)
+      expect(result).toBe('reacquired')
+      expect(getLockCount()).toBe(0)
     })
   })
 
   describe('withLock Wrapper Function', () => {
     it('should automatically acquire and release lock', async () => {
-      const result = await withLock(testFile, async (_lock) => {
+      const result = await withLock(testFile, async () => {
+        expect(getLockCount()).toBe(1)
         return 'success'
       })
 
       expect(result).toBe('success')
+      expect(getLockCount()).toBe(0)
     })
 
     it('should handle errors in callback and still release lock', async () => {
-      try {
-        await withLock(testFile, async (_lock) => {
+      await expect(
+        withLock(testFile, async () => {
           throw new Error('test error')
         })
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error)
-      }
+      ).rejects.toThrow('test error')
+
+      expect(getLockCount()).toBe(0)
 
       // Should still be able to acquire lock
-      const lock = await acquireLock(testFile, { timeout: 1000 })
-      expect(lock).toBeDefined()
-      await releaseLock(lock)
+      const result = await withLock(testFile, async () => 'after-error', 1000)
+      expect(result).toBe('after-error')
     })
 
     it('should prevent concurrent executions of callback', async () => {
       let activeCount = 0
       let maxActive = 0
 
-      const callback = async () => {
+      const callback = async (): Promise<void> => {
         activeCount++
         maxActive = Math.max(maxActive, activeCount)
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await sleep(50)
         activeCount--
       }
 
-      await Promise.all([
-        withLock(testFile, callback),
-        withLock(testFile, callback),
-        withLock(testFile, callback),
-      ])
+      await Promise.all([withLock(testFile, callback), withLock(testFile, callback), withLock(testFile, callback)])
 
       // Only one should be active at a time
       expect(maxActive).toBe(1)
@@ -162,24 +222,25 @@ describe('File Locking - Race Condition Prevention', () => {
 
   describe('Stale Lock Detection', () => {
     it('should detect and clean up stale locks', async () => {
-      const lockDir = path.join(os.tmpdir(), '.file-locks')
-      await fs.mkdir(lockDir, { recursive: true })
+      const staleFile = path.join(testDir, 'stale.txt')
 
-      // Create a stale lock file manually
-      const staleLockPath = path.join(lockDir, 'stale.lock')
-      const staleMetadata = {
-        pid: 99999, // Non-existent process
-        timestamp: Date.now() - 60000, // 60 seconds old
-        filePath: '/tmp/stale',
-      }
-      await fs.writeFile(staleLockPath, JSON.stringify(staleMetadata))
+      // A holder that never releases on its own simulates a stale lock
+      const stale = await holdLock(staleFile)
+      expect(getLockCount()).toBe(1)
 
-      const cleaned = await cleanupStaleLocks(lockDir, 30000) // 30 second timeout
-      expect(cleaned).toBeGreaterThanOrEqual(1)
+      clearAllLocks()
+      expect(getLockCount()).toBe(0)
 
-      // Stale lock should be removed
-      const files = await fs.readdir(lockDir)
-      expect(files.filter(f => f.endsWith('.lock')).length).toBe(0)
+      // Path is usable again despite the stale holder
+      const outcome = await Promise.race([
+        withFileLock(staleFile, async () => 'acquired', 1000),
+        sleep(500).then(() => 'blocked'),
+      ])
+      expect(outcome).toBe('acquired')
+      expect(getLockCount()).toBe(0)
+
+      stale.release()
+      await stale.done
     })
   })
 
@@ -187,15 +248,25 @@ describe('File Locking - Race Condition Prevention', () => {
     it('should isolate locks per file path', async () => {
       const testFile2 = path.join(testDir, 'test2.txt')
 
-      const lock1 = await acquireLock(testFile)
-      const lock2 = await acquireLock(testFile2, { timeout: 1000 })
+      const holder = await holdLock(testFile)
 
-      // Both should be acquired (different files)
-      expect(lock1).toBeDefined()
-      expect(lock2).toBeDefined()
+      // Different file should be acquirable while the first is held
+      const outcome = await Promise.race([
+        withFileLock(
+          testFile2,
+          async () => {
+            expect(getLockCount()).toBe(2)
+            return 'acquired'
+          },
+          1000
+        ),
+        sleep(500).then(() => 'blocked'),
+      ])
+      expect(outcome).toBe('acquired')
 
-      await releaseLock(lock1)
-      await releaseLock(lock2)
+      holder.release()
+      await holder.done
+      expect(getLockCount()).toBe(0)
     })
 
     it('should not interfere with locks on different files', async () => {
@@ -207,12 +278,12 @@ describe('File Locking - Race Condition Prevention', () => {
       await Promise.all([
         withLock(file1, async () => {
           results.push('f1-start')
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await sleep(100)
           results.push('f1-end')
         }),
         withLock(file2, async () => {
           results.push('f2-start')
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await sleep(100)
           results.push('f2-end')
         }),
       ])
@@ -230,24 +301,37 @@ describe('File Locking - Race Condition Prevention', () => {
       const results: boolean[] = []
 
       for (let i = 0; i < iterations; i++) {
-        const lock = await acquireLock(testFile, { timeout: 1000 })
-        results.push(lock !== null)
-        await releaseLock(lock)
+        const acquired = await withFileLock(testFile, async () => true, 1000)
+        results.push(acquired)
+        expect(getLockCount()).toBe(0)
       }
 
-      expect(results.every(r => r === true)).toBe(true)
+      expect(results).toHaveLength(iterations)
+      expect(results.every((r) => r === true)).toBe(true)
     })
 
     it('should preserve lock data integrity across concurrent operations', async () => {
-      const locks = await Promise.all([
-        acquireLock(testFile, { timeout: 5000 }),
-        acquireLock(testFile, { timeout: 5000 }),
-      ])
+      const holder = await holdLock(testFile)
+      let queuedRan = false
 
-      expect(locks[0].path).toBe(locks[1].path)
-      expect(locks[0].lockPath).toBe(locks[1].lockPath)
+      const queued = withFileLock(
+        testFile,
+        async () => {
+          queuedRan = true
+        },
+        5000
+      )
 
-      await Promise.all(locks.map(lock => releaseLock(lock)))
+      // Both operations share a single lock entry for the same path
+      expect(getLockCount()).toBe(1)
+      await sleep(50)
+      expect(queuedRan).toBe(false)
+
+      holder.release()
+      await Promise.all([holder.done, queued])
+
+      expect(queuedRan).toBe(true)
+      expect(getLockCount()).toBe(0)
     })
   })
 })

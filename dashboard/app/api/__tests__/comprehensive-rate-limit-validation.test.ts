@@ -10,11 +10,11 @@
 
 import { NextRequest } from 'next/server'
 import {
-  applyRateLimit,
   createRateLimiter,
   defaultKeyGenerator,
   userKeyGenerator,
-} from '@/lib/api-rate-limit-middleware'
+  resetRateLimitStore,
+} from '@/lib/rate-limiting'
 import {
   validateBody,
   validateQuery,
@@ -36,6 +36,16 @@ import {
 
 describe('Comprehensive Rate Limiting & Input Validation', () => {
   describe('Rate Limiting', () => {
+    beforeEach(() => {
+      // All limiters share one global store; start every test from a clean slate
+      resetRateLimitStore()
+    })
+
+    afterAll(() => {
+      // Stops the store's cleanup interval so Jest can exit cleanly
+      resetRateLimitStore()
+    })
+
     describe('Auth endpoint rate limiting', () => {
       it('should enforce 5 requests per minute for auth endpoint', async () => {
         const limiter = createRateLimiter({
@@ -77,11 +87,20 @@ describe('Comprehensive Rate Limiting & Input Validation', () => {
           },
         })
 
+        // Requests within the limit pass through (limiter returns null)
         const response = await limiter(mockRequest)
         expect(response).toBeNull()
 
-        // Headers should be set by the rate limiter
-        // These are validated in the limiter itself
+        // Exhaust the limit; the 429 response must carry the rate limit headers
+        for (let i = 0; i < 9; i++) {
+          expect(await limiter(mockRequest)).toBeNull()
+        }
+        const limited = await limiter(mockRequest)
+        expect(limited?.status).toBe(429)
+        expect(limited?.headers.get('X-RateLimit-Limit')).toBe('10')
+        expect(limited?.headers.get('X-RateLimit-Remaining')).toBe('0')
+        const reset = Number(limited?.headers.get('X-RateLimit-Reset'))
+        expect(reset).toBeGreaterThanOrEqual(Math.floor(Date.now() / 1000))
       })
 
       it('should distinguish between different IPs', async () => {
@@ -152,13 +171,15 @@ describe('Comprehensive Rate Limiting & Input Validation', () => {
   })
 
   describe('Input Validation - Enum Values', () => {
-    describe('Alert level enum validation', () => {
-      it('should accept valid alert levels', async () => {
-        const validPayloads = [
-          { level: 'info', component: 'test', message: 'test message' },
-          { level: 'warning', component: 'test', message: 'test message' },
-          { level: 'critical', component: 'test', message: 'test message' },
-        ]
+    // AlertCreateBodySchema now uses `severity` (info|warning|error|critical) and
+    // requires `title` + `message`; the old `level`/`component` fields were removed.
+    describe('Alert severity enum validation', () => {
+      it('should accept valid alert severities', async () => {
+        const validPayloads = ['info', 'warning', 'error', 'critical'].map((severity) => ({
+          title: 'test',
+          message: 'test message',
+          severity,
+        }))
 
         for (const payload of validPayloads) {
           const result = AlertCreateBodySchema.safeParse(payload)
@@ -166,11 +187,11 @@ describe('Comprehensive Rate Limiting & Input Validation', () => {
         }
       })
 
-      it('should reject invalid alert levels', () => {
+      it('should reject invalid alert severities', () => {
         const invalidPayload = {
-          level: 'invalid',
-          component: 'test',
+          title: 'test',
           message: 'test message',
+          severity: 'invalid',
         }
 
         const result = AlertCreateBodySchema.safeParse(invalidPayload)
@@ -284,8 +305,8 @@ describe('Comprehensive Rate Limiting & Input Validation', () => {
     describe('Alert creation validation', () => {
       it('should require all mandatory fields', () => {
         const incompletePayload = {
-          level: 'info',
-          // missing component and message
+          severity: 'info',
+          // missing title and message
         }
         const result = AlertCreateBodySchema.safeParse(incompletePayload)
         expect(result.success).toBe(false)
@@ -293,9 +314,9 @@ describe('Comprehensive Rate Limiting & Input Validation', () => {
 
       it('should enforce string length limits', () => {
         const tooLongMessage = {
-          level: 'info',
-          component: 'test',
-          message: 'x'.repeat(2001), // Exceeds 2000 character limit
+          title: 'test',
+          severity: 'info',
+          message: 'x'.repeat(1001), // Exceeds 1000 character limit (createSafeString default)
         }
         const result = AlertCreateBodySchema.safeParse(tooLongMessage)
         expect(result.success).toBe(false)
