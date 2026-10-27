@@ -77,10 +77,11 @@ describe('Authentication Middleware', () => {
 
       const response = await middleware(request)
 
-      // Check if headers are attached
-      expect(response.headers.get('x-user-id')).toBe('user-123')
-      expect(response.headers.get('x-user-email')).toBe('test@example.com')
-      expect(response.headers.get('x-user-role')).toBe('admin')
+      // Forwarded to the route handler via x-middleware-request-* headers
+      expect(response.headers.get('x-middleware-request-x-user-id')).toBe('user-123')
+      expect(response.headers.get('x-middleware-request-x-user-email')).toBe('test@example.com')
+      expect(response.headers.get('x-middleware-request-x-user-role')).toBe('admin')
+      expect(response.headers.get('x-user-id')).toBeNull()
     })
 
     test('should handle missing token gracefully', async () => {

@@ -366,6 +366,7 @@ export const ProfileQuerySchema = z.object({
     .string()
     .min(1, 'User ID is required')
     .max(100, 'User ID must not exceed 100 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'User ID must contain only alphanumeric characters, underscores, and hyphens')
     .optional(),
 })
 

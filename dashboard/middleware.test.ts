@@ -108,11 +108,30 @@ describe('Auth Middleware', () => {
         const request = createRequest(route, validToken)
         const response = await middleware(request)
 
-        // Check that headers were set
-        expect(response.headers.get('x-user-id')).toBe('user-123')
-        expect(response.headers.get('x-user-email')).toBe('user@example.com')
-        expect(response.headers.get('x-user-role')).toBe('admin')
-        expect(response.headers.get('x-auth-verified')).toBe('true')
+        // NextResponse.next({ request: { headers } }) forwards request headers to the
+        // route handler via x-middleware-request-* (not as plain response headers)
+        expect(response.headers.get('x-middleware-request-x-user-id')).toBe('user-123')
+        expect(response.headers.get('x-middleware-request-x-user-email')).toBe('user@example.com')
+        expect(response.headers.get('x-middleware-request-x-user-role')).toBe('admin')
+        expect(response.headers.get('x-middleware-request-x-auth-verified')).toBe('true')
+        // Identity must not leak onto the client-facing response
+        expect(response.headers.get('x-user-id')).toBeNull()
+      })
+
+      test('should overwrite client-supplied identity headers (no spoofing)', async () => {
+        const validToken = createTestToken({
+          sub: 'user-123',
+          email: 'user@example.com',
+          role: 'user',
+        })
+
+        const request = createRequest(route, validToken)
+        request.headers.set('x-user-id', 'attacker')
+        request.headers.set('x-user-role', 'admin')
+        const response = await middleware(request)
+
+        expect(response.headers.get('x-middleware-request-x-user-id')).toBe('user-123')
+        expect(response.headers.get('x-middleware-request-x-user-role')).toBe('user')
       })
     })
   })
@@ -197,9 +216,9 @@ describe('Auth Middleware', () => {
       const request = createRequest('/api/alerts', token)
       const response = await middleware(request)
 
-      expect(response.headers.get('x-user-id')).toBe('user-456')
-      expect(response.headers.get('x-user-email')).toBe('admin@example.com')
-      expect(response.headers.get('x-user-role')).toBe('admin')
+      expect(response.headers.get('x-middleware-request-x-user-id')).toBe('user-456')
+      expect(response.headers.get('x-middleware-request-x-user-email')).toBe('admin@example.com')
+      expect(response.headers.get('x-middleware-request-x-user-role')).toBe('admin')
     })
   })
 
@@ -254,15 +273,15 @@ describe('Auth Middleware', () => {
         role: 'user',
       })
 
-      // This should throw because JWT_SECRET is required
+      // Missing secret must fail closed (401), never let the request through
       const request = createRequest('/api/alerts', token)
 
-      expect(() => {
-        middleware(request)
-      }).toThrow('JWT_SECRET not configured')
-
-      // Restore
-      process.env.JWT_SECRET = originalSecret
+      try {
+        const response = await middleware(request)
+        expect(response.status).toBe(401)
+      } finally {
+        process.env.JWT_SECRET = originalSecret
+      }
     })
   })
 

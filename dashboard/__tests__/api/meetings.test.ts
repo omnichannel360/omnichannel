@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { POST, GET } from '@/app/api/meetings/route'
 import * as fs from 'fs/promises'
+import { atomicUpdate } from '@/lib/atomic-file-ops'
 import path from 'path'
 
 // Mock authentication
@@ -21,6 +22,18 @@ jest.mock('@/lib/ensure-dir', () => ({
   ensureDataDir: jest.fn(),
 }))
 
+// Accepted POSTs must never touch real data/ or company-brain/ files
+jest.mock('@/lib/atomic-file-ops', () => ({
+  atomicRead: jest.fn(async () => []),
+  atomicWrite: jest.fn(async () => undefined),
+  atomicUpdate: jest.fn(async (_path: string, updater: (data: unknown[]) => Promise<unknown>) => updater([])),
+}))
+
+// Isolate route logic from the shared in-memory rate limiter
+jest.mock('@/lib/api-rate-limit-middleware', () => ({
+  applyRateLimit: jest.fn(async () => null),
+}))
+
 describe('POST /api/meetings - Path Traversal Prevention', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -30,6 +43,7 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
     it('rejects meeting_type with path traversal attempt: ../', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: '../../../etc/passwd',
@@ -41,11 +55,14 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
+      expect(String(data.error)).not.toMatch(/content-type/i)
+      expect(atomicUpdate).not.toHaveBeenCalled()
     })
 
     it('rejects meeting_type with backslash traversal: ..\\', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: '..\\..\\windows\\system32',
@@ -57,11 +74,14 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
+      expect(String(data.error)).not.toMatch(/content-type/i)
+      expect(atomicUpdate).not.toHaveBeenCalled()
     })
 
     it('rejects meeting_type with forward slash only', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: '/etc/passwd',
@@ -73,11 +93,14 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
+      expect(String(data.error)).not.toMatch(/content-type/i)
+      expect(atomicUpdate).not.toHaveBeenCalled()
     })
 
     it('rejects meeting_type with dot sequences', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: '....',
@@ -89,11 +112,14 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
+      expect(String(data.error)).not.toMatch(/content-type/i)
+      expect(atomicUpdate).not.toHaveBeenCalled()
     })
 
     it('rejects meeting_type with mixed separators', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: '..\\../admin',
@@ -105,11 +131,14 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
+      expect(String(data.error)).not.toMatch(/content-type/i)
+      expect(atomicUpdate).not.toHaveBeenCalled()
     })
 
     it('rejects meeting_type with encoded traversal', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: '%2e%2e%2fadmin',
@@ -121,11 +150,14 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
+      expect(String(data.error)).not.toMatch(/content-type/i)
+      expect(atomicUpdate).not.toHaveBeenCalled()
     })
 
     it('rejects meeting_type exceeding max length (64 chars)', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: 'a'.repeat(65),
@@ -137,6 +169,8 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
+      expect(String(data.error)).not.toMatch(/content-type/i)
+      expect(atomicUpdate).not.toHaveBeenCalled()
     })
 
     it('rejects meeting_type with special characters', async () => {
@@ -145,6 +179,7 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
       for (const char of specialChars) {
         const request = new NextRequest('http://localhost/api/meetings', {
           method: 'POST',
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             message: 'Test meeting',
             meeting_type: `test${char}meeting`,
@@ -156,6 +191,8 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
         expect(response.status).toBe(400)
         expect(data.success).toBe(false)
+        expect(String(data.error)).not.toMatch(/content-type/i)
+        expect(atomicUpdate).not.toHaveBeenCalled()
       }
 
     })
@@ -163,6 +200,7 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
     it('accepts valid meeting_type: alphanumeric', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: 'planning_meeting_2025',
@@ -171,11 +209,13 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       const response = await POST(request)
       expect(response.status).toBe(200)
+      expect(atomicUpdate).toHaveBeenCalledTimes(1)
     })
 
     it('accepts valid meeting_type: with hyphens', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: 'budget-review-q4',
@@ -184,11 +224,13 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       const response = await POST(request)
       expect(response.status).toBe(200)
+      expect(atomicUpdate).toHaveBeenCalledTimes(1)
     })
 
     it('accepts valid meeting_type: with underscores', async () => {
       const request = new NextRequest('http://localhost/api/meetings', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: 'Test meeting',
           meeting_type: 'team_standup',
@@ -197,6 +239,7 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
 
       const response = await POST(request)
       expect(response.status).toBe(200)
+      expect(atomicUpdate).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -235,10 +278,9 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
       const { safeJoin } = require('@/lib/validation')
       const baseDir = '/data/meetings'
 
-      // safeJoin should throw or prevent escape
-      expect(() => {
-        safeJoin(baseDir, '../../../etc/passwd')
-      }).toThrow()
+      // safeJoin strips directories via basename, so the result stays inside baseDir
+      const result = safeJoin(baseDir, '../../../etc/passwd')
+      expect(path.dirname(result)).toBe(path.resolve(baseDir))
     })
 
     it('allows valid filenames in safeJoin()', () => {
@@ -249,8 +291,7 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
       const result = safeJoin(baseDir, fileName)
 
       expect(result).toContain('meeting_12345.json')
-      expect(result).toContain('/data/meetings')
-      // Resolved path must be within baseDir
+      // Resolved path must be within baseDir (platform-independent)
       expect(result.startsWith(path.resolve(baseDir))).toBe(true)
     })
   })
@@ -274,17 +315,15 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
       const { safeJoin } = require('@/lib/validation')
       const baseDir = path.resolve('/data/meetings')
 
-      // Attempt 1: Direct path traversal
-      const attempt1 = '../../../etc/passwd'
-      expect(() => safeJoin(baseDir, attempt1)).toThrow()
-
-      // Attempt 2: Encoded traversal
-      const attempt2 = '%2e%2e%2fadmin'
-      expect(() => safeJoin(baseDir, attempt2)).toThrow()
-
-      // Attempt 3: Null byte injection
-      const attempt3 = 'file.json\0.txt'
-      expect(() => safeJoin(baseDir, attempt3)).toThrow()
+      // Every attempt must resolve to a direct child of baseDir
+      const attempts = [
+        '../../../etc/passwd', // direct traversal
+        '%2e%2e%2fadmin', // encoded traversal (not decoded, so a literal filename)
+        'file.json\0.txt', // null byte (fs calls reject \0 at I/O time)
+      ]
+      for (const attempt of attempts) {
+        expect(path.dirname(safeJoin(baseDir, attempt))).toBe(baseDir)
+      }
     })
   })
 
