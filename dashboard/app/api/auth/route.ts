@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateToken, generateRefreshToken } from '@/lib/auth'
+import { generateToken, generateRefreshToken, verifyToken } from '@/lib/auth'
 import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
 import { logger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
@@ -8,6 +8,8 @@ import {
   extractCorrelationFromRequest,
   handleRouteError,
   createSuccessResponse,
+  createErrorResponse,
+  ERROR_CODES,
 } from '@/lib/error-handling'
 
 // Create rate limiter for this endpoint
@@ -15,8 +17,10 @@ const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.auth)
 
 /**
  * POST /api/auth
- * Generate authentication tokens for API access
+ * Generate authentication tokens for API access (admin only — e.g. service tokens).
+ * Interactive users obtain tokens via /api/auth/login.
  *
+ * @header Authorization: Bearer <admin access token>
  * @body { userId: string, email: string, role?: string }
  * @returns { accessToken: string, refreshToken: string, expiresIn: number }
  */
@@ -33,6 +37,30 @@ export async function POST(request: NextRequest) {
   const remaining = rateLimitCheck.remaining ?? 0
   const resetTime = rateLimitCheck.resetTime ?? (Date.now() + 3600 * 1000)
   const limit = rateLimitCheck.limit ?? RATE_LIMIT_CONFIGS.auth.maxRequests
+
+  // Middleware treats /api/auth* as public, so the caller must be authorized here
+  const caller = await verifyToken(request)
+  if (!caller) {
+    return addRateLimitHeaders(
+      createErrorResponse('Authentication required', ERROR_CODES.AUTH_MISSING, requestId, 401),
+      remaining,
+      resetTime,
+      limit
+    )
+  }
+  if (caller.role !== 'admin') {
+    return addRateLimitHeaders(
+      createErrorResponse(
+        'Insufficient permissions. Required role: admin',
+        ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+        requestId,
+        403
+      ),
+      remaining,
+      resetTime,
+      limit
+    )
+  }
 
   const startTime = Date.now()
   const logContext = createLogContext({
@@ -57,6 +85,7 @@ export async function POST(request: NextRequest) {
 
     logger.info('Auth tokens generated successfully', {
       ...logContext,
+      issuedBy: caller.sub,
       userEmail: email,
       statusCode: 200,
       responseTimeMs: Date.now() - startTime,
