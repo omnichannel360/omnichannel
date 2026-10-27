@@ -162,8 +162,8 @@ describe('Authentication Middleware', () => {
       })
 
       const result = await verifyAuth(mockRequest)
-      // Note: Current implementation is case-sensitive, adjust test if needed
-      expect(result.authenticated).toBe(false)
+      // RFC 7235 §2.1: auth-scheme is case-insensitive
+      expect(result.authenticated).toBe(true)
     })
   })
 

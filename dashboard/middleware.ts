@@ -104,8 +104,10 @@ function getJWTSecret(): string {
  */
 function extractToken(request: NextRequest): { token?: string; fromCookie: boolean } {
   const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    return { token: authHeader.substring(7), fromCookie: false }
+  // RFC 7235 §2.1: auth-scheme is case-insensitive
+  const match = authHeader?.match(/^Bearer\s+(\S+)$/i)
+  if (match) {
+    return { token: match[1], fromCookie: false }
   }
   const cookie = request.cookies.get(SESSION_COOKIE)?.value
   return { token: cookie || undefined, fromCookie: Boolean(cookie) }
