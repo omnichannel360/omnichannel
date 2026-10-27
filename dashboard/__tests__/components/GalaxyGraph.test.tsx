@@ -1,3 +1,4 @@
+/** @jest-environment jsdom */
 ﻿import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { GalaxyGraph } from '../../components/GalaxyGraph'
@@ -70,11 +71,7 @@ describe('GalaxyGraph - XSS Vulnerability Prevention', () => {
 
     it('should display success state with node counts', async () => {
       ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-        json: async () => ({ success: true, meta: { total: 42 }
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  }) })
+        json: async () => ({ success: true, meta: { total: 42 } })
       })
 
       render(<GalaxyGraph />)

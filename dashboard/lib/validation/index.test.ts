@@ -3,7 +3,7 @@
  * Tests all validation utilities, schema parsing, and error handling
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 import { z } from 'zod'
 import {
   validateBody,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'

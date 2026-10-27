@@ -4,13 +4,6 @@
  * This file runs before test suite execution
  */
 
-// Polyfill global fetch for Node.js test environment (Node 18+ has it, but ensure availability)
-if (typeof global.fetch === 'undefined') {
-  // For Node < 18 compatibility, import node-fetch or use jest-fetch-mock
-  // For now, we assume Node 18+ which has native fetch support
-  global.fetch = fetch
-}
-
 // Set JWT_SECRET for authentication tests
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'test-jwt-secret-key-at-least-256-bits-long-for-security'

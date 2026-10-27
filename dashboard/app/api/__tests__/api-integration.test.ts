@@ -12,7 +12,7 @@ import os from 'os'
  * 4. File locking prevents data corruption
  */
 
-const apiDir = path.join(process.cwd(), 'dashboard', 'app', 'api')
+const apiDir = path.join(process.cwd(), 'app', 'api')
 
 describe('API Integration - Async I/O Verification', () => {
   const apiFiles = [

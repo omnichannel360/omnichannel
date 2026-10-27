@@ -50,9 +50,6 @@ describe('Race Condition Tests', () => {
       // File doesn't exist
     }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
   })
 
   afterAll(async () => {

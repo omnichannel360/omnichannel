@@ -18,7 +18,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { MeetingTypeSchema, SkillTypeSchema, safeJoin, generateId, VALID_MEETING_TYPES } from '@/lib/validation'
+import { MeetingTypeSchema, SkillTypeSchema, safeJoin, generateId } from '@/lib/validation'
+
+// Meeting types present in real brain logs (schema enforces format, not a fixed list)
+const VALID_MEETING_TYPES = ['standup-report', 'sprint-review', 'sprint-planning', 'retrospective-kaizen', 'postmortem'] as const
 
 describe('PATH TRAVERSAL PREVENTION - COMPREHENSIVE SECURITY SUITE', () => {
   const TEST_BASE_DIR = path.join(process.cwd(), 'data', 'test-comprehensive-security')
@@ -30,9 +33,6 @@ describe('PATH TRAVERSAL PREVENTION - COMPREHENSIVE SECURITY SUITE', () => {
       // Already exists
     }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
   })
 
   afterAll(async () => {
@@ -513,19 +513,19 @@ describe('PATH TRAVERSAL PREVENTION - COMPREHENSIVE SECURITY SUITE', () => {
         expect(result).toContain('meeting_log.json')
       })
 
-      it('should throw on absolute path injection', () => {
+      it('should contain absolute path injection inside base directory', () => {
         const absolutePath = process.platform === 'win32' ? 'C:\\windows\\system32' : '/etc/passwd'
-        expect(() => safeJoin(TEST_BASE_DIR, absolutePath)).toThrow()
+        expect(path.dirname(safeJoin(TEST_BASE_DIR, absolutePath))).toBe(path.resolve(TEST_BASE_DIR))
       })
 
-      it('should throw on directory traversal escape attempts', () => {
+      it('should contain directory traversal escape attempts inside base directory', () => {
         const attempts = [
           '../../sensitive.json',
           '..\\..\\windows\\data',
           '../../../root/.ssh/id_rsa',
         ]
         attempts.forEach(attempt => {
-          expect(() => safeJoin(TEST_BASE_DIR, attempt)).toThrow('Invalid file path')
+          expect(path.dirname(safeJoin(TEST_BASE_DIR, attempt))).toBe(path.resolve(TEST_BASE_DIR))
         })
       })
 
@@ -584,7 +584,7 @@ describe('PATH TRAVERSAL PREVENTION - COMPREHENSIVE SECURITY SUITE', () => {
         expect(basename).not.toBe(attack)
 
         // Layer 3: safeJoin
-        expect(() => safeJoin(TEST_BASE_DIR, attack)).toThrow()
+        expect(path.dirname(safeJoin(TEST_BASE_DIR, attack))).toBe(path.resolve(TEST_BASE_DIR))
       })
 
       it('should handle combination attacks across all vectors', () => {

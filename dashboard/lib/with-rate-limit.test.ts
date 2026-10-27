@@ -18,9 +18,6 @@ describe('withRateLimit middleware', () => {
       })
     }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
   })
 
   describe('Rate limiting enforcement', () => {

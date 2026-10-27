@@ -5,7 +5,8 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals'
  * Verifies all API endpoints properly handle malformed JSON with 400 responses
  */
 
-const BASE_URL = 'http://localhost:3000/api'
+const BASE_URL = `${process.env.E2E_BASE_URL}/api`
+const describeE2E = process.env.E2E_BASE_URL ? describe : describe.skip
 const AUTH_TOKEN = 'test-token'
 
 // Mock headers with authentication
@@ -38,7 +39,7 @@ async function testJsonErrorHandling(endpoint: string, method: 'POST' | 'PUT' | 
   }
 }
 
-describe('API JSON Parsing Error Handling', () => {
+describeE2E('API JSON Parsing Error Handling', () => {
   describe('POST Endpoints', () => {
     it('POST /api/auth - handles malformed JSON with 400', async () => {
       await testJsonErrorHandling('/auth', 'POST')

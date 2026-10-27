@@ -94,19 +94,14 @@ describe('ID Generation - UUID Standardization', () => {
       expect(uuid).not.toMatch(/^\d{13}/)
     })
 
-    it('should generate IDs suitable for concurrent operations', () => {
+    it('should generate IDs suitable for concurrent operations', async () => {
       // Test that multiple simultaneous ID generations don't collide
-      const ids = new Set()
-      const promises = Array.from({ length: 100 }, () =>
-        Promise.resolve(generateId('concurrent'))
+      const ids = await Promise.all(
+        Array.from({ length: 100 }, () => Promise.resolve(generateId('concurrent')))
       )
 
-      promises.forEach(p => {
-        p.then(id => ids.add(id))
-      })
-
       // All IDs should be unique even in concurrent scenarios
-      expect(ids.size).toBeGreaterThan(0)
+      expect(new Set(ids).size).toBe(100)
     })
   })
 

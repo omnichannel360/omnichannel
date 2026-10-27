@@ -3,7 +3,7 @@
  * OWASP Top 10 coverage and advanced security testing
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 import {

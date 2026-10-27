@@ -4,7 +4,7 @@
  * TDD approach: RED → GREEN → REFACTOR
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 import {
   CircuitBreaker,
   retryWithBackoff,
@@ -28,7 +28,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const operation = jest.fn().mockResolvedValue('success')
       const result = await circuitBreaker.execute(operation)
       expect(result).toBe('success')
-      expect(operation).toHaveBeenCalledOnce()
+      expect(operation).toHaveBeenCalledTimes(1)
     })
 
     it('should open after failure threshold', async () => {
@@ -121,7 +121,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const result = await retryWithBackoff(operation)
 
       expect(result).toBe('success')
-      expect(operation).toHaveBeenCalledOnce()
+      expect(operation).toHaveBeenCalledTimes(1)
     })
 
     it('should retry on transient errors', async () => {

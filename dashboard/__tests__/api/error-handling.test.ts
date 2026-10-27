@@ -4,7 +4,7 @@
  * Covers: error codes, status codes, logging, correlation IDs, and error messages
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   generateCorrelationId,

@@ -71,9 +71,6 @@ describe('Error Logging Wrapper', () => {
           'x-forwarded-for': '192.168.1.1'
         }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
       })
 
       await wrapped(request)

@@ -3,7 +3,7 @@
  * Tests timeout handling, retry logic, and circuit breaker patterns
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import {
   retryWithBackoff,
   DEFAULT_RETRY_CONFIG,
@@ -15,12 +15,12 @@ import {
 describe('Error Handling Edge Cases', () => {
   describe('withTimeout function', () => {
     beforeEach(() => {
-      vi.useFakeTimers()
+      jest.useFakeTimers()
     })
 
     afterEach(() => {
-      vi.useRealTimers()
-      vi.clearAllMocks()
+      jest.useRealTimers()
+      jest.clearAllMocks()
     })
 
     it('should resolve successfully when operation completes before timeout', async () => {
@@ -133,11 +133,11 @@ describe('Error Handling Edge Cases', () => {
 
     beforeEach(() => {
       mockOperation = jest.fn()
-      vi.useFakeTimers()
+      jest.useFakeTimers()
     })
 
     afterEach(() => {
-      vi.useRealTimers()
+      jest.useRealTimers()
     })
 
     it('should succeed on first attempt if no error', async () => {
@@ -181,7 +181,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should implement exponential backoff', async () => {
-      vi.useFakeTimers()
+      jest.useFakeTimers()
 
       const operation = vi
         .fn()
@@ -199,16 +199,16 @@ describe('Error Handling Edge Cases', () => {
       const promise = retryWithBackoff(operation, config)
 
       // Verify backoff delays
-      expect(vi.getTimerCount()).toBeGreaterThan(0)
+      expect(jest.getTimerCount()).toBeGreaterThan(0)
 
-      vi.advanceTimersByTime(100)
-      await vi.runAllTimersAsync()
+      jest.advanceTimersByTime(100)
+      await jest.runAllTimersAsync()
 
-      vi.useRealTimers()
+      jest.useRealTimers()
     })
 
     it('should respect maxDelayMs limit', async () => {
-      vi.useFakeTimers()
+      jest.useFakeTimers()
 
       const operation = jest.fn().mockRejectedValue(new Error('timeout'))
 
@@ -223,10 +223,10 @@ describe('Error Handling Edge Cases', () => {
       const promise = retryWithBackoff(operation, config).catch(() => {})
 
       // Skip past all timeouts
-      vi.advanceTimersByTime(2000)
-      await vi.runAllTimersAsync()
+      jest.advanceTimersByTime(2000)
+      await jest.runAllTimersAsync()
 
-      vi.useRealTimers()
+      jest.useRealTimers()
 
       // Max delay should cap at 500ms
       expect(operation.mock.calls.length).toBeLessThanOrEqual(6)
@@ -294,7 +294,7 @@ describe('Error Handling Edge Cases', () => {
       const result = await circuitBreaker.execute(operation)
 
       expect(result).toBe('success')
-      expect(operation).toHaveBeenCalledOnce()
+      expect(operation).toHaveBeenCalledTimes(1)
       expect(circuitBreaker.getState()).toBe('CLOSED')
     })
 

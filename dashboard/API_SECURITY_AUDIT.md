@@ -7,6 +7,13 @@
 
 ---
 
+> **Correction (2026-10-26):** The first version of this report overstated verification.
+> `/api/conductor` passes no `requiredRoles` to `protectRouteMulti`, so any authenticated
+> user can call it (login currently issues `role: 'admin'` to every user, so there is no
+> practical exposure yet). `lib/auth-middleware.ts` skips the role check when a token has
+> no `role` claim (fail-open), but no production route imports it. The "66 test cases" in
+> `app/api/__tests__/security.test.ts` are placeholders, not implemented tests.
+
 ## EXECUTIVE SUMMARY
 
 ✅ **VERDICT: SECURE** — All 11 API endpoints properly protected with authentication middleware, rate limiting, and role-based access control.
@@ -31,7 +38,7 @@
 |----------|--------|------|-----------|-------|--------|
 | `/api/alerts` | GET/POST/PATCH | ✅ Required | ✅ Yes | User | ✅ Protected |
 | `/api/brain` | GET | ✅ Required | ✅ Yes | User | ✅ Protected |
-| `/api/conductor` | POST | ✅ Required | ✅ Yes | Admin | ✅ Protected |
+| `/api/conductor` | GET/POST | ✅ Required | ✅ Yes | ⚠️ Any authenticated user (no `requiredRoles`) | ⚠️ Auth only |
 | `/api/kanban` | GET/POST/PATCH | ✅ Required | ✅ Yes | User | ✅ Protected |
 | `/api/meetings` | POST | ✅ Required | ✅ Yes | User | ✅ Protected |
 | `/api/metrics` | GET | ✅ Required | ✅ Yes | User | ✅ Protected |

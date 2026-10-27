@@ -35,9 +35,6 @@ describe('Rate Limiting Integration', () => {
         expect(RATE_LIMIT_CONFIGS[endpoint as keyof typeof RATE_LIMIT_CONFIGS]).toBeDefined()
       }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
     })
 
     it('enforces auth endpoint limits (5 req/min)', async () => {

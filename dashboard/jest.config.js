@@ -1,7 +1,8 @@
 module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>'],
-  testMatch: ['**/__tests__/**/*.ts', '**/__tests__/**/*.tsx', '**/*.test.ts', '**/*.test.tsx'],
+  testMatch: ['**/*.test.ts', '**/*.test.tsx'],
+  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
@@ -9,11 +10,11 @@ module.exports = {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
       tsconfig: {
-        jsx: 'react',
+        jsx: 'react-jsx',
       },
     }],
   },
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js', '<rootDir>/jest.setup.ts'],
   collectCoverageFrom: [
     'lib/**/*.ts',
     'app/api/**/*.ts',

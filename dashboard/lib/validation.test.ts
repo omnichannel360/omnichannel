@@ -10,7 +10,7 @@ describe('validation.generateId', () => {
   it('generates prefixed UUID v4 when prefix provided', () => {
     const id = generateId('meeting')
     expect(id).toMatch(/^meeting_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
-    expect(id).toStartWith('meeting_')
+    expect(id).toMatch(/^meeting_/)
   })
 
   it('generates unique IDs on successive calls', () => {
@@ -40,9 +40,9 @@ describe('validation.generateId', () => {
     const alertId = generateId('alert')
     const taskId = generateId('task')
 
-    expect(meetingId).toStartWith('meeting_')
-    expect(alertId).toStartWith('alert_')
-    expect(taskId).toStartWith('task_')
+    expect(meetingId).toMatch(/^meeting_/)
+    expect(alertId).toMatch(/^alert_/)
+    expect(taskId).toMatch(/^task_/)
     expect(new Set([meetingId, alertId, taskId]).size).toBe(3)
   })
 
@@ -62,7 +62,7 @@ describe('validation.generateId', () => {
 
   it('works with special characters in prefix', () => {
     const id = generateId('user-message')
-    expect(id).toStartWith('user-message_')
+    expect(id).toMatch(/^user-message_/)
   })
 })
 

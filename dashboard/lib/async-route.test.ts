@@ -36,7 +36,7 @@ describe('asyncRoute', () => {
 
       const response = await wrapped(request)
 
-      expect(handler).toHaveBeenCalledOnce()
+      expect(handler).toHaveBeenCalledTimes(1)
       expect(response.status).toBe(200)
       expect(logger.debug).toHaveBeenCalled()
       expect(logger.logOperation).toHaveBeenCalledWith(
@@ -143,9 +143,6 @@ describe('asyncRoute', () => {
         statusCode: 418,
         details: { custom: true }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
       }))
 
       const wrapped = asyncRoute(handler, {
@@ -219,7 +216,7 @@ describe('asyncRoute', () => {
       })
 
       await wrapped(request)
-      expect(handler).toHaveBeenCalledOnce()
+      expect(handler).toHaveBeenCalledTimes(1)
     })
 
     it('creates POST handler with asyncPost', async () => {
@@ -231,7 +228,7 @@ describe('asyncRoute', () => {
       })
 
       await wrapped(request)
-      expect(handler).toHaveBeenCalledOnce()
+      expect(handler).toHaveBeenCalledTimes(1)
     })
   })
 

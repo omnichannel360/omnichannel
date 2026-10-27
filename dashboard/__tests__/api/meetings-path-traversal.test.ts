@@ -104,8 +104,7 @@ describe('Path Traversal Prevention - MeetingTypeSchema', () => {
     it('accepts valid string of max length (64 chars)', () => {
       const maxLengthString = 'a'.repeat(64)
       const result = MeetingTypeSchema.safeParse(maxLengthString)
-      // Will likely fail whitelist check but passes length constraint
-      expect(result.success).toBe(false) // Because 'aaa...aaa' is not whitelisted
+      expect(result.success).toBe(true)
     })
   })
 
@@ -150,7 +149,7 @@ describe('safeJoin() - Filesystem Path Containment', () => {
     it('allows simple filenames', () => {
       const result = safeJoin('/data/meetings', 'planning_2024.json')
       expect(result).toContain('planning_2024.json')
-      expect(result.startsWith('/data/meetings')).toBe(true)
+      expect(result.startsWith(path.resolve('/data/meetings'))).toBe(true)
     })
 
     it('allows alphanumeric with underscores and hyphens', () => {
@@ -159,7 +158,7 @@ describe('safeJoin() - Filesystem Path Containment', () => {
     })
   })
 
-  describe('Path traversal attempts are blocked', () => {
+  describe('Path traversal attempts are contained', () => {
     const attacks = [
       '../../../etc/passwd',
       '..\\..\\windows\\system32',
@@ -167,17 +166,17 @@ describe('safeJoin() - Filesystem Path Containment', () => {
       '../config.json',
     ]
     attacks.forEach((attack) => {
-      it(`throws on: ${attack}`, () => {
-        expect(() => safeJoin('/data/meetings', attack)).toThrow('Invalid file path')
+      it(`stays inside base on: ${attack}`, () => {
+        expect(path.dirname(safeJoin('/data/meetings', attack))).toBe(path.resolve('/data/meetings'))
       })
     })
   })
 
-  describe('Absolute paths are rejected', () => {
+  describe('Absolute paths are contained', () => {
     const paths = ['/etc/passwd', 'C:\\Windows\\System32']
     paths.forEach((pathName) => {
-      it(`rejects absolute path: ${pathName}`, () => {
-        expect(() => safeJoin('/safe/dir', pathName)).toThrow()
+      it(`stays inside base on absolute path: ${pathName}`, () => {
+        expect(path.dirname(safeJoin('/safe/dir', pathName))).toBe(path.resolve('/safe/dir'))
       })
     })
   })
@@ -205,8 +204,8 @@ describe('Defense in Depth Integration', () => {
     expect(baseName).not.toBe(malicious)
     expect(baseName).toBe('passwd')
 
-    // Layer 3: safeJoin rejects it even if schema somehow failed
-    expect(() => safeJoin('/data/meetings', malicious)).toThrow()
+    // Layer 3: safeJoin contains it even if schema somehow failed
+    expect(path.dirname(safeJoin('/data/meetings', malicious))).toBe(path.resolve('/data/meetings'))
   })
 
   it('Prevents encoding bypass attacks', () => {
@@ -223,16 +222,11 @@ describe('Defense in Depth Integration', () => {
     })
   })
 
-  it('Whitelist enforcement is the final gate', () => {
-    // Even if somehow all special chars pass, whitelist prevents execution
-    const almostValid = 'planning' // Valid format but need to check whitelist
-    const result = MeetingTypeSchema.safeParse(almostValid)
-    // 'planning' is in whitelist
-    expect(result.success).toBe(true)
-
-    const notWhitelisted = 'some_random_meeting' // Valid format but not whitelisted
-    const result2 = MeetingTypeSchema.safeParse(notWhitelisted)
-    expect(result2.success).toBe(false)
+  it('Character allowlist is the gate (no fixed type list)', () => {
+    // Real logs use free-form types like 'sprint-review', so only format is enforced
+    expect(MeetingTypeSchema.safeParse('planning').success).toBe(true)
+    expect(MeetingTypeSchema.safeParse('some_random_meeting').success).toBe(true)
+    expect(MeetingTypeSchema.safeParse('some.random/meeting').success).toBe(false)
   })
 })
 

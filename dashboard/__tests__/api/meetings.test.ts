@@ -158,9 +158,6 @@ describe('POST /api/meetings - Path Traversal Prevention', () => {
         expect(data.success).toBe(false)
       }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
     })
 
     it('accepts valid meeting_type: alphanumeric', async () => {

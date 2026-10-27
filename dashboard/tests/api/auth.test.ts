@@ -158,9 +158,6 @@ describe('Authentication Middleware', () => {
         expect(Math.abs(expirationTime - expectedTime)).toBeLessThan(1000)
       }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
     })
   })
 })

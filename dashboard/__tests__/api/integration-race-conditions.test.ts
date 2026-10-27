@@ -44,9 +44,6 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
       // Already cleaned
     }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
   })
 
   afterAll(async () => {

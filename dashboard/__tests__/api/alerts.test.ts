@@ -26,7 +26,7 @@ describe('Alerts API - Async File I/O Verification', () => {
   })
 
   test('ensures all file I/O operations are async', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
+    const sourceFile = path.join(process.cwd(), 'app/api/alerts/route.ts')
     const content = await fs.readFile(sourceFile, 'utf-8')
 
     // Verify: No synchronous file operations
@@ -49,11 +49,11 @@ describe('Alerts API - Async File I/O Verification', () => {
 
   test('verifies all API endpoints use async patterns', async () => {
     const endpoints = [
-      'dashboard/app/api/alerts/route.ts',
-      'dashboard/app/api/brain/route.ts',
-      'dashboard/app/api/conductor/route.ts',
-      'dashboard/app/api/kanban/route.ts',
-      'dashboard/app/api/meetings/route.ts',
+      'app/api/alerts/route.ts',
+      'app/api/brain/route.ts',
+      'app/api/conductor/route.ts',
+      'app/api/kanban/route.ts',
+      'app/api/meetings/route.ts',
     ]
 
     for (const endpoint of endpoints) {
@@ -73,7 +73,7 @@ describe('Alerts API - Async File I/O Verification', () => {
   })
 
   test('verifies error handling with JSON parse errors', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
+    const sourceFile = path.join(process.cwd(), 'app/api/alerts/route.ts')
     const content = await fs.readFile(sourceFile, 'utf-8')
 
     // Verify explicit error handling for JSON parse failures
@@ -102,7 +102,7 @@ describe('Alerts API - Async File I/O Verification', () => {
   })
 
   test('verifies async/await chain completeness', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
+    const sourceFile = path.join(process.cwd(), 'app/api/alerts/route.ts')
     const content = await fs.readFile(sourceFile, 'utf-8')
 
     // Check that all async functions properly use await
@@ -117,7 +117,7 @@ describe('Alerts API - Async File I/O Verification', () => {
   })
 
   test('verifies imports are properly resolved', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
+    const sourceFile = path.join(process.cwd(), 'app/api/alerts/route.ts')
     const content = await fs.readFile(sourceFile, 'utf-8')
 
     // Verify no duplicate imports

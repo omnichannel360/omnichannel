@@ -2,7 +2,7 @@ import { POST, GET } from '../route'
 import { NextRequest } from 'next/server'
 import * as fs from 'fs/promises'
 import path from 'path'
-import { beforeEach, describe, it, expect, vi } from '@jest/globals'
+import { beforeEach, describe, it, expect, jest } from '@jest/globals'
 
 // Mock dependencies
 jest.mock('@/lib/auth', () => ({

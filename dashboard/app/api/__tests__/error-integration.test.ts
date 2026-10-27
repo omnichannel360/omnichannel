@@ -3,7 +3,7 @@
  * Tests request/response validation, error logging integration, and end-to-end error scenarios
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 import {
   createErrorResponse,
   createSuccessResponse,

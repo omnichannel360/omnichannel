@@ -1,3 +1,4 @@
+/** @jest-environment jsdom */
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ConductorDock } from '@/components/ConductorDock'
@@ -23,11 +24,7 @@ describe('ConductorDock UUID Integration', () => {
     const input = screen.getByPlaceholderText('Dispatch task...')
     const sendButton = screen.getByText('Send')
 
-    fireEvent.change(input, { target: { value: 'Test message' }
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  }) })
+    fireEvent.change(input, { target: { value: 'Test message' } })
     fireEvent.click(sendButton)
 
     await waitFor(() => {

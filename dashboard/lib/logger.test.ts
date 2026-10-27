@@ -24,7 +24,7 @@ describe('Logger', () => {
 
       logger.debug('Debug message', context)
 
-      expect(consoleSpy.log).toHaveBeenCalledOnce()
+      expect(consoleSpy.log).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.log.mock.calls[0][0])
       expect(output.level).toBe('debug')
       expect(output.message).toBe('Debug message')
@@ -44,7 +44,7 @@ describe('Logger', () => {
     it('logs info messages', () => {
       logger.info('Info message', { operation: 'test' })
 
-      expect(consoleSpy.log).toHaveBeenCalledOnce()
+      expect(consoleSpy.log).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.log.mock.calls[0][0])
       expect(output.level).toBe('info')
       expect(output.message).toBe('Info message')
@@ -55,7 +55,7 @@ describe('Logger', () => {
     it('logs warnings', () => {
       logger.warn('Warning message', { operation: 'test' })
 
-      expect(consoleSpy.warn).toHaveBeenCalledOnce()
+      expect(consoleSpy.warn).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.warn.mock.calls[0][0])
       expect(output.level).toBe('warn')
       expect(output.message).toBe('Warning message')
@@ -69,7 +69,7 @@ describe('Logger', () => {
 
       logger.error('Operation failed', error, context)
 
-      expect(consoleSpy.error).toHaveBeenCalledOnce()
+      expect(consoleSpy.error).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.error.mock.calls[0][0])
       expect(output.level).toBe('error')
       expect(output.message).toBe('Operation failed')
@@ -81,7 +81,7 @@ describe('Logger', () => {
     it('logs errors with string errors', () => {
       logger.error('Operation failed', 'String error message', { operation: 'test' })
 
-      expect(consoleSpy.error).toHaveBeenCalledOnce()
+      expect(consoleSpy.error).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.error.mock.calls[0][0])
       expect(output.error.message).toBe('String error message')
     })
@@ -89,7 +89,7 @@ describe('Logger', () => {
     it('logs errors with unknown types', () => {
       logger.error('Operation failed', { custom: 'error' }, { operation: 'test' })
 
-      expect(consoleSpy.error).toHaveBeenCalledOnce()
+      expect(consoleSpy.error).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.error.mock.calls[0][0])
       expect(output.error.name).toBe('UnknownError')
     })
@@ -103,7 +103,7 @@ describe('Logger', () => {
 
       logger.error('Operation failed', new Error('Test'), context)
 
-      expect(consoleSpy.error).toHaveBeenCalledOnce()
+      expect(consoleSpy.error).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.error.mock.calls[0][0])
       expect(output.context.password).toBe('[REDACTED]')
       expect(output.context.apiKey).toBe('[REDACTED]')
@@ -117,7 +117,7 @@ describe('Logger', () => {
 
       logger.logOperation('test-op', 150, true, context)
 
-      expect(consoleSpy.log).toHaveBeenCalledOnce()
+      expect(consoleSpy.log).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.log.mock.calls[0][0])
       expect(output.level).toBe('info')
       expect(output.message).toContain('completed')
@@ -130,7 +130,7 @@ describe('Logger', () => {
 
       logger.logOperation('test-op', 500, false, context)
 
-      expect(consoleSpy.warn).toHaveBeenCalledOnce()
+      expect(consoleSpy.warn).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.warn.mock.calls[0][0])
       expect(output.level).toBe('warn')
       expect(output.message).toContain('failed')
@@ -191,7 +191,7 @@ describe('Logger', () => {
 
       logger.error('API error', new Error('Invalid request'), context)
 
-      expect(consoleSpy.error).toHaveBeenCalledOnce()
+      expect(consoleSpy.error).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleSpy.error.mock.calls[0][0])
       expect(output.context.method).toBe('POST')
       expect(output.context.route).toBe('/api/users')
