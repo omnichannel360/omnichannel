@@ -169,10 +169,10 @@ describe('Logger', () => {
       expect(getErrorMessage('String error')).toBe('String error')
     })
 
-    it('stringifies unknown error types', () => {
+    it('returns generic fallback for unknown error types (does not serialize arbitrary objects)', () => {
       const result = getErrorMessage({ code: 'ERR001' })
       expect(typeof result).toBe('string')
-      expect(result).toContain('ERR001')
+      expect(result).toBe('An unexpected error occurred')
     })
 
     it('returns fallback for undefined/null', () => {

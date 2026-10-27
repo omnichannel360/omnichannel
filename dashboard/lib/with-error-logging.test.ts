@@ -146,11 +146,18 @@ describe('Error Logging Wrapper', () => {
         method: 'GET'
       })
 
-      await wrapped(request)
+      const mockConsoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        await wrapped(request)
 
-      expect(mockConsoleLog).toHaveBeenCalled()
-      const logCall = mockConsoleLog.mock.calls[0][0]
-      expect(logCall).toContain('[WARN]')
+        // Logger emits structured JSON via console.warn for warn level
+        expect(mockConsoleWarn).toHaveBeenCalled()
+        const logOutput = JSON.parse(mockConsoleWarn.mock.calls[0][0] as string)
+        expect(logOutput.level).toBe('warn')
+        expect(logOutput.context.statusCode).toBe(400)
+      } finally {
+        mockConsoleWarn.mockRestore()
+      }
     })
 
     it('preserves correlation ID across request/response', async () => {
@@ -164,15 +171,16 @@ describe('Error Logging Wrapper', () => {
 
       const wrapped = withErrorLogging(handler, { serviceName: 'correlation-test' })
       const request = new NextRequest('http://localhost:3000/api/test', {
-        method: 'GET'
+        method: 'GET',
+        headers: { 'x-correlation-id': 'client-correlation-123' },
       })
 
       const response = await wrapped(request)
       const responseCorrelationId = response.headers.get('x-correlation-id')
 
-      // Both should have correlation ID
-      expect(capturedCorrelationId).toBeTruthy()
-      expect(responseCorrelationId).toBeTruthy()
+      // Client-supplied correlation ID reaches the handler and is echoed on the response
+      expect(capturedCorrelationId).toBe('client-correlation-123')
+      expect(responseCorrelationId).toBe('client-correlation-123')
     })
 
     it('measures request duration', async () => {

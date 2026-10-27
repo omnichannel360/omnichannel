@@ -184,7 +184,8 @@ describe('asyncRoute', () => {
         expect.objectContaining({
           userId: 'user-123',
           environment: 'test'
-        })
+        }),
+        expect.objectContaining({ url: '/api/test' })
       )
     })
 

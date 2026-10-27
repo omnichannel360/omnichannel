@@ -22,7 +22,8 @@ export function extractRequestContext(request: NextRequest, options?: ErrorHandl
   const correlationId = request.headers.get('x-correlation-id') || options?.correlationId
 
   return createLogContext({
-    correlationId,
+    // Only override when present, so createLogContext's generated ID is kept otherwise
+    ...(correlationId && { correlationId }),
     method: request.method,
     route: url.pathname,
     path: url.pathname,
@@ -125,11 +126,12 @@ export function withErrorLogging<T extends (req: NextRequest) => Promise<NextRes
       // Determine status code based on error type
       let statusCode = 500
       if (error instanceof Error) {
-        if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
+        const lowerMessage = error.message.toLowerCase()
+        if (lowerMessage.includes('unauthorized') || lowerMessage.includes('forbidden')) {
           statusCode = 403
-        } else if (error.message.includes('not found')) {
+        } else if (lowerMessage.includes('not found')) {
           statusCode = 404
-        } else if (error.message.includes('invalid') || error.message.includes('validation')) {
+        } else if (lowerMessage.includes('invalid') || lowerMessage.includes('validation')) {
           statusCode = 400
         }
       }
@@ -177,12 +179,12 @@ export async function tryCatchWithLogging<T>(
     const duration = Date.now() - startTime
 
     let statusCode = 500
-    const errorMsg = getErrorMessage(error)
+    const errorMsg = getErrorMessage(error).toLowerCase()
 
     if (
       error instanceof Error &&
-      (error.message.includes('unauthorized') ||
-        error.message.includes('forbidden'))
+      (errorMsg.includes('unauthorized') ||
+        errorMsg.includes('forbidden'))
     ) {
       statusCode = 403
     } else if (errorMsg.includes('not found')) {

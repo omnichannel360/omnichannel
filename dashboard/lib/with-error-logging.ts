@@ -99,6 +99,9 @@ export function withErrorLogging(
         })
       }
 
+      // Propagate correlation ID on success too (error path already sets it)
+      response.headers.set('x-correlation-id', correlationId)
+
       return response
     } catch (error) {
       const duration = Date.now() - startTime

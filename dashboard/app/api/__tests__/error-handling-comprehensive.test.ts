@@ -299,7 +299,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const sanitized = sanitizeErrorDetails(details)
       expect(sanitized?.longField).toBeUndefined()
       expect(sanitized?.shortField).toBe('ok')
-      expect(sanitized?.message).toBeUndefined() // > 500 chars
+      expect(sanitized?.message).toBe('Error occurred') // short, non-sensitive: kept
     })
 
     it('should keep numbers and booleans', () => {
@@ -362,7 +362,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const message = getSafeErrorMessage(error, 'Default message')
 
       process.env.NODE_ENV = env
-      expect(message).toContain('validation')
+      expect(message).toBe('Invalid email format in field user.email')
     })
 
     it('should return default message for unsafe errors in production', () => {
