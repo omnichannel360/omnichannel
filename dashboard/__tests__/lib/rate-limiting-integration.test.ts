@@ -5,7 +5,7 @@
 
 import { getStore, type RateLimitConfig } from '@/lib/rateLimit/store'
 import { createRateLimitMiddleware, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 describe('Rate Limiting Integration', () => {
   const store = getStore()
@@ -88,7 +88,7 @@ describe('Rate Limiting Integration', () => {
 
   describe('Rate Limit Headers', () => {
     it('includes all required headers in response', async () => {
-      const config = RATE_LIMIT_CONFIGS.standard
+      const config = RATE_LIMIT_CONFIGS.profiles
       const middleware = createRateLimitMiddleware({ ...config })
 
       const mockRequest = new NextRequest('http://localhost/api/test')
@@ -121,7 +121,7 @@ describe('Rate Limiting Integration', () => {
 
   describe('Per-IP Rate Limiting', () => {
     it('maintains separate limits per IP address', async () => {
-      const config = RATE_LIMIT_CONFIGS.standard
+      const config = RATE_LIMIT_CONFIGS.profiles
       const middleware = createRateLimitMiddleware({ ...config })
 
       // Create requests from different IPs
@@ -162,7 +162,7 @@ describe('Rate Limiting Integration', () => {
 
   describe('Concurrent Request Handling', () => {
     it('handles concurrent requests safely', async () => {
-      const config = RATE_LIMIT_CONFIGS.standard
+      const config = RATE_LIMIT_CONFIGS.profiles
       const middleware = createRateLimitMiddleware({ ...config })
 
       const mockRequest = new NextRequest('http://localhost/api/test')
@@ -176,16 +176,18 @@ describe('Rate Limiting Integration', () => {
       const allowedCount = results.filter((r) => r.allowed).length
 
       // Should allow exactly maxRequests (30)
-      expect(allowedCount).toBeLessThanOrEqual(config.maxRequests)
+      expect(allowedCount).toBe(config.maxRequests)
     })
   })
 
   describe('Error Messages', () => {
     it('provides helpful error message when rate limited', async () => {
       const config = RATE_LIMIT_CONFIGS.auth
+      // Custom responses are supplied via onLimitExceeded (there is no `message` option)
       const middleware = createRateLimitMiddleware({
         ...config,
-        message: 'Custom rate limit message',
+        onLimitExceeded: () =>
+          NextResponse.json({ error: 'Custom rate limit message' }, { status: 429 }),
       })
 
       const mockRequest = new NextRequest('http://localhost/api/auth')
@@ -220,7 +222,7 @@ describe('Rate Limiting Deployment Checklist', () => {
 
   it('auth endpoints have stricter limits than others', () => {
     const authLimit = RATE_LIMIT_CONFIGS.auth.maxRequests
-    const standardLimit = RATE_LIMIT_CONFIGS.standard.maxRequests
+    const standardLimit = RATE_LIMIT_CONFIGS.profiles.maxRequests
 
     expect(authLimit).toBeLessThan(standardLimit)
   })

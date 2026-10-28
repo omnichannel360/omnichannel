@@ -72,8 +72,10 @@ describe('RateLimiter - Immutable Updates & Type Safety', () => {
 
       const results = await Promise.all(promises)
 
-      // Verify all incremented the counter
-      expect(results.some((r) => r.remaining === 0)).toBe(false)
+      // Verify every request incremented the counter exactly once (no lost updates):
+      // 5 requests against a limit of 5 are all allowed and consume the window fully
+      expect(results.every((r) => r.allowed)).toBe(true)
+      expect(results.map((r) => r.remaining).sort((a, b) => b - a)).toEqual([4, 3, 2, 1, 0])
       expect(results[results.length - 1].remaining).toBeLessThan(
         results[0].remaining
       )

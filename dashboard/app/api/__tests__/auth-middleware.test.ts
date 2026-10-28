@@ -129,8 +129,8 @@ describe('Auth Middleware', () => {
 
     it('should handle expired token and return authentication error', async () => {
       // Arrange — Create a token that is already expired
-      const expiredToken = await generateToken('user-123', 'user@example.com', 'user')
-      // In real scenario, mock the token verification to return expired status
+      // Negative expiresIn signs a token whose exp is already in the past
+      const expiredToken = await generateToken('user-123', 'user@example.com', 'user', -60)
       const request = new NextRequest('http://localhost:3000/api/test', {
         headers: { authorization: `Bearer ${expiredToken}` },
       })
@@ -167,7 +167,7 @@ describe('Auth Middleware', () => {
 
       // Assert — Verify access is granted for matching role
       expect(result.allowed).toBe(true)
-      expect(result.reason).toBeUndefined()
+      expect(result.error).toBeUndefined()
     })
 
     it('should deny access when role does not match required role', () => {
@@ -179,7 +179,7 @@ describe('Auth Middleware', () => {
 
       // Assert — Verify access is denied with proper reason
       expect(result.allowed).toBe(false)
-      expect(result.reason).toMatch(/insufficient|permission|role/i)
+      expect(result.error).toMatch(/insufficient|permission|role/i)
     })
 
     it('should allow access when user role is in array of allowed roles', () => {
@@ -191,7 +191,7 @@ describe('Auth Middleware', () => {
 
       // Assert — Verify access granted for one of multiple roles
       expect(result.allowed).toBe(true)
-      expect(result.reason).toBeUndefined()
+      expect(result.error).toBeUndefined()
     })
 
     it('should deny access when role is not in array of allowed roles', () => {
@@ -203,7 +203,7 @@ describe('Auth Middleware', () => {
 
       // Assert — Verify access denied for role not in list
       expect(result.allowed).toBe(false)
-      expect(result.reason).toMatch(/insufficient|permission/i)
+      expect(result.error).toMatch(/insufficient|permission/i)
     })
 
     it('should grant access when no role requirement is specified (open endpoint)', () => {

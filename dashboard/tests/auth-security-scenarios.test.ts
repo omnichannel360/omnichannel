@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
+import { createHmac } from 'crypto'
 import {
   verifyAuthMiddleware,
   getAuthContext,
@@ -245,22 +246,25 @@ describe('OWASP A04: Insecure Deserialization', () => {
   })
 
   it('should reject tokens with embedded scripts', async () => {
-    const maliciousPayload = {
-      sub: TEST_USERS.user.id,
-      email: TEST_USERS.user.email,
-      role: 'user',
-      __proto__: { isAdmin: true }, // Prototype pollution attempt
-    }
-
-    const token = jwt.sign(maliciousPayload, TEST_JWT_SECRET)
+    // Prototype pollution attempt: a raw "__proto__" key in the JWT body. jsonwebtoken refuses
+    // to sign such payloads, so hand-sign HS256 the way an attacker holding the key would.
+    const now = Math.floor(Date.now() / 1000)
+    const b64url = (s: string) => Buffer.from(s).toString('base64url')
+    const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    const body = b64url(
+      `{"__proto__":{"isAdmin":true},"sub":${JSON.stringify(TEST_USERS.user.id)},` +
+        `"email":${JSON.stringify(TEST_USERS.user.email)},"role":"user","iat":${now},"exp":${now + 3600}}`
+    )
+    const signature = createHmac('sha256', TEST_JWT_SECRET).update(`${header}.${body}`).digest('base64url')
+    const token = `${header}.${body}.${signature}`
     const request = createRequest(token)
 
     const context = await getAuthContext(request)
 
     // Should still work but not allow prototype pollution
-    if (context.authenticated) {
-      expect((context.payload as any).isAdmin).toBeUndefined()
-    }
+    expect(context.authenticated).toBe(true)
+    expect((context.payload as any).isAdmin).toBeUndefined()
+    expect(({} as any).isAdmin).toBeUndefined()
   })
 })
 
@@ -361,7 +365,9 @@ describe('Authentication Bypass Attempts', () => {
           role: 'user',
           type: 'access_token',
         },
-        TEST_JWT_SECRET
+        TEST_JWT_SECRET,
+        // verifyToken rejects tokens without exp (no non-expiring access tokens)
+        { expiresIn: '1h' }
       )
 
       const request = createRequest(token)

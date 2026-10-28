@@ -62,7 +62,8 @@ export async function verifyAuthMiddleware(
   request: NextRequest,
   options: AuthMiddlewareOptions = {}
 ): Promise<AuthContext | NextResponse> {
-  const { requireAuth = true, allowedRoles = [], auditLog = true } = options
+  // allowedRoles undefined = any authenticated role; explicit [] = deny all (fail closed)
+  const { requireAuth = true, allowedRoles, auditLog = true } = options
 
   const authContext = await getAuthContext(request)
 
@@ -103,8 +104,8 @@ export async function verifyAuthMiddleware(
   }
 
   // Check role-based access control
-  if (allowedRoles.length > 0 && authContext.role) {
-    if (!allowedRoles.includes(authContext.role)) {
+  if (allowedRoles !== undefined) {
+    if (!authContext.role || !allowedRoles.includes(authContext.role)) {
       logger.warn('Auth middleware: insufficient permissions', {
         method: request.method,
         path: request.nextUrl.pathname,

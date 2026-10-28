@@ -140,13 +140,14 @@ describe('Auth Middleware Integration', () => {
     })
 
     it('should allow users with any of multiple allowed roles', async () => {
-      const token = createToken('user-123', 'user@example.com', 'moderator')
+      // Roles outside VALID_ROLES are rejected by verifyToken, so use a real secondary role
+      const token = createToken('user-123', 'user@example.com', 'user')
       const request = createRequestWithToken(token)
       const { verifyAuthMiddleware } = await import('@/lib/auth-middleware')
 
       const result = await verifyAuthMiddleware(request, {
         requireAuth: true,
-        allowedRoles: ['admin', 'moderator'],
+        allowedRoles: ['admin', 'user'],
       })
 
       expect(result).not.toBeInstanceOf(Response)

@@ -4,7 +4,7 @@
  */
 
 import { createMockRequest } from '../lib/test-utils'
-import { rateLimiters, createRateLimiter, resetRateLimitStore } from '@/lib/rate-limiting'
+import { rateLimiters, createRateLimiter, resetRateLimitStore, userKeyGenerator } from '@/lib/rate-limiting'
 
 describe('Rate Limiting Integration', () => {
   // CRITICAL: Reset global store before each test to prevent state pollution
@@ -183,6 +183,8 @@ describe('Rate Limiting Integration', () => {
         windowMs: 60 * 1000,
         maxRequests: 2,
         endpoint: 'api/brain',
+        // Per-user keying, as in rateLimiters.brain (default keying is per-IP)
+        keyGenerator: userKeyGenerator,
       }
       const limiter = createRateLimiter(config)
       const request1 = createMockRequest({ path: '/api/brain', userId: 'user-1' })

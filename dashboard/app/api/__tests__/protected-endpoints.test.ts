@@ -35,7 +35,7 @@ describe('Protected API Endpoints', () => {
 
       // Assert
       expect(response.status).toBe(401)
-      expect(mockFetch).toHaveBeenCalledWith('/api/alerts', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith('/api/alerts')
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
@@ -131,7 +131,7 @@ describe('Protected API Endpoints', () => {
 
       // Assert
       expect(response.status).toBe(401)
-      expect(mockFetch).toHaveBeenCalledWith('/api/brain', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith('/api/brain')
     })
 
     it('should return 200 with valid token', async () => {

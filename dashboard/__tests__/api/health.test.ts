@@ -26,9 +26,24 @@ jest.mock('fs', () => {
 
 const { verifyAuth } = require('@/lib/auth')
 
+/**
+ * The three stat collectors run concurrently, so readFile call order is not deterministic.
+ * Route readFile results by file name instead of relying on mockResolvedValueOnce ordering.
+ */
+function mockReadFileByName(contents: Record<string, string>) {
+  const mockFs = require('fs').promises
+  mockFs.readFile.mockImplementation(async (filePath: string) => {
+    const name = path.basename(String(filePath))
+    if (name in contents) return contents[name]
+    throw new Error(`ENOENT: ${name}`)
+  })
+}
+
 describe('/api/health - Async I/O Conversion Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // clearAllMocks keeps implementations; drop any mockReadFileByName routing from a prior test
+    require('fs').promises.readFile.mockReset()
     process.env.JWT_SECRET = 'test-secret'
   })
 
@@ -36,7 +51,7 @@ describe('/api/health - Async I/O Conversion Tests', () => {
     const mockFs = require('fs').promises
     mockFs.stat.mockResolvedValueOnce({ isDirectory: () => true })
     mockFs.readdir.mockResolvedValueOnce(['test-1.json', 'test-2.json'])
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify({ timestamp: '2026-10-21T12:00:00Z' }))
+    mockReadFileByName({ 'test-2.json': JSON.stringify({ timestamp: '2026-10-21T12:00:00Z' }) })
 
     verifyAuth.mockResolvedValueOnce({ authenticated: true })
 
@@ -98,7 +113,9 @@ describe('/api/health - Async I/O Conversion Tests', () => {
     expect(data.components.skill_registry.status).toBe('missing')
   })
 
-  it('should return 401 when authentication fails', async () => {
+  // Health is public by design (middleware PUBLIC_ROUTES, route comment, rateLimiters.health):
+  // monitoring/load balancers call it without credentials, so auth is never consulted.
+  it('should be public: no auth check and no 401 without credentials', async () => {
     verifyAuth.mockResolvedValueOnce({
       authenticated: false,
       error: 'Invalid token',
@@ -109,7 +126,8 @@ describe('/api/health - Async I/O Conversion Tests', () => {
     })
 
     const response = await GET(request)
-    expect(response.status).toBe(401)
+    expect(response.status).not.toBe(401)
+    expect(verifyAuth).not.toHaveBeenCalled()
   })
 
   it('should handle JSON parse errors gracefully', async () => {
@@ -136,15 +154,15 @@ describe('/api/health - Async I/O Conversion Tests', () => {
     const mockFs = require('fs').promises
     mockFs.stat.mockResolvedValue({ isDirectory: () => true })
     mockFs.readdir.mockResolvedValueOnce(['meeting-1.json'])
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify({ timestamp: '2026-10-21T12:00:00Z' }))
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify([
-      { status: 'scheduled' },
-      { status: 'scheduled' },
-      { status: 'scheduled' },
-    ]))
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify({
-      meeting_skills: ['skill1', 'skill2', 'skill3'],
-    }))
+    mockReadFileByName({
+      'meeting-1.json': JSON.stringify({ timestamp: '2026-10-21T12:00:00Z' }),
+      'meetings-log.json': JSON.stringify([
+        { status: 'scheduled' },
+        { status: 'scheduled' },
+        { status: 'scheduled' },
+      ]),
+      'registry.json': JSON.stringify({ meeting_skills: ['skill1', 'skill2', 'skill3'] }),
+    })
 
     verifyAuth.mockResolvedValueOnce({ authenticated: true })
 

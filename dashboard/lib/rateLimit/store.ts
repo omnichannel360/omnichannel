@@ -32,6 +32,8 @@ class RateLimitStore {
       this.cleanupInterval = setInterval(() => {
         this.cleanup()
       }, 60000) // Every 60 seconds
+      // Housekeeping only: don't keep the process (or a Jest worker) alive for it
+      this.cleanupInterval.unref?.()
     }
   }
 

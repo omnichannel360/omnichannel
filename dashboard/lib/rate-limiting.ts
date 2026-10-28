@@ -26,6 +26,8 @@ class RateLimitMemoryStore {
     this.cleanupInterval = setInterval(() => {
       this.cleanup()
     }, 60000)
+    // Housekeeping only: don't keep the process (or a Jest worker) alive for it
+    this.cleanupInterval.unref?.()
   }
 
   /**
@@ -35,7 +37,7 @@ class RateLimitMemoryStore {
     const now = Date.now()
     const existing = this.store.get(key)
 
-    if (!existing || now > existing.resetTime) {
+    if (!existing || now >= existing.resetTime) {
       // Create new window
       const newEntry: RateLimitStore = {
         key,
@@ -61,7 +63,7 @@ class RateLimitMemoryStore {
     }
 
     // Check if window has expired
-    if (Date.now() > entry.resetTime) {
+    if (Date.now() >= entry.resetTime) {
       this.store.delete(key)
       return null
     }
@@ -82,7 +84,7 @@ class RateLimitMemoryStore {
   private cleanup(): void {
     const now = Date.now()
     for (const [key, entry] of this.store.entries()) {
-      if (now > entry.resetTime) {
+      if (now >= entry.resetTime) {
         this.store.delete(key)
       }
     }
@@ -171,6 +173,8 @@ export function createRateLimiter(config: RateLimitConfig) {
 
     // Check if limit exceeded
     if (entry.count > maxRequests) {
+      // RFC 6585 §4: tell the client how long to wait before retrying
+      headers.set('Retry-After', Math.max(1, Math.ceil((resetTime - Date.now()) / 1000)).toString())
       return NextResponse.json(
         {
           success: false,
