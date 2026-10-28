@@ -4,9 +4,6 @@
  * stack traces, and contextual information.
  */
 
-// FIXED: Moved inline to avoid circular dependency with crypto-utils
-import { randomUUID } from 'crypto'
-
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface LogContext {
@@ -307,17 +304,13 @@ export function createLogger(serviceName: string, options: LoggerOptions = {}): 
 export const logger = createLogger('default')
 
 /**
- * Generate secure random ID for correlation tracking
- * Uses crypto.randomUUID when available, falls back to secure random bytes
- */
-/**
- * Generate a secure ID using Node.js crypto module
- * FIXED: Uses randomUUID directly to avoid circular dependency
+ * Generate a secure ID for correlation tracking
+ * Uses Web Crypto (globalThis.crypto): available in Node 19+ and the Edge runtime,
+ * where middleware.ts imports this module and Node built-ins cannot be loaded
  */
 function generateSecureId(): string {
   try {
-    // Node.js 15+ has built-in randomUUID
-    return randomUUID()
+    return globalThis.crypto.randomUUID()
   } catch (error) {
     // SECURITY: Cryptographic randomness is required for UUIDs
     // Throw error instead of falling back to Math.random() (non-cryptographic)
@@ -325,7 +318,7 @@ function generateSecureId(): string {
       new Error(
         'UUID generation failed: crypto.randomUUID not available. ' +
         'This is a critical security failure - the system cannot generate secure identifiers. ' +
-        'Ensure Node.js crypto module is available and not disabled. ' +
+        'Ensure Web Crypto (globalThis.crypto) is available. ' +
         `Original error: ${error instanceof Error ? error.message : 'Unknown'}`
       ),
       { cause: error }

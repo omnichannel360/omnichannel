@@ -243,3 +243,21 @@ describe('Logger', () => {
   })
 })
 
+
+describe('Edge runtime safety', () => {
+  // middleware.ts imports the logger and runs in the Edge runtime, where Node built-ins are unavailable
+  it('does not import the Node crypto module', () => {
+    const fs = jest.requireActual<typeof import('fs')>('fs')
+    const path = jest.requireActual<typeof import('path')>('path')
+    const source = fs.readFileSync(path.join(__dirname, 'logger.ts'), 'utf-8')
+
+    expect(source).not.toMatch(/from ['"](node:)?crypto['"]/)
+    expect(source).not.toMatch(/require\(['"](node:)?crypto['"]\)/)
+  })
+
+  it('generates a UUID v4 correlation id with Web Crypto', () => {
+    const { correlationId } = createLogContext()
+
+    expect(correlationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  })
+})
