@@ -119,10 +119,15 @@ function getStore(): RateLimitMemoryStore {
  * Default key generator - uses IP address
  */
 export function defaultKeyGenerator(request: NextRequest): string {
+  // Use the hop appended by our reverse proxy (rightmost entry). Earlier entries are
+  // client-controlled, so keying on the whole header lets a caller mint a new bucket per request.
+  const forwardedHops = (request.headers.get('x-forwarded-for') || '')
+    .split(',')
+    .map((hop) => hop.trim())
+    .filter(Boolean)
   const ip =
-    request.headers.get('x-forwarded-for') ||
-    request.headers.get('x-real-ip') ||
-    request.ip ||
+    forwardedHops[forwardedHops.length - 1] ||
+    request.headers.get('x-real-ip')?.trim() ||
     'unknown'
 
   return `ip:${ip}`

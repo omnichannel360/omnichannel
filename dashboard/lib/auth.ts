@@ -65,7 +65,12 @@ export async function verifyToken(request: NextRequest): Promise<TokenPayload | 
     }
 
     const token = match[1]
-    const decoded = jwt.verify(token, getJWTSecret()) as JwtPayload
+    const decoded = jwt.verify(token, getJWTSecret(), { algorithms: ['HS256'] }) as JwtPayload
+
+    // Refresh tokens only mint new access tokens; they never authorize requests
+    if (decoded.type === 'refresh') {
+      return null
+    }
 
     // Validate decoded token has required fields before returning
     if (!isValidTokenPayload(decoded)) {
