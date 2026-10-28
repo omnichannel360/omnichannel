@@ -475,12 +475,12 @@ describe('Input Validation - Meeting', () => {
     expect(result.success).toBe(false)
   })
 
-  it('should reject meeting with no attendees if attendees array is empty', () => {
+  it('should accept a meeting with an empty attendee list', () => {
     const result = MeetingSchema.safeParse({
       title: 'Meeting',
       attendees: [],
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 })
 

@@ -290,13 +290,13 @@ describe('Input Validation - Meetings', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects meeting with no attendees when array is required', () => {
+  it('accepts a meeting with an empty attendee list', () => {
     const validInput = {
       title: 'Meeting',
       attendees: [],
     }
     const result = MeetingCreateSchema.safeParse(validInput)
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('rejects invalid email in attendees', () => {

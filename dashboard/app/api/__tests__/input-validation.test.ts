@@ -474,12 +474,12 @@ describe('Input Validation - API Endpoint Schemas', () => {
       expect(result.success).toBe(false)
     })
 
-    it('MeetingSchema - require at least one attendee', () => {
+    it('MeetingSchema - accepts an empty attendee list', () => {
       const result = MeetingSchema.safeParse({
         title: 'Meeting',
         attendees: [],
       })
-      expect(result.success).toBe(false)
+      expect(result.success).toBe(true)
     })
   })
 

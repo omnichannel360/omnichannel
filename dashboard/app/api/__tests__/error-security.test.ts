@@ -434,7 +434,8 @@ describe('Error Handling Security', () => {
 
       expect(sanitized?.apiKey).toBeUndefined()
       expect(sanitized?.secret).toBeUndefined()
-      expect(sanitized?.publicKey).toBe('pk-12345678')
+      // Any key containing "key" is dropped, including publicKey (fail closed)
+      expect(sanitized?.publicKey).toBeUndefined()
     })
   })
 })
