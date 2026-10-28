@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken'
 import { NextRequest } from 'next/server'
 import { generateToken } from '@/lib/auth'
-import { middleware } from '@/middleware'
+import { proxy as middleware } from '@/proxy'
 
 /**
  * Previously these hit a live server on localhost:3000 via fetch. They now drive the

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { verifyAuth, verifyToken, generateToken, isValidTokenPayload } from '@/lib/auth'
 import { isPublicRoute } from '@/lib/auth-config'
-import { middleware } from '@/middleware'
+import { proxy as middleware } from '@/proxy'
 
 /**
  * Retargeted from the removed '@/lib/auth/jwt' module:

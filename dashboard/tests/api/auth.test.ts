@@ -7,7 +7,7 @@ import {
   createUnauthorizedResponse,
   TokenPayload,
 } from '@/lib/auth'
-import { middleware } from '@/middleware'
+import { proxy as middleware } from '@/proxy'
 import { NextRequest } from 'next/server'
 
 type TestIdentity = Pick<TokenPayload, 'sub' | 'email' | 'role'>

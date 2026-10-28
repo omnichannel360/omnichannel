@@ -7,7 +7,7 @@
  */
 import jwt from 'jsonwebtoken'
 import { NextRequest } from 'next/server'
-import { middleware, SESSION_COOKIE } from '@/middleware'
+import { proxy as middleware, SESSION_COOKIE } from '@/proxy'
 import { verifyToken as verifyRouteToken } from '@/lib/auth'
 
 const TEST_JWT_SECRET = 'test-secret-key-auth-hardening'

@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals'
-import { middleware } from '@/middleware'
+import { proxy as middleware } from '@/proxy'
 import { NextRequest } from 'next/server'
 import { generateToken } from '@/lib/auth'
 

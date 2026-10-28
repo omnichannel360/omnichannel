@@ -306,7 +306,7 @@ export const logger = createLogger('default')
 /**
  * Generate a secure ID for correlation tracking
  * Uses Web Crypto (globalThis.crypto): available in Node 19+ and the Edge runtime,
- * where middleware.ts imports this module and Node built-ins cannot be loaded
+ * so this module stays safe to import from proxy.ts and any Edge code
  */
 function generateSecureId(): string {
   try {

@@ -3,7 +3,7 @@
  * Verifies auth middleware protects all endpoints correctly
  */
 
-import { middleware } from './middleware'
+import { proxy as middleware } from './proxy'
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 

@@ -1,5 +1,5 @@
 /**
- * Next.js Middleware for Request-Level Authentication
+ * Next.js Proxy (formerly Middleware) for Request-Level Authentication
  * Protects all API endpoints except public routes (auth, health)
  * Runs on all API requests before route handlers
  *
@@ -247,7 +247,7 @@ function withoutIdentityHeaders(request: NextRequest): Headers {
  * 5. Check role-based access control
  * 6. Inject auth context into headers
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const method = request.method
 
   // Generate or extract correlation ID for request tracing
