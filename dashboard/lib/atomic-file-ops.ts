@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import path from 'path'
 import { withFileLock } from './file-lock'
 import { createLogger } from './logger'
@@ -27,23 +27,71 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
 }
 
 /**
+ * Thrown by read-modify-write helpers when the target file exists but is not valid JSON.
+ * The write is refused so existing records are never replaced by the fallback.
+ * The message deliberately avoids words the route error mappers treat as 4xx ("invalid", "not found").
+ */
+export class CorruptDataFileError extends Error {
+  readonly filePath: string
+  readonly backupPath: string | null
+  readonly cause: unknown
+
+  constructor(filePath: string, backupPath: string | null, cause: unknown) {
+    super('Stored data could not be read; the write was refused to protect existing records')
+    this.name = 'CorruptDataFileError'
+    this.filePath = filePath
+    this.backupPath = backupPath
+    this.cause = cause
+  }
+}
+
+/**
  * Log file corruption detection using structured logger.
  * FIXED: Now uses the centralized logger instead of direct stderr writes,
  * preserving structured logging, correlation IDs, and consistent error handling.
  */
-const logFileCorruption = (filePath: string, error: unknown) => {
-  logger.warn('File corruption detected - invalid JSON content', {
+const logFileCorruption = (filePath: string, error: unknown, extra: Record<string, unknown> = {}) => {
+  logger.error('File corruption detected - invalid JSON content', {
     filePath,
     error: error instanceof Error ? error.message : String(error),
     errorType: error instanceof Error ? error.constructor.name : typeof error,
+    ...extra,
   })
 }
 
 /**
- * Read and parse JSON. Caller must already hold the file lock for filePath.
- * With a fallback, a missing file or invalid JSON returns the fallback; without one, both throw.
+ * Preserve the corrupted bytes next to the target before refusing the write.
+ * Named by content hash, so repeated failures on the same corruption create one copy.
+ * Best effort: a failed backup is logged and never masks the corruption error.
  */
-async function readJsonFile<T>(filePath: string, fallback?: T): Promise<T> {
+async function backupCorruptFile(filePath: string, content: string): Promise<string | null> {
+  const hash = createHash('sha256').update(content).digest('hex').slice(0, 16)
+  const backupPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.corrupt-${hash}.json`)
+  try {
+    // Owner-only: data files can hold user messages
+    await fs.writeFile(backupPath, content, { encoding: 'utf-8', flag: 'wx', mode: 0o600 })
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') {
+      logger.warn('Failed to back up corrupted data file', {
+        filePath,
+        backupPath,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return null
+    }
+  }
+  return backupPath
+}
+
+type CorruptionPolicy = 'fallback' | 'refuse'
+
+/**
+ * Read and parse JSON. Caller must already hold the file lock for filePath.
+ * A missing file returns the fallback when one is given, otherwise throws.
+ * Invalid JSON: 'fallback' (reads) returns the fallback when given, otherwise throws the parse error;
+ * 'refuse' (read-modify-write) backs up the bytes and throws CorruptDataFileError, never using the fallback.
+ */
+async function readJsonFile<T>(filePath: string, fallback?: T, onCorrupt: CorruptionPolicy = 'fallback'): Promise<T> {
   let content: string
   try {
     content = await fs.readFile(filePath, 'utf-8')
@@ -54,9 +102,19 @@ async function readJsonFile<T>(filePath: string, fallback?: T): Promise<T> {
   }
 
   try {
-    return JSON.parse(content) as T
+    const parsed: unknown = JSON.parse(content)
+    // Valid JSON of the wrong shape (e.g. {} where a list is stored) is as unsafe to write over as a torn file
+    if (onCorrupt === 'refuse' && Array.isArray(fallback) && !Array.isArray(parsed)) {
+      throw new TypeError(`Expected a JSON array, found ${parsed === null ? 'null' : typeof parsed}`)
+    }
+    return parsed as T
   } catch (parseError) {
-    logFileCorruption(filePath, parseError)
+    if (onCorrupt === 'refuse') {
+      const backupPath = await backupCorruptFile(filePath, content)
+      logFileCorruption(filePath, parseError, { action: 'write_refused', backupPath })
+      throw new CorruptDataFileError(filePath, backupPath, parseError)
+    }
+    logFileCorruption(filePath, parseError, { action: 'read_fallback' })
     if (fallback !== undefined) {
       return fallback
     }
@@ -118,7 +176,7 @@ export async function atomicUpdate<T>(
   fallback: T,
 ): Promise<T> {
   return withFileLock(filePath, async () => {
-    const current = await readJsonFile<T>(filePath, fallback)
+    const current = await readJsonFile<T>(filePath, fallback, 'refuse')
     const updated = await transform(current)
     await writeJsonFile(filePath, updated, 'Failed to serialize updated data to JSON')
     return updated
@@ -132,7 +190,7 @@ export async function atomicConditionalUpdate<T>(
   fallback: T,
 ): Promise<{ updated: boolean; data: T }> {
   return withFileLock(filePath, async () => {
-    const current = await readJsonFile<T>(filePath, fallback)
+    const current = await readJsonFile<T>(filePath, fallback, 'refuse')
 
     if (!condition(current)) {
       return { updated: false, data: current }
@@ -155,7 +213,7 @@ export async function atomicReadModifyWrite<T>(
   fallback: T,
 ): Promise<T> {
   return withFileLock(filePath, async () => {
-    const current = await readJsonFile<T>(filePath, fallback)
+    const current = await readJsonFile<T>(filePath, fallback, 'refuse')
     const modified = await modifier(current)
     await writeJsonFile(filePath, modified, 'Failed to serialize data to JSON')
     return modified
@@ -178,7 +236,7 @@ export async function atomicTransaction<T>(
       if (cachedData !== undefined) {
         return cachedData
       }
-      cachedData = await readJsonFile<T>(filePath)
+      cachedData = await readJsonFile<T>(filePath, undefined, 'refuse')
       return cachedData
     }
 

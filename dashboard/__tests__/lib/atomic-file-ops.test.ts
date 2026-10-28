@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
-import { atomicRead, atomicWrite, atomicUpdate } from '@/lib/atomic-file-ops'
+import {
+  atomicRead,
+  atomicWrite,
+  atomicUpdate,
+  atomicConditionalUpdate,
+  atomicReadModifyWrite,
+  atomicTransaction,
+  CorruptDataFileError,
+} from '@/lib/atomic-file-ops'
 import { withFileLock, withLock, clearAllLocks, getLockCount } from '@/lib/file-lock'
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
@@ -491,5 +499,99 @@ describe('atomic-file-ops rename handling', () => {
 
     expect(await fs.readFile(testFile, 'utf-8')).toBe('{"version":1}')
     expect(await fs.readdir(testDir)).toEqual(['state.json'])
+  })
+})
+
+// Regression: .specify/bugs/atomic-corrupt-file-overwrite
+describe('atomic-file-ops corrupted target file', () => {
+  type Item = { id: string }
+  const RECORDS = JSON.stringify([{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }], null, 2)
+  const TORN = RECORDS.slice(0, RECORDS.length - 5)
+
+  let testDir: string
+  let testFile: string
+
+  beforeEach(async () => {
+    clearAllLocks()
+    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'omni-corrupt-'))
+    testFile = path.join(testDir, 'alerts.json')
+    await fs.writeFile(testFile, TORN, 'utf-8')
+  })
+
+  afterEach(async () => {
+    clearAllLocks()
+    await fs.rm(testDir, { recursive: true, force: true })
+  })
+
+  const backups = async (): Promise<string[]> =>
+    (await fs.readdir(testDir)).filter((name) => name.startsWith('.alerts.json.corrupt-'))
+
+  const writers: Array<[string, (file: string) => Promise<unknown>]> = [
+    ['atomicUpdate', (file) => atomicUpdate<Item[]>(file, (items) => [...items, { id: 'new' }], [])],
+    [
+      'atomicConditionalUpdate',
+      (file) => atomicConditionalUpdate<Item[]>(file, () => true, (items) => [...items, { id: 'new' }], []),
+    ],
+    ['atomicReadModifyWrite', (file) => atomicReadModifyWrite<Item[]>(file, (items) => [...items, { id: 'new' }], [])],
+    [
+      'atomicTransaction',
+      (file) =>
+        atomicTransaction<Item[]>(file, async (read, write) => {
+          const items = await read()
+          await write([...items, { id: 'new' }])
+          return items
+        }),
+    ],
+  ]
+
+  it.each(writers)('%s refuses the write and leaves the corrupted file byte-identical', async (_name, run) => {
+    await expect(run(testFile)).rejects.toBeInstanceOf(CorruptDataFileError)
+
+    expect(await fs.readFile(testFile, 'utf-8')).toBe(TORN)
+    const copies = await backups()
+    expect(copies).toHaveLength(1)
+    expect(await fs.readFile(path.join(testDir, copies[0]), 'utf-8')).toBe(TORN)
+  })
+
+  it('reports the target and backup paths on the error, with a message that maps to 500', async () => {
+    const error = await atomicUpdate<Item[]>(testFile, (items) => items, []).catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(CorruptDataFileError)
+    const corrupt = error as CorruptDataFileError
+    expect(corrupt.filePath).toBe(testFile)
+    expect(corrupt.backupPath).toBe(path.join(testDir, (await backups())[0]))
+    // Route error mappers turn these words into 4xx; a corrupted store is a server-side fault
+    expect(corrupt.message).not.toMatch(/invalid|validation|schema|not found|enoent|permission|timeout/i)
+  })
+
+  it('keeps a single backup when the same corruption is hit repeatedly', async () => {
+    for (let i = 0; i < 3; i++) {
+      await expect(atomicUpdate<Item[]>(testFile, (items) => items, [])).rejects.toBeInstanceOf(CorruptDataFileError)
+    }
+    expect(await backups()).toHaveLength(1)
+  })
+
+  it('refuses to write over valid JSON of the wrong shape when a list is expected', async () => {
+    await fs.writeFile(testFile, '{"meta":"not a list"}', 'utf-8')
+
+    await expect(atomicUpdate<Item[]>(testFile, (items) => [...items, { id: 'new' }], [])).rejects.toBeInstanceOf(
+      CorruptDataFileError
+    )
+    expect(await fs.readFile(testFile, 'utf-8')).toBe('{"meta":"not a list"}')
+  })
+
+  it('still seeds from the fallback when the file is missing', async () => {
+    await fs.rm(testFile)
+
+    const result = await atomicUpdate<Item[]>(testFile, (items) => [...items, { id: 'new' }], [{ id: 'seed' }])
+
+    expect(result).toEqual([{ id: 'seed' }, { id: 'new' }])
+    expect(JSON.parse(await fs.readFile(testFile, 'utf-8'))).toEqual(result)
+  })
+
+  it('atomicRead still returns the fallback for reads and never touches the file', async () => {
+    expect(await atomicRead<Item[]>(testFile, [])).toEqual([])
+    expect(await fs.readFile(testFile, 'utf-8')).toBe(TORN)
+    expect(await backups()).toHaveLength(0)
   })
 })
