@@ -163,7 +163,7 @@ function containsSecret(value: string): boolean {
 /**
  * Replace any embedded secrets in a message with [REDACTED]
  */
-function redactSecrets(message: string): string {
+export function redactSecrets(message: string): string {
   return SECRET_VALUE_PATTERNS.reduce(
     (result, pattern) => result.replace(new RegExp(pattern.source, `${pattern.flags}g`), REDACTED),
     message

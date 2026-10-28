@@ -4,7 +4,8 @@ import {
   createErrorResponse,
   logValidationError,
   logDatabaseError,
-  tryCatchWithLogging
+  tryCatchWithLogging,
+  withErrorLogging
 } from './error-handler'
 import { createLogContext } from './logger'
 
@@ -334,6 +335,58 @@ describe('Error Handler Middleware', () => {
       const unknownError = { message: undefined }
       // Errors without message property should be handled gracefully
       expect(unknownError).toBeDefined()
+    })
+  })
+
+  describe('secret redaction in client responses', () => {
+    const DB_URL = 'postgres://admin:hunter2@db.internal:5432/app'
+    const API_KEY = 'sk-proj-abc123DEF456ghi789'
+
+    it('createErrorResponse redacts secrets from error and details', async () => {
+      const error = new Error(`validation failed connecting to ${DB_URL}`)
+
+      const response = createErrorResponse(error, createLogContext(), 400)
+      const raw = JSON.stringify(await response.json())
+
+      expect(raw).not.toContain('hunter2')
+      expect(raw).toContain('[REDACTED]')
+    })
+
+    it('createErrorResponse redacts secrets from an explicit message option', async () => {
+      const response = createErrorResponse(new Error('x'), createLogContext(), 500, {
+        message: `upstream rejected key ${API_KEY}`,
+      })
+      const body = await response.json()
+
+      expect(body.error).not.toContain(API_KEY)
+      expect(body.error).toContain('[REDACTED]')
+    })
+
+    it('withErrorLogging never returns a thrown secret to the client', async () => {
+      const handler = withErrorLogging(async () => {
+        throw new Error(`Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl rejected`)
+      }, 'test-service')
+
+      const response = await handler(new NextRequest('http://localhost:3000/api/x'))
+      const raw = JSON.stringify(await response.json())
+
+      expect(response.status).toBe(500)
+      expect(raw).not.toContain('eyJhbGciOiJIUzI1NiJ9')
+      expect(raw).toContain('[REDACTED]')
+    })
+
+    it('logValidationError redacts secrets from the message', () => {
+      const result = logValidationError(new Error(`bad value ${API_KEY}`), createLogContext())
+
+      expect(String(result.body.message)).not.toContain(API_KEY)
+      expect(String(result.body.message)).toContain('[REDACTED]')
+    })
+
+    it('keeps ordinary messages unchanged', async () => {
+      const response = createErrorResponse(new Error('Email is required'), createLogContext(), 400)
+      const body = await response.json()
+
+      expect(body.error).toBe('Email is required')
     })
   })
 })

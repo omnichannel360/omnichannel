@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createLogger, createLogContext, getErrorMessage } from './logger'
 import type { LogContext } from './logger'
+import { redactSecrets } from './error-handling'
 
 const logger = createLogger('error-handler')
 
@@ -41,7 +42,8 @@ export function createErrorResponse(
   statusCode: number = 500,
   options?: { serviceName?: string; message?: string }
 ): NextResponse {
-  const errorMessage = options?.message || getErrorMessage(error)
+  // Never echo embedded credentials/tokens back to the client or into log lines
+  const errorMessage = redactSecrets(options?.message || getErrorMessage(error))
   const serviceName = options?.serviceName || 'api'
 
   // Create a logger for this service
@@ -72,7 +74,7 @@ export function createErrorResponse(
   // Add validation details for 400 errors
   if (statusCode === 400 && error instanceof Error) {
     if (error.message.includes('validation') || error.message.includes('invalid')) {
-      responseBody.details = getErrorMessage(error)
+      responseBody.details = redactSecrets(getErrorMessage(error))
     }
   }
 
@@ -226,7 +228,7 @@ export function logValidationError(
     body: {
       success: false,
       error: 'Validation failed',
-      message: getErrorMessage(error),
+      message: redactSecrets(getErrorMessage(error)),
       field,
       correlationId: context.correlationId,
     },
