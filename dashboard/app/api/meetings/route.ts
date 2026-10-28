@@ -191,6 +191,13 @@ const meetingHandlers = protectRouteMulti(
         }
         const { message, meeting_type, participants } = bodyResult.data
 
+        if (!message && !meeting_type) {
+          return NextResponse.json(
+            { success: false, error: 'Message or meeting_type required' },
+            { status: 400 }
+          )
+        }
+
         const registry = await loadSkillRegistry()
 
         let parsed: { meeting_type: string | null; skill: string | null; description: string } = {

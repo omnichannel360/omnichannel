@@ -189,10 +189,9 @@ describe('Integration Tests - Race Conditions Across All APIs', () => {
 
       // Concurrent increments
       const promises = Array.from({ length: 20 }, () =>
-        atomicUpdate<Counter, Counter>(counterFile, async (data) => {
-          const updated = { count: data.count + 1 }
-          return { updated, result: updated }
-        })
+        atomicUpdate<Counter>(counterFile, async (data) => {
+          return { count: data.count + 1 }
+        }, { count: 0 })
       )
 
       await Promise.all(promises)

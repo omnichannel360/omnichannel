@@ -1,18 +1,60 @@
-import { describe, it, expect, beforeEach } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
+import { NextRequest, NextResponse } from 'next/server'
+
+jest.mock('@/lib/auth', () => ({
+  verifyAuth: jest.fn(async () => ({ authenticated: true })),
+  createUnauthorizedResponse: jest.fn(),
+}))
 
 /**
  * Integration tests for async I/O across all API endpoints
  * Verifies:
  * 1. No synchronous file operations (readFileSync, writeFileSync)
- * 2. All file operations use fs/promises
+ * 2. All file operations are async (fs.promises directly, or the async atomic helpers)
  * 3. Proper error handling for concurrent access
  * 4. File locking prevents data corruption
  */
 
 const apiDir = path.join(process.cwd(), 'app', 'api')
+
+// Atomic helpers do async I/O under withFileLock internally (lib/atomic-file-ops, lib/atomic-dir-ops)
+const ATOMIC_HELPER_IMPORT = /from\s+['"]@\/lib\/atomic-(file|dir)-ops['"]/
+
+/**
+ * Lines where an async file operation is invoked as a bare statement, i.e. a floating
+ * promise that is neither awaited, returned, assigned, nor passed as an argument.
+ */
+function findFloatingCalls(content: string, callPattern: string): string[] {
+  const callAtLineStart = new RegExp(`^\\s*(${callPattern})\\s*(<[^>]*>)?\\(`)
+  const lines = content.split('\n')
+  return lines.filter((line, i) => {
+    if (!callAtLineStart.test(line)) return false
+    const prev = lines.slice(0, i).reverse().find((l) => l.trim() !== '') ?? ''
+    // Continuation of an expression (argument list, assignment, arrow body) is not floating
+    return !/[(,=]\s*$|=>\s*$/.test(prev)
+  })
+}
+
+type RouteModule = Record<string, ((req: NextRequest) => Promise<NextResponse>) | undefined>
+
+/** Load a route module with process.cwd() pointed at `cwd`, so it uses <cwd>/data/*.json */
+function loadRouteWithCwd(routeFile: string, cwd: string): RouteModule {
+  const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(cwd)
+  let mod: RouteModule | undefined
+  try {
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      mod = require(path.join(apiDir, routeFile)) as RouteModule
+    })
+  } finally {
+    cwdSpy.mockRestore()
+  }
+  if (!mod) throw new Error(`Failed to load ${routeFile}`)
+  return mod
+}
 
 describe('API Integration - Async I/O Verification', () => {
   const apiFiles = [
@@ -29,9 +71,13 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        // Check for fs/promises import
-        expect(content).toMatch(/import.*fs.*from\s+['"]fs['"]/)
-        expect(content).toMatch(/promises/)
+        // Direct fs usage must be the promises API; otherwise file I/O is delegated to the async atomic helpers
+        const importsFs = /from\s+['"]fs['"]/.test(content)
+        if (importsFs) {
+          expect(content).toMatch(/import\s*\{\s*promises\s+as\s+fs\s*\}\s*from\s+['"]fs['"]/)
+        } else {
+          expect(content).toMatch(ATOMIC_HELPER_IMPORT)
+        }
 
         // Verify no sync imports
         expect(content).not.toMatch(/from\s+['"]fs\/promises['"]/)
@@ -43,8 +89,9 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        expect(content).toMatch(/withFileLock/)
-        expect(content).toMatch(/file-lock/)
+        // Locking is either explicit (withFileLock from lib/file-lock) or inside the atomic helpers
+        const usesFileLock = /withFileLock/.test(content) && /file-lock/.test(content)
+        expect(usesFileLock || ATOMIC_HELPER_IMPORT.test(content)).toBe(true)
       }
     })
   })
@@ -94,7 +141,7 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        expect(content).toMatch(/await.*readFile/)
+        expect(findFloatingCalls(content, 'fs\\.readFile|atomicRead|atomicReaddir')).toEqual([])
       }
     })
 
@@ -103,7 +150,7 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        expect(content).toMatch(/await.*writeFile/)
+        expect(findFloatingCalls(content, 'fs\\.writeFile|atomicWrite|atomicUpdate')).toEqual([])
       }
     })
 
@@ -112,7 +159,7 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        expect(content).toMatch(/await.*mkdir/)
+        expect(findFloatingCalls(content, 'fs\\.mkdir|ensureDataDir')).toEqual([])
       }
     })
 
@@ -122,9 +169,8 @@ describe('API Integration - Async I/O Verification', () => {
         const content = await fs.readFile(filePath, 'utf-8')
 
         // Not all files use stat, but if they do, it should be awaited
-        if (content.includes('stat(')) {
-          expect(content).toMatch(/await.*stat/)
-        }
+        // (a substring check for 'stat(' also matched e.g. 'Status(' / 'status(')
+        expect(findFloatingCalls(content, 'fs\\.stat')).toEqual([])
       }
     })
   })
@@ -140,17 +186,42 @@ describe('API Integration - Async I/O Verification', () => {
       }
     })
 
-    it('should handle JSON parse errors', async () => {
-      const filesWithJsonParse = ['alerts/route.ts', 'conductor/route.ts', 'kanban/route.ts']
+    describe('JSON parse errors in data files', () => {
+      let tmpCwd: string
 
-      for (const file of filesWithJsonParse) {
-        const filePath = path.join(apiDir, file)
-        const content = await fs.readFile(filePath, 'utf-8')
+      beforeEach(async () => {
+        tmpCwd = await fs.mkdtemp(path.join(os.tmpdir(), 'api-integration-'))
+        await fs.mkdir(path.join(tmpCwd, 'data'), { recursive: true })
+      })
 
-        // Should have nested try-catch for JSON.parse
-        const parseErrorHandling = content.match(/JSON\.parse.*\n.*try|catch.*JSON\.parse/s)
-        expect(parseErrorHandling || content.includes('parseError')).toBeTruthy()
-      }
+      afterEach(async () => {
+        await fs.rm(tmpCwd, { recursive: true, force: true })
+      })
+
+      const cases = [
+        { route: 'alerts/route.ts', dataFile: 'alerts.json' },
+        { route: 'conductor/route.ts', dataFile: 'conductor-logs.json' },
+        { route: 'kanban/route.ts', dataFile: 'kanban.json' },
+      ]
+
+      it.each(cases)('should handle JSON parse errors ($route)', async ({ route, dataFile }) => {
+        const corrupted = '{ "not": valid json'
+        const dataPath = path.join(tmpCwd, 'data', dataFile)
+        await fs.writeFile(dataPath, corrupted, 'utf-8')
+
+        const { GET } = loadRouteWithCwd(route, tmpCwd)
+        const response = await GET!(new NextRequest(`http://localhost/api/${path.dirname(route)}`))
+
+        // Handled: a well-formed JSON API response instead of an unhandled exception
+        const body = await response.json()
+        expect(typeof body.success).toBe('boolean')
+        if (!body.success) {
+          expect(response.status).toBeGreaterThanOrEqual(400)
+        }
+
+        // Reading a corrupted file must never rewrite or truncate it
+        await expect(fs.readFile(dataPath, 'utf-8')).resolves.toBe(corrupted)
+      })
     })
   })
 
@@ -162,8 +233,10 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        // Check for withFileLock wrapper around load functions
-        expect(content).toMatch(/withFileLock.*async.*\(\)/)
+        // Reads happen under a lock: explicit withFileLock wrapper, or atomicRead (locks internally)
+        const explicitLock = /withFileLock.*async.*\(\)/.test(content)
+        const atomicLoad = ATOMIC_HELPER_IMPORT.test(content) && /\batomicRead\s*(<[^>]*>)?\(/.test(content)
+        expect(explicitLock || atomicLoad).toBe(true)
       }
     })
 
@@ -174,8 +247,10 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        // Check for withFileLock wrapper around save functions
-        expect(content).toMatch(/withFileLock.*async.*\(\)/)
+        // Writes happen under a lock: explicit withFileLock wrapper, or atomicUpdate/atomicWrite (lock internally)
+        const explicitLock = /withFileLock.*async.*\(\)/.test(content)
+        const atomicSave = ATOMIC_HELPER_IMPORT.test(content) && /\batomic(Update|Write)\s*(<[^>]*>)?\(/.test(content)
+        expect(explicitLock || atomicSave).toBe(true)
       }
     })
   })
@@ -195,7 +270,8 @@ describe('API Integration - Async I/O Verification', () => {
         const filePath = path.join(apiDir, file)
         const content = await fs.readFile(filePath, 'utf-8')
 
-        expect(content).toMatch(/interface\s+\w+/)
+        // Data types may be declared locally or imported from the shared validation schemas
+        expect(content).toMatch(/interface\s+\w+|\btype\s+\w+\s*=|import\s+type\s|import\s*\{[^}]*\btype\s+\w+/)
       }
     })
   })

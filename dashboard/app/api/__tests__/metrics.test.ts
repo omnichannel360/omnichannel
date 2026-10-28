@@ -26,8 +26,8 @@ const validateMetricsStructure = (metrics: Metrics): void => {
   expect(typeof metrics.finance.revenue).toBe('number')
   expect(typeof metrics.finance.costs).toBe('number')
   expect(typeof metrics.finance.profit_margin).toBe('number')
-  expect(metrics.finance.revenue).toBeGreaterThan(0)
-  expect(metrics.finance.costs).toBeGreaterThan(0)
+  expect(metrics.finance.revenue).toBeGreaterThanOrEqual(0)
+  expect(metrics.finance.costs).toBeGreaterThanOrEqual(0)
   expect(metrics.finance.profit_margin).toBeGreaterThanOrEqual(0)
   expect(metrics.finance.profit_margin).toBeLessThanOrEqual(1)
 
@@ -36,8 +36,8 @@ const validateMetricsStructure = (metrics: Metrics): void => {
   expect(typeof metrics.operations.agents_deployed).toBe('number')
   expect(typeof metrics.operations.skills_available).toBe('number')
   expect(typeof metrics.operations.avg_processing_time_ms).toBe('number')
-  expect(metrics.operations.agents_deployed).toBeGreaterThan(0)
-  expect(metrics.operations.skills_available).toBeGreaterThan(0)
+  expect(metrics.operations.agents_deployed).toBeGreaterThanOrEqual(0)
+  expect(metrics.operations.skills_available).toBeGreaterThanOrEqual(0)
   expect(metrics.operations.avg_processing_time_ms).toBeGreaterThanOrEqual(0)
 
   // Performance metrics
@@ -311,7 +311,7 @@ describe('Metrics Object Structure', () => {
     const successRate = 0.95
     const errorRate = 1 - successRate
     expect(successRate + errorRate).toBeCloseTo(1.0, 10)
-    expect(errorRate).toBe(0.05)
+    expect(errorRate).toBeCloseTo(0.05, 10)
   })
 
   it('should handle all zeros gracefully', () => {

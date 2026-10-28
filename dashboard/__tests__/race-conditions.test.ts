@@ -47,19 +47,19 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
 
       // Simulate two concurrent update attempts
       // Both should see the same initial state and properly merge their updates
-      const promise1 = atomicUpdate<TestData[], void>(TEST_FILE, async (data) => {
+      const promise1 = atomicUpdate<TestData[]>(TEST_FILE, async (data) => {
         // Simulate some async work
         await new Promise(resolve => setTimeout(resolve, 50))
         const updated = [...data, { id: '2', value: 200, timestamp: new Date().toISOString() }]
-        return { updated, result: undefined }
-      })
+        return updated
+      }, [])
 
-      const promise2 = atomicUpdate<TestData[], void>(TEST_FILE, async (data) => {
+      const promise2 = atomicUpdate<TestData[]>(TEST_FILE, async (data) => {
         // This should see data with only item 1, not the item added by promise1
         // because each update is atomic and sequential
         const updated = [...data, { id: '3', value: 300, timestamp: new Date().toISOString() }]
-        return { updated, result: undefined }
-      })
+        return updated
+      }, [])
 
       // Execute both "concurrently" but they will queue due to file lock
       await Promise.all([promise1, promise2])
@@ -79,7 +79,7 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
       let readDuringWrite = false
 
       // Start an update that takes time
-      const updatePromise = atomicUpdate<TestData[], void>(TEST_FILE, async (data) => {
+      const updatePromise = atomicUpdate<TestData[]>(TEST_FILE, async (data) => {
         // During this update, try to read the file
         const readAttempt = await Promise.race([
           atomicRead<TestData[]>(TEST_FILE).then(() => 'read succeeded'),
@@ -93,8 +93,8 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
         }
 
         const updated = [...data, { id: '2', value: 200, timestamp: new Date().toISOString() }]
-        return { updated, result: undefined }
-      })
+        return updated
+      }, [])
 
       await updatePromise
 
@@ -109,18 +109,18 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
 
       // First update fails
       try {
-        await atomicUpdate<TestData[], void>(TEST_FILE, async () => {
+        await atomicUpdate<TestData[]>(TEST_FILE, async () => {
           throw new Error('Simulated failure')
-        })
+        }, [])
       } catch (error) {
         expect(error).toBeInstanceOf(Error)
       }
 
       // Second update should still work (lock was released)
-      const result = await atomicUpdate<TestData[], TestData[]>(TEST_FILE, async (data) => {
+      const result = await atomicUpdate<TestData[]>(TEST_FILE, async (data) => {
         const updated = [...data, { id: '1', value: 100, timestamp: new Date().toISOString() }]
-        return { updated, result: updated }
-      })
+        return updated
+      }, [])
 
       expect(result).toHaveLength(1)
     })
@@ -131,7 +131,7 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
 
       // Simulate 10 concurrent operations
       const operations = Array.from({ length: 10 }, (_, i) =>
-        atomicUpdate<TestData[], void>(TEST_FILE, async (data) => {
+        atomicUpdate<TestData[]>(TEST_FILE, async (data) => {
           // Each operation adds an item
           const newItem: TestData = {
             id: `item-${i}`,
@@ -139,8 +139,8 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
             timestamp: new Date().toISOString(),
           }
           const updated = [...data, newItem]
-          return { updated, result: undefined }
-        })
+          return updated
+        }, [])
       )
 
       await Promise.all(operations)
@@ -164,19 +164,25 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
       expect(result).toEqual(testData)
     })
 
-    it('should return empty array for non-existent file', async () => {
+    it('should return the fallback for a non-existent file', async () => {
       const nonExistentFile = path.join(TEST_DIR, 'non-existent.json')
-      const result = await atomicRead<TestData[]>(nonExistentFile)
+      const result = await atomicRead<TestData[]>(nonExistentFile, [])
       expect(result).toEqual([])
+    })
+
+    it('should reject a non-existent file when no fallback is given', async () => {
+      const nonExistentFile = path.join(TEST_DIR, 'non-existent.json')
+      await expect(atomicRead<TestData[]>(nonExistentFile)).rejects.toMatchObject({ code: 'ENOENT' })
     })
 
     it('should throw on corrupted JSON', async () => {
       // Write invalid JSON
       await fs.writeFile(TEST_FILE, 'invalid json {]', 'utf-8')
 
-      await expect(atomicRead<TestData[]>(TEST_FILE)).rejects.toThrow(
-        'File is corrupted or contains invalid JSON'
-      )
+      await expect(atomicRead<TestData[]>(TEST_FILE)).rejects.toThrow(SyntaxError)
+
+      // The corrupted file must be left untouched, not replaced
+      await expect(fs.readFile(TEST_FILE, 'utf-8')).resolves.toBe('invalid json {]')
     })
   })
 
@@ -229,15 +235,15 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
 
       // Simulate 5 concurrent POST requests creating alerts
       const createAlertOperations = Array.from({ length: 5 }, (_, i) =>
-        atomicUpdate<Alert[], Alert>(ALERTS_FILE, async (alerts) => {
+        atomicUpdate<Alert[]>(ALERTS_FILE, async (alerts) => {
           const newAlert: Alert = {
             id: `alert-${i}`,
             message: `Alert ${i}`,
             status: 'active',
           }
           const updated = [...alerts, newAlert]
-          return { updated, result: newAlert }
-        })
+          return updated
+        }, [])
       )
 
       const createdAlerts = await Promise.all(createAlertOperations)
@@ -257,13 +263,13 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
       await atomicWrite(ALERTS_FILE, initialAlerts)
 
       // Concurrent: 1 update, 1 read
-      const updatePromise = atomicUpdate<Alert[], void>(ALERTS_FILE, async (alerts) => {
+      const updatePromise = atomicUpdate<Alert[]>(ALERTS_FILE, async (alerts) => {
         const updated = alerts.map(a => ({
           ...a,
           status: 'resolved' as const,
         }))
-        return { updated, result: undefined }
-      })
+        return updated
+      }, [])
 
       // This read will queue after the update due to file lock
       const readPromise = atomicRead<Alert[]>(ALERTS_FILE)
@@ -298,23 +304,23 @@ describe('Atomic File Operations - Race Condition Prevention', () => {
       // - Request C: Delete task 2
       // Both A and B should succeed, C should succeed
 
-      const updatePromise = atomicUpdate<Task[], void>(TASKS_FILE, async (tasks) => {
+      const updatePromise = atomicUpdate<Task[]>(TASKS_FILE, async (tasks) => {
         const updated = tasks.map(t =>
           t.id === '1' ? { ...t, status: 'in-progress' as const } : t
         )
-        return { updated, result: undefined }
-      })
+        return updated
+      }, [])
 
-      const createPromise = atomicUpdate<Task[], void>(TASKS_FILE, async (tasks) => {
+      const createPromise = atomicUpdate<Task[]>(TASKS_FILE, async (tasks) => {
         const newTask: Task = { id: '3', title: 'Task 3', status: 'todo' }
         const updated = [...tasks, newTask]
-        return { updated, result: undefined }
-      })
+        return updated
+      }, [])
 
-      const deletePromise = atomicUpdate<Task[], void>(TASKS_FILE, async (tasks) => {
+      const deletePromise = atomicUpdate<Task[]>(TASKS_FILE, async (tasks) => {
         const updated = tasks.filter(t => t.id !== '2')
-        return { updated, result: undefined }
-      })
+        return updated
+      }, [])
 
       await Promise.all([updatePromise, createPromise, deletePromise])
 
