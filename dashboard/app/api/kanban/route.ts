@@ -4,7 +4,6 @@ import { generateId } from '@/lib/validation'
 import { validateBody } from '@/lib/validation/middleware'
 import { KanbanItemSchema, type KanbanItem } from '@/lib/validation/schemas'
 import { atomicUpdate, atomicRead } from '@/lib/atomic-file-ops'
-import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { createLogger, createLogContext } from '@/lib/logger'
 import { protectRouteMulti } from '@/lib/protected-route'
 import {
@@ -20,7 +19,7 @@ const logger = createLogger('kanban-api')
 export interface Task {
   id: string
   title: string
-  status: 'todo' | 'in-progress' | 'done'
+  status: 'todo' | 'in-progress' | 'in_progress' | 'done'
   assignee?: string
   dueDate?: string
 }
@@ -52,9 +51,6 @@ const kanbanHandlers = protectRouteMulti(
   {
     GET: async (request: NextRequest, { userId }) => {
       const requestId = extractCorrelationFromRequest(request.headers)
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'kanban')
-      if (rateLimitError) return rateLimitError
 
       const startTime = Date.now()
       const logContext = createLogContext({
@@ -98,9 +94,6 @@ const kanbanHandlers = protectRouteMulti(
 
     POST: async (request: NextRequest, { userId }) => {
       const requestId = extractCorrelationFromRequest(request.headers)
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'kanban')
-      if (rateLimitError) return rateLimitError
 
       const startTime = Date.now()
       const logContext = createLogContext({
@@ -165,9 +158,6 @@ const kanbanHandlers = protectRouteMulti(
 
     PUT: async (request: NextRequest, { userId }) => {
       const requestId = extractCorrelationFromRequest(request.headers)
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'kanban')
-      if (rateLimitError) return rateLimitError
 
       const startTime = Date.now()
       const logContext = createLogContext({
@@ -285,9 +275,6 @@ const kanbanHandlers = protectRouteMulti(
 
     DELETE: async (request: NextRequest, { userId }) => {
       const requestId = extractCorrelationFromRequest(request.headers)
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'kanban')
-      if (rateLimitError) return rateLimitError
 
       const startTime = Date.now()
       const { searchParams } = new URL(request.url)

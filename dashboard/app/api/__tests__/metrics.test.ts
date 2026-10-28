@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import type { Metrics } from '@/app/api/metrics/route'
-import { getConfigValue } from '@/app/api/metrics/route'
+import { getConfigValue } from '@/lib/config-value'
 
 // ============================================================================
 // TEST UTILITIES

@@ -38,14 +38,17 @@ import {
   getHttpStatus,
   getSafeErrorMessage,
   getErrorDetails,
+  type ErrorCode,
 } from '@/lib/error-handling'
+
+type RateLimitEndpoint = Parameters<typeof applyRateLimit>[1]
 
 /**
  * Guard options for route protection
  */
 export interface RouteGuardOptions {
   /** Rate limit bucket name */
-  rateLimit?: string
+  rateLimit?: RateLimitEndpoint
   /** Require authentication (default: true) */
   requireAuth?: boolean
   /** Required role(s) for access */
@@ -206,7 +209,7 @@ export function guardRoute<T = unknown>(
       const errorDetails = getErrorDetails(error)
 
       // Determine error code and status
-      let code = ERROR_CODES.INTERNAL_ERROR
+      let code: ErrorCode = ERROR_CODES.INTERNAL_ERROR
       let userMessage = 'An unexpected error occurred'
       let statusCode = 500
 

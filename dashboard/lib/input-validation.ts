@@ -182,7 +182,7 @@ export function validateBody<T>(
     const result = schema.safeParse(body)
 
     if (!result.success) {
-      const errors = result.error.flatten().fieldErrors
+      const errors: Record<string, string[] | undefined> = result.error.flatten().fieldErrors
       const validationErrors: ValidationError[] = []
 
       for (const [field, messages] of Object.entries(errors)) {
@@ -356,7 +356,7 @@ export function validateQuery<T>(
     const result = schema.safeParse(processedParams)
 
     if (!result.success) {
-      const errors = result.error.flatten().fieldErrors
+      const errors: Record<string, string[] | undefined> = result.error.flatten().fieldErrors
       const validationErrors: ValidationError[] = []
 
       for (const [field, messages] of Object.entries(errors)) {

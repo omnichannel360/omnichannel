@@ -21,12 +21,6 @@
  * - Circuit breaker
  */
 
-// uuid@14 is ESM-only ("type": "module"), which ts-jest's CommonJS pipeline cannot load.
-// Back v4 with Node's crypto.randomUUID, which produces the same RFC 4122 v4 format.
-jest.mock('uuid', () => ({
-  v4: () => jest.requireActual<typeof import('crypto')>('crypto').randomUUID(),
-}))
-
 import {
   generateCorrelationId,
   getOrCreateCorrelationId,

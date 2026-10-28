@@ -142,4 +142,5 @@ export function getStore(): RateLimitStore {
   return instance
 }
 
-export { RateLimitStore, RateLimitConfig, RateLimitEntry }
+export { RateLimitStore }
+export type { RateLimitConfig, RateLimitEntry }

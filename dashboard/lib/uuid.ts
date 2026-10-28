@@ -91,7 +91,7 @@ export function generateUUIDv4(): string {
     throw new Error('[CRITICAL] generateUUIDv4: Cryptographically insecure UUID generation blocked in production. This environment lacks crypto.randomUUID() (Node.js 15.7+) and crypto.getRandomValues(). Ensure Node.js 15+ is deployed.')
   } else {
     // Development environment - just a warning, then use fallback
-    fallbackLogger.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. For production, ensure Node.js 15+ or modern browser crypto APIs are available.', {
+    fallbackLogger?.warn('[SECURITY] generateUUIDv4: Using non-secure Math.random() fallback. For production, ensure Node.js 15+ or modern browser crypto APIs are available.', {
       component: 'uuid'
     })
   }

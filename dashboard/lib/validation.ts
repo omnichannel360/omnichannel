@@ -256,7 +256,7 @@ export function getZodErrorMessage(
 ): string | null {
   if (result.success) return null
 
-  const fieldErrors = result.error.flatten().fieldErrors
+  const fieldErrors: Record<string, string[] | undefined> = result.error.flatten().fieldErrors
   const errors: string[] = []
 
   for (const [field, fieldErrorList] of Object.entries(fieldErrors)) {

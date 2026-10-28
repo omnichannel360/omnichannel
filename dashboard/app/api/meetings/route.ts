@@ -7,7 +7,6 @@ import { validateBody } from '@/lib/validation/middleware'
 import { MeetingSchema, type Meeting as MeetingType } from '@/lib/validation/schemas'
 import { atomicUpdate, atomicRead, atomicWrite } from '@/lib/atomic-file-ops'
 import { withFileLock } from '@/lib/file-lock'
-import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { protectRouteMulti } from '@/lib/protected-route'
 
 interface Meeting {
@@ -150,9 +149,6 @@ function parseMeetingFromMessage(message: string, registry: SkillRegistry | null
 const meetingHandlers = protectRouteMulti(
   {
     GET: async (request: NextRequest, { userId }) => {
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'meetings')
-      if (rateLimitError) return rateLimitError
 
       try {
         const meetings = await loadMeetingsConfig()
@@ -180,9 +176,6 @@ const meetingHandlers = protectRouteMulti(
     },
 
     POST: async (request: NextRequest, { userId }) => {
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'meetings')
-      if (rateLimitError) return rateLimitError
 
       try {
         const bodyResult = await validateBody<z.infer<typeof MeetingRequestSchema>>(request, MeetingRequestSchema)
@@ -213,7 +206,7 @@ const meetingHandlers = protectRouteMulti(
         // SECURITY: Validate meeting_type against whitelist schema (Layer 1)
         const validatedMeetingType = parsed.meeting_type
           ? MeetingTypeSchema.safeParse(parsed.meeting_type)
-          : { success: false }
+          : { success: false as const }
         const safeMeetingType = validatedMeetingType.success
           ? validatedMeetingType.data
           : 'unknown'

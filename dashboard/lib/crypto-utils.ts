@@ -11,7 +11,9 @@ import type { Logger } from './logger'
 import { generateUUIDv4 } from './uuid'
 
 // Fallback logger implementation for circular dependency scenarios
-const createFallbackLogger = (): Logger => ({
+type LoggerLike = Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>
+
+const createFallbackLogger = (): LoggerLike => ({
   debug: (msg: string, context?: Record<string, unknown>) => {
     // Silent fallback - avoid console in production
   },
@@ -27,14 +29,14 @@ const createFallbackLogger = (): Logger => ({
 })
 
 // Cache fallback logger to avoid recreating on each call
-let fallbackLoggerCache: Logger | null = null
+let fallbackLoggerCache: LoggerLike | null = null
 
 let logger: Logger | null = null
 let nonCryptoWarningLogged = false
 
 // Try to use the real logger, fall back to console if not available
 let loggerInitialized = false
-function getLogger(): Logger {
+function getLogger(): LoggerLike {
   if (!loggerInitialized) {
     loggerInitialized = true
     try {

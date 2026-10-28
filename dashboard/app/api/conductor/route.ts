@@ -2,7 +2,6 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 import { atomicConditionalUpdate, atomicRead, atomicUpdate } from '@/lib/atomic-file-ops'
-import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { createLogger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { ConductorRequestSchemaComprehensive, type ConductorRequestMessage } from '@/lib/validation/schemas'
@@ -113,7 +112,7 @@ function parseTaskFromMessage(message: string): {
 
 const conductorHandlers = protectRouteMulti(
   {
-    POST: async (request: NextRequest, { userId }) => {
+    POST: async (request: NextRequest, { userId, email }) => {
       const startTime = Date.now()
       const requestId = extractCorrelationFromRequest(request.headers)
       const logContext = createLogContext({
@@ -122,17 +121,6 @@ const conductorHandlers = protectRouteMulti(
         operation: 'dispatch_task',
         requestId,
       })
-
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'conductor')
-      if (rateLimitError) {
-        logger.warn('Rate limit exceeded for conductor', {
-          ...logContext,
-          statusCode: 429,
-          responseTimeMs: Date.now() - startTime,
-        })
-        return rateLimitError
-      }
 
       try {
         // Validate request body with comprehensive Zod schema
@@ -149,7 +137,8 @@ const conductorHandlers = protectRouteMulti(
 
         const dispatchedSkills: string[] = skillId ? [skillId] : []
         const dispatchedAgents: string[] = []
-        const requester = request.headers.get('x-user-email') || userId || ''
+        // Verified token claim, never a request header
+        const requester = email || userId || ''
         await assertLogWritable()
         const dispatch = await dispatchToGitHub(message, requester)
 
@@ -214,17 +203,6 @@ const conductorHandlers = protectRouteMulti(
         operation: 'load_conductor_logs',
         requestId,
       })
-
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'conductor')
-      if (rateLimitError) {
-        logger.warn('Rate limit exceeded for conductor logs', {
-          ...logContext,
-          statusCode: 429,
-          responseTimeMs: Date.now() - startTime,
-        })
-        return rateLimitError
-      }
 
       try {
         const logs = await loadLogs()

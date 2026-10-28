@@ -214,7 +214,7 @@ export function getErrorDetails(error: unknown): {
 
   return {
     message: 'Unknown error',
-    ...(error && { details: JSON.stringify(error) }),
+    ...(error ? { details: JSON.stringify(error) } : {}),
   }
 }
 
@@ -225,7 +225,7 @@ export function formatErrorLog(
   message: string,
   error: unknown,
   context: {
-    requestId: string
+    requestId?: string
     method?: string
     path?: string
     userId?: string

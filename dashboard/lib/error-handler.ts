@@ -219,8 +219,8 @@ export function logValidationError(
 
   logger.warn(
     `Validation error${field ? ` on field: ${field}` : ''}`,
-    error,
-    { ...context, validationError: true, field }
+    { ...context, validationError: true, field },
+    { error: getErrorMessage(error) }
   )
 
   return {

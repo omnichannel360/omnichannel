@@ -5,7 +5,6 @@ import { logger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { AlertCreateBodySchema, AlertUpdateBodySchema, type AlertCreateBody, type AlertUpdateBody } from '@/lib/validation/schemas'
 import path from 'path'
-import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { AlertSchema } from '@/lib/validation/schemas'
 import { protectRouteMulti, type RouteHandler } from '@/lib/protected-route'
 import {
@@ -16,7 +15,13 @@ import {
   withTimeout,
   sanitizeErrorDetails,
 } from '@/lib/error-handling'
-import type { Alert } from '@/lib/validation/schemas'
+import type { Alert as AlertInput } from '@/lib/validation/schemas'
+
+type Alert = AlertInput & {
+  id: string
+  timestamp: string
+  status: 'active' | 'resolved'
+}
 
 const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json')
 
@@ -26,9 +31,6 @@ const alertHandlers = protectRouteMulti(
       const requestId = extractCorrelationFromRequest(request.headers)
       const startTime = Date.now()
 
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'alerts')
-      if (rateLimitError) return rateLimitError
 
       const logContext = createLogContext({
         method: request.method,
@@ -86,9 +88,6 @@ const alertHandlers = protectRouteMulti(
       const requestId = extractCorrelationFromRequest(request.headers)
       const startTime = Date.now()
 
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'alerts')
-      if (rateLimitError) return rateLimitError
 
       const logContext = createLogContext({
         method: request.method,
@@ -109,7 +108,7 @@ const alertHandlers = protectRouteMulti(
             statusCode: bodyResult.response.status,
             responseTimeMs: Date.now() - startTime,
           })
-          const resp = bodyResult.response.clone()
+          const resp = bodyResult.response
           resp.headers.set('x-correlation-id', requestId)
           return resp
         }
@@ -170,9 +169,6 @@ const alertHandlers = protectRouteMulti(
       const requestId = extractCorrelationFromRequest(request.headers)
       const startTime = Date.now()
 
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'alerts')
-      if (rateLimitError) return rateLimitError
 
       const logContext = createLogContext({
         method: request.method,
@@ -193,7 +189,7 @@ const alertHandlers = protectRouteMulti(
             statusCode: bodyResult.response.status,
             responseTimeMs: Date.now() - startTime,
           })
-          const resp = bodyResult.response.clone()
+          const resp = bodyResult.response
           resp.headers.set('x-correlation-id', requestId)
           return resp
         }

@@ -42,7 +42,7 @@ export function protectRoute(
 
         // Safely extract error message from context
         if (result.context && typeof result.context === 'object') {
-          const contextObj = result.context as Record<string, unknown>
+          const contextObj: Record<string, unknown> = { ...result.context }
           if ('error' in contextObj && typeof contextObj.error === 'string') {
             errorMessage = contextObj.error
           }
@@ -56,7 +56,7 @@ export function protectRoute(
 
       // Call the handler with authenticated context
       // Safely extract context properties with type checks
-      const contextObj = result.context ? (result.context as Record<string, unknown>) : {}
+      const contextObj: Record<string, unknown> = { ...result.context }
       const userId = contextObj && typeof contextObj.userId === 'string' ? contextObj.userId : undefined
       const email = contextObj && typeof contextObj.email === 'string' ? contextObj.email : undefined
       const role = contextObj && typeof contextObj.role === 'string' ? contextObj.role : undefined

@@ -321,11 +321,13 @@ function generateSecureId(): string {
   } catch (error) {
     // SECURITY: Cryptographic randomness is required for UUIDs
     // Throw error instead of falling back to Math.random() (non-cryptographic)
-    throw new Error(
-      'UUID generation failed: crypto.randomUUID not available. ' +
-      'This is a critical security failure - the system cannot generate secure identifiers. ' +
-      'Ensure Node.js crypto module is available and not disabled. ' +
-      `Original error: ${error instanceof Error ? error.message : 'Unknown'}`,
+    throw Object.assign(
+      new Error(
+        'UUID generation failed: crypto.randomUUID not available. ' +
+        'This is a critical security failure - the system cannot generate secure identifiers. ' +
+        'Ensure Node.js crypto module is available and not disabled. ' +
+        `Original error: ${error instanceof Error ? error.message : 'Unknown'}`
+      ),
       { cause: error }
     )
   }

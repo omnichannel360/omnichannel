@@ -55,8 +55,8 @@ export function buildGraph(profiles: Profile[]): { nodes: GraphNode[]; links: Gr
   }
 }
 
-function useContainerSize(): [React.RefObject<HTMLDivElement | null>, { width: number; height: number }] {
-  const ref = useRef<HTMLDivElement | null>(null)
+function useContainerSize(): [React.RefObject<HTMLDivElement>, { width: number; height: number }] {
+  const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   useEffect(() => {
     const el = ref.current

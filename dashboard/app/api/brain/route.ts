@@ -4,9 +4,8 @@ import path from 'path'
 import crypto from 'crypto'
 import { atomicRead } from '@/lib/atomic-file-ops'
 import { atomicReaddir } from '@/lib/atomic-dir-ops'
-import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { generateId } from '@/lib/validation'
-import { createLogger, createLogContext } from '@/lib/logger'
+import { createLogger, createLogContext, getErrorMessage } from '@/lib/logger'
 import { validateQuery } from '@/lib/validation/middleware'
 import { BrainQuerySchema, type BrainQuery } from '@/lib/validation/schemas'
 import { protectRoute, type RouteHandler } from '@/lib/protected-route'
@@ -52,9 +51,6 @@ export const GET = protectRoute(
     const requestId = extractCorrelationFromRequest(request.headers)
     const startTime = Date.now()
 
-    // Apply rate limiting
-    const rateLimitError = await applyRateLimit(request, 'brain')
-    if (rateLimitError) return rateLimitError
 
     const logContext = createLogContext({
       method: request.method,
@@ -90,12 +86,16 @@ export const GET = protectRoute(
         files = allFiles.filter(f => f.endsWith('.json'))
       } catch (error) {
         // Log directory read error but return empty response (graceful degradation)
-        logger.warn('Failed to read brain directory', error, {
-          ...logContext,
-          statusCode: 200,
-          responseTimeMs: Date.now() - startTime,
-          operation: 'read_brain_dir',
-        })
+        logger.warn(
+          'Failed to read brain directory',
+          {
+            ...logContext,
+            statusCode: 200,
+            responseTimeMs: Date.now() - startTime,
+            operation: 'read_brain_dir',
+          },
+          { error: getErrorMessage(error) }
+        )
         const response = NextResponse.json(
           createSuccessResponse(
             {
