@@ -82,8 +82,9 @@ export const GET = protectRoute(
 
     try {
       const profiles = await withFileLock(PROFILES_DIR, async () => {
+        // Profiles are runtime data outside the deploy; keep the build tracer from bundling the whole project
         try {
-          await fs.stat(PROFILES_DIR)
+          await fs.stat(/*turbopackIgnore: true*/ PROFILES_DIR)
         } catch (error) {
           logger.debug('Profiles directory not found, returning empty list', {
             ...logContext,
@@ -92,7 +93,7 @@ export const GET = protectRoute(
           return []
         }
 
-        const entries = await fs.readdir(PROFILES_DIR, { withFileTypes: true })
+        const entries = await fs.readdir(/*turbopackIgnore: true*/ PROFILES_DIR, { withFileTypes: true })
         return entries
           .filter(entry => entry.isDirectory())
           .map(entry => ({
