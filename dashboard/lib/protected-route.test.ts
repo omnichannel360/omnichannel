@@ -3,14 +3,21 @@ import { protectRoute, protectRouteMulti } from './protected-route'
 import * as middlewareModule from './auth-middleware-wrapper'
 
 jest.mock('./auth-middleware-wrapper')
-jest.mock('./logger', () => ({
-  logger: {
+jest.mock('./logger', () => {
+  const mockLogger = {
     error: jest.fn(),
     warn: jest.fn(),
     info: jest.fn(),
     debug: jest.fn(),
-  },
-}))
+  }
+  return {
+    logger: mockLogger,
+    // Called at module load by api-rate-limit-middleware (loaded to build the
+    // auth-middleware-wrapper automock)
+    createLogger: jest.fn(() => mockLogger),
+    createLogContext: jest.fn(),
+  }
+})
 
 describe('Protected Route Utilities', () => {
   let mockRequest: Partial<NextRequest>
@@ -25,9 +32,6 @@ describe('Protected Route Utilities', () => {
       headers: new Headers(),
     }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
   })
 
   describe('protectRoute', () => {

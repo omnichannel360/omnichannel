@@ -88,7 +88,7 @@ describe('Security & Edge Case Validation', () => {
 
     it('should reject onclick with alert', () => {
       const result = schema.safeParse('onclick="alert(1)"')
-      expect(result.success).toBe(true) // Text is safe, HTML parsing would happen elsewhere
+      expect(result.success).toBe(false) // Event-handler attribute pattern (on\w+=) is blocked
     })
   })
 

@@ -9,6 +9,15 @@
     "**/*.spec.tsx",
     "__tests__/**",
     "tests/**",
-    "jest.setup.ts"
+    "jest.setup.ts",
+    "ENDPOINT_EXAMPLE_ALERTS.ts",
+    "ERROR_HANDLING_ROUTE_TEMPLATE.ts",
+    "examples/authenticated-requests.ts",
+    "auth.config.ts",
+    "middleware-nextauth.ts",
+    "lib/auth-helpers.ts",
+    "lib/error-handling-v2.ts",
+    "app/api/auth/_nextauth-disabled/**",
+    "app/api/_protected-route-example-disabled/**"
   ]
 }

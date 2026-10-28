@@ -144,20 +144,49 @@ export function getHttpStatus(code: ErrorCode): number {
 }
 
 /**
+ * Value patterns that indicate a secret embedded in free text
+ * (credentials in connection strings, API keys, bearer tokens, JWTs).
+ */
+const SECRET_VALUE_PATTERNS: readonly RegExp[] = [
+  /\b[a-z][a-z0-9+.-]*:\/\/[^\s/@:]+:[^\s/@]+@\S*/i, // scheme://user:pass@host
+  /\b(?:sk|rk)[-_][A-Za-z0-9_-]{6,}/, // sk-..., sk-proj-..., rk_live_...
+  /\bBearer\s+[A-Za-z0-9._~+/-]+=*/i,
+  /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/, // JWT
+]
+
+const REDACTED = '[REDACTED]'
+
+function containsSecret(value: string): boolean {
+  return SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(value))
+}
+
+/**
+ * Replace any embedded secrets in a message with [REDACTED]
+ */
+export function redactSecrets(message: string): string {
+  return SECRET_VALUE_PATTERNS.reduce(
+    (result, pattern) => result.replace(new RegExp(pattern.source, `${pattern.flags}g`), REDACTED),
+    message
+  )
+}
+
+/**
  * Safe error message extraction
- * Prevents leaking sensitive information in production
+ * Prevents leaking sensitive information in production, and never returns
+ * embedded secrets (API keys, connection-string credentials, tokens) in any environment.
  */
 export function getSafeErrorMessage(error: unknown, defaultMessage: string): string {
   if (error instanceof Error) {
     // In production, only return safe error messages
     if (process.env.NODE_ENV === 'production') {
       // Specific error types that are safe to expose
-      if (error.message.includes('validation') || error.message.includes('invalid')) {
-        return error.message
+      const lowerMessage = error.message.toLowerCase()
+      if (lowerMessage.includes('validation') || lowerMessage.includes('invalid')) {
+        return redactSecrets(error.message)
       }
       return defaultMessage
     }
-    return error.message
+    return redactSecrets(error.message)
   }
 
   return defaultMessage
@@ -185,7 +214,7 @@ export function getErrorDetails(error: unknown): {
 
   return {
     message: 'Unknown error',
-    ...(error && { details: JSON.stringify(error) }),
+    ...(error ? { details: JSON.stringify(error) } : {}),
   }
 }
 
@@ -196,7 +225,7 @@ export function formatErrorLog(
   message: string,
   error: unknown,
   context: {
-    requestId: string
+    requestId?: string
     method?: string
     path?: string
     userId?: string
@@ -250,7 +279,7 @@ export function handleRouteError(
       code = ERROR_CODES.VALIDATION_ERROR
       userMessage = getSafeErrorMessage(error, 'Validation failed')
       statusCode = 400
-      details = { message: errorMessage }
+      details = { message: redactSecrets(errorMessage) }
     }
     // File not found
     else if (errorMessage.includes('ENOENT') || errorMessage.includes('not found')) {
@@ -312,6 +341,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
       const msg = error.message.toLowerCase()
       return (
         msg.includes('timeout') ||
+        msg.includes('etimedout') ||
         msg.includes('econnrefused') ||
         msg.includes('service unavailable') ||
         msg.includes('econnreset')
@@ -491,7 +521,11 @@ export async function withTimeout<T>(
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
+      setTimeout(() => {
+        const timeoutError = new Error(timeoutMessage)
+        timeoutError.name = 'TimeoutError'
+        reject(timeoutError)
+      }, timeoutMs)
     ),
   ])
 }
@@ -513,7 +547,7 @@ export function sanitizeErrorDetails(details: unknown): Record<string, unknown> 
         continue
       }
 
-      if (typeof value === 'string' && value.length < 500) {
+      if (typeof value === 'string' && value.length < 500 && !containsSecret(value)) {
         sanitized[key] = value
       } else if (typeof value === 'number' || typeof value === 'boolean') {
         sanitized[key] = value

@@ -108,12 +108,8 @@ describe('File Operations - Async I/O', () => {
     })
 
     it('should handle missing files gracefully', async () => {
-      try {
-        await fs.readFile(testFile, 'utf-8')
-        expect.fail('Should have thrown')
-      } catch (error) {
-        expect(error instanceof Error).toBe(true)
-      }
+      // fs errors come from Node's realm, so assert on the error code rather than instanceof Error
+      await expect(fs.readFile(testFile, 'utf-8')).rejects.toMatchObject({ code: 'ENOENT' })
     })
 
     it('should parse JSON safely with error handling', async () => {

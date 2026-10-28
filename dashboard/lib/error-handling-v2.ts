@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { v4 as uuidv4 } from 'uuid'
+import { generateUUIDv4 as uuidv4 } from './uuid'
 
 /**
  * Extended error response envelope with full context

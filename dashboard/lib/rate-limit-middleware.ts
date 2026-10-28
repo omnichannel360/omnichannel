@@ -81,7 +81,7 @@ export function withRateLimit(
     const limiter = getLimiter(options.config)
 
     // Extract client info
-    const ip = getClientIp(request.headers as Record<string, string | string[] | undefined>)
+    const ip = getClientIp(Object.fromEntries(request.headers.entries()))
     const userId = extractUserId(request)
     const apiKey = extractApiKey(request)
 

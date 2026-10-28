@@ -58,12 +58,19 @@ export async function verifyToken(request: NextRequest): Promise<TokenPayload | 
   try {
     const authHeader = request.headers.get('authorization')
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // RFC 7235 §2.1: auth-scheme is case-insensitive; exactly one token must follow
+    const match = authHeader?.match(/^Bearer\s+(\S+)$/i)
+    if (!match) {
       return null
     }
 
-    const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, getJWTSecret()) as JwtPayload
+    const token = match[1]
+    const decoded = jwt.verify(token, getJWTSecret(), { algorithms: ['HS256'] }) as JwtPayload
+
+    // Refresh tokens only mint new access tokens; they never authorize requests
+    if (decoded.type === 'refresh') {
+      return null
+    }
 
     // Validate decoded token has required fields before returning
     if (!isValidTokenPayload(decoded)) {

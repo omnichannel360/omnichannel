@@ -3,7 +3,7 @@
  * Tests timeout handling, retry logic, and circuit breaker patterns
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import {
   retryWithBackoff,
   DEFAULT_RETRY_CONFIG,
@@ -14,13 +14,9 @@ import {
 
 describe('Error Handling Edge Cases', () => {
   describe('withTimeout function', () => {
-    beforeEach(() => {
-      vi.useFakeTimers()
-    })
-
+    // Real timers: delays here are <= 200ms, and fake timers were never advanced
     afterEach(() => {
-      vi.useRealTimers()
-      vi.clearAllMocks()
+      jest.clearAllMocks()
     })
 
     it('should resolve successfully when operation completes before timeout', async () => {
@@ -115,16 +111,14 @@ describe('Error Handling Edge Cases', () => {
 
     it('should allow cleanup/abort of timed-out operation', async () => {
       // Arrange — Track if cleanup occurred
-      const cleanup = jest.fn()
+      let timer: ReturnType<typeof setTimeout> | undefined
       const operation = new Promise((resolve) => {
-        const timer = setTimeout(() => resolve('success'), 200)
-        // Handle cleanup when operation times out
-        operation.catch(() => clearTimeout(timer))
+        timer = setTimeout(() => resolve('success'), 200)
       })
 
-      // Act & Assert — Verify timeout and cleanup
+      // Act & Assert — Verify timeout, then caller aborts the pending operation
       await expect(withTimeout(operation, 50)).rejects.toThrow('timeout')
-      // Verify cleanup was potentially called (implementation dependent)
+      clearTimeout(timer)
     })
   })
 
@@ -132,12 +126,13 @@ describe('Error Handling Edge Cases', () => {
     let mockOperation: jest.Mock
 
     beforeEach(() => {
+      // Real timers by default (default backoff totals ~700ms); tests that need
+      // fake timers opt in and advance them explicitly.
       mockOperation = jest.fn()
-      vi.useFakeTimers()
     })
 
     afterEach(() => {
-      vi.useRealTimers()
+      jest.useRealTimers()
     })
 
     it('should succeed on first attempt if no error', async () => {
@@ -154,7 +149,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should retry on retryable error and succeed', async () => {
-      const operation = vi
+      const operation = jest
         .fn()
         .mockRejectedValueOnce(new Error('timeout'))
         .mockRejectedValueOnce(new Error('ECONNREFUSED'))
@@ -181,11 +176,12 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should implement exponential backoff', async () => {
-      vi.useFakeTimers()
+      jest.useFakeTimers()
 
-      const operation = vi
+      const operation = jest
         .fn()
-        .mockRejectedValue(new Error('ECONNREFUSED'))
+        .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+        .mockRejectedValueOnce(new Error('ECONNREFUSED'))
         .mockResolvedValueOnce('success')
 
       const config: RetryConfig = {
@@ -198,17 +194,25 @@ describe('Error Handling Edge Cases', () => {
 
       const promise = retryWithBackoff(operation, config)
 
-      // Verify backoff delays
-      expect(vi.getTimerCount()).toBeGreaterThan(0)
+      // First retry waits initialDelayMs (100ms)
+      await jest.advanceTimersByTimeAsync(99)
+      expect(operation).toHaveBeenCalledTimes(1)
+      await jest.advanceTimersByTimeAsync(1)
+      expect(operation).toHaveBeenCalledTimes(2)
 
-      vi.advanceTimersByTime(100)
-      await vi.runAllTimersAsync()
+      // Second retry waits 100 * 2 = 200ms
+      await jest.advanceTimersByTimeAsync(199)
+      expect(operation).toHaveBeenCalledTimes(2)
+      await jest.advanceTimersByTimeAsync(1)
 
-      vi.useRealTimers()
+      await expect(promise).resolves.toBe('success')
+      expect(operation).toHaveBeenCalledTimes(3)
+
+      jest.useRealTimers()
     })
 
     it('should respect maxDelayMs limit', async () => {
-      vi.useFakeTimers()
+      jest.useFakeTimers()
 
       const operation = jest.fn().mockRejectedValue(new Error('timeout'))
 
@@ -223,10 +227,10 @@ describe('Error Handling Edge Cases', () => {
       const promise = retryWithBackoff(operation, config).catch(() => {})
 
       // Skip past all timeouts
-      vi.advanceTimersByTime(2000)
-      await vi.runAllTimersAsync()
+      jest.advanceTimersByTime(2000)
+      await jest.runAllTimersAsync()
 
-      vi.useRealTimers()
+      jest.useRealTimers()
 
       // Max delay should cap at 500ms
       expect(operation.mock.calls.length).toBeLessThanOrEqual(6)
@@ -240,7 +244,7 @@ describe('Error Handling Edge Cases', () => {
         return false
       })
 
-      const operation = vi
+      const operation = jest
         .fn()
         .mockRejectedValueOnce(new Error('temporary failure'))
         .mockResolvedValueOnce('success')
@@ -257,7 +261,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should handle ECONNRESET as retryable', async () => {
-      const operation = vi
+      const operation = jest
         .fn()
         .mockRejectedValueOnce(new Error('ECONNRESET'))
         .mockResolvedValueOnce('success')
@@ -269,7 +273,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should handle service unavailable as retryable', async () => {
-      const operation = vi
+      const operation = jest
         .fn()
         .mockRejectedValueOnce(new Error('Service unavailable'))
         .mockResolvedValueOnce('success')
@@ -294,7 +298,7 @@ describe('Error Handling Edge Cases', () => {
       const result = await circuitBreaker.execute(operation)
 
       expect(result).toBe('success')
-      expect(operation).toHaveBeenCalledOnce()
+      expect(operation).toHaveBeenCalledTimes(1)
       expect(circuitBreaker.getState()).toBe('CLOSED')
     })
 
@@ -310,7 +314,7 @@ describe('Error Handling Edge Cases', () => {
     })
 
     it('should remain CLOSED with occasional failures below threshold', async () => {
-      const operation = vi
+      const operation = jest
         .fn()
         .mockResolvedValueOnce('success')
         .mockRejectedValueOnce(new Error('Failed'))

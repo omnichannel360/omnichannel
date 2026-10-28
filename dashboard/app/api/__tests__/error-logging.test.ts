@@ -3,7 +3,7 @@
  * Tests error logging across API routes with context, correlation IDs, and sanitization
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import { createLogContext, logger } from '@/lib/logger'
 import type { LogContext } from '@/lib/logger'
@@ -41,7 +41,7 @@ describe('Error Logging in API Routes', () => {
 
       logger.error('Operation failed', new Error('Test error'), context)
 
-      expect(consoleMocks.error).toHaveBeenCalledOnce()
+      expect(consoleMocks.error).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleMocks.error.mock.calls[0][0])
       expect(output.context.correlationId).toBe(correlationId)
     })

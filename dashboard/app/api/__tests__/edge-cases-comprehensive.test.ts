@@ -8,7 +8,7 @@
  * Arrange -> Act -> Assert
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 
 describe('Edge Cases - Comprehensive Coverage', () => {
   // ============================================================================
@@ -280,7 +280,7 @@ describe('Edge Cases - Comprehensive Coverage', () => {
   describe('Mock Isolation & Verification', () => {
     it('should verify mock was called with correct arguments', () => {
       // Arrange: Create mock function
-      const mockFn = vi.fn()
+      const mockFn = jest.fn()
 
       // Act: Call mock with specific arguments
       mockFn('arg1', 42, { key: 'value' })
@@ -292,7 +292,7 @@ describe('Edge Cases - Comprehensive Coverage', () => {
 
     it('should isolate mock state between tests', () => {
       // Arrange: Create fresh mock in this test
-      const mock1 = vi.fn(() => 'value1')
+      const mock1 = jest.fn(() => 'value1')
 
       // Act: Call the mock
       mock1()
@@ -305,7 +305,7 @@ describe('Edge Cases - Comprehensive Coverage', () => {
 
     it('should verify mock return values', () => {
       // Arrange: Create mock with return value
-      const mockFn = vi.fn((x: number) => x * 2)
+      const mockFn = jest.fn((x: number) => x * 2)
 
       // Act: Call mock
       const result = mockFn(5)
@@ -317,7 +317,7 @@ describe('Edge Cases - Comprehensive Coverage', () => {
 
     it('should verify mock was NOT called', () => {
       // Arrange: Create mock that won't be called
-      const mockFn = vi.fn()
+      const mockFn = jest.fn()
 
       // Act: Don't call the mock
       // (intentional - testing that mock wasn't called)

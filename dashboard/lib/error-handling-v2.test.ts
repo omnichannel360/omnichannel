@@ -500,7 +500,8 @@ describe('Error Handling System v2', () => {
 
       const response = createBulkOperationResponse([], failed, requestId)
 
-      expect(response.status).toBe(400)
+      // Status map assigns BULK_OPERATION_TOTAL_FAILURE -> 500 (lib/error-handling-v2.ts)
+      expect(response.status).toBe(500)
     })
 
     test('handles partial success (207 Multi-Status)', () => {
@@ -606,9 +607,15 @@ describe('Error Handling System v2', () => {
       // Wait for timeout
       await new Promise(resolve => setTimeout(resolve, 150))
 
-      // Should transition to half-open
-      const state = breaker.getState()
-      expect(state.state).toBe('half-open')
+      // Transition is lazy: the next execute() after the timeout runs in half-open
+      expect(breaker.getState().state).toBe('open')
+      let stateDuringProbe: string | undefined
+      await breaker.execute(async () => {
+        stateDuringProbe = breaker.getState().state
+        return 'ok'
+      })
+      expect(stateDuringProbe).toBe('half-open')
+      expect(breaker.getState().state).toBe('closed')
     })
 
     test('resets circuit on successful operation', async () => {
@@ -640,11 +647,11 @@ describe('Error Handling System v2', () => {
       expect(state.state).toBe('closed')
     })
 
-    test('can be manually reset', () => {
+    test('can be manually reset', async () => {
       const breaker = new CircuitBreaker(1, 1000, 1)
 
-      // Simulate failures to open circuit
-      breaker.execute(() => Promise.reject(new Error())).catch(() => {})
+      // Simulate failures to open circuit (await so the failure is recorded before asserting)
+      await expect(breaker.execute(() => Promise.reject(new Error()))).rejects.toThrow()
 
       let state = breaker.getState()
       expect(state.state).toBe('open')

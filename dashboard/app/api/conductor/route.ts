@@ -1,9 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { withFileLock } from '@/lib/file-lock'
-import { ensureDataDir } from '@/lib/ensure-dir'
-import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
+import { atomicConditionalUpdate, atomicRead, atomicUpdate } from '@/lib/atomic-file-ops'
 import { createLogger, createLogContext } from '@/lib/logger'
 import { validateBody } from '@/lib/validation/middleware'
 import { ConductorRequestSchemaComprehensive, type ConductorRequestMessage } from '@/lib/validation/schemas'
@@ -59,37 +57,20 @@ async function loadSkillRegistry(requestId: string): Promise<SkillRegistry | nul
   }
 }
 
-async function loadLogs(requestId: string): Promise<ConversationLog[]> {
-  return withFileLock(LOG_FILE, async () => {
-    await ensureDataDir(path.dirname(LOG_FILE))
-    try {
-      const data = await fs.readFile(LOG_FILE, 'utf-8')
-      try {
-        return JSON.parse(data)
-      } catch (parseError) {
-        logger.error('Failed to parse conductor logs', parseError, {
-          requestId,
-          operation: 'parse_conductor_logs',
-          path: LOG_FILE,
-        })
-        return []
-      }
-    } catch (readError) {
-      logger.error('Failed to read conductor logs', readError, {
-        requestId,
-        operation: 'read_conductor_logs',
-        path: LOG_FILE,
-      })
-      return []
-    }
-  })
+// Missing file reads as []; a corrupted file also reads as [] (logged), but is never overwritten
+async function loadLogs(): Promise<ConversationLog[]> {
+  return atomicRead<ConversationLog[]>(LOG_FILE, [])
 }
 
-async function saveLogs(logs: ConversationLog[]): Promise<void> {
-  return withFileLock(LOG_FILE, async () => {
-    await ensureDataDir(path.dirname(LOG_FILE))
-    await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), 'utf-8')
-  })
+// Read and append under one lock; throws CorruptDataFileError instead of replacing a corrupted log
+async function appendLog(entry: ConversationLog): Promise<void> {
+  await atomicUpdate<ConversationLog[]>(LOG_FILE, (logs) => [...logs, entry], [])
+}
+
+// Fail before any side effect (GitHub dispatch) if the log could not be appended to.
+// The condition is always false, so this only reads (with the write path's corruption check).
+async function assertLogWritable(): Promise<void> {
+  await atomicConditionalUpdate<ConversationLog[]>(LOG_FILE, () => false, (logs) => logs, [])
 }
 
 function findMatchingSkill(message: string, registry: SkillRegistry | null): string | null {
@@ -131,7 +112,7 @@ function parseTaskFromMessage(message: string): {
 
 const conductorHandlers = protectRouteMulti(
   {
-    POST: async (request: NextRequest, { userId }) => {
+    POST: async (request: NextRequest, { userId, email }) => {
       const startTime = Date.now()
       const requestId = extractCorrelationFromRequest(request.headers)
       const logContext = createLogContext({
@@ -140,17 +121,6 @@ const conductorHandlers = protectRouteMulti(
         operation: 'dispatch_task',
         requestId,
       })
-
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'conductor')
-      if (rateLimitError) {
-        logger.warn('Rate limit exceeded for conductor', {
-          ...logContext,
-          statusCode: 429,
-          responseTimeMs: Date.now() - startTime,
-        })
-        return rateLimitError
-      }
 
       try {
         // Validate request body with comprehensive Zod schema
@@ -167,7 +137,9 @@ const conductorHandlers = protectRouteMulti(
 
         const dispatchedSkills: string[] = skillId ? [skillId] : []
         const dispatchedAgents: string[] = []
-        const requester = request.headers.get('x-user-email') || userId || ''
+        // Verified token claim, never a request header
+        const requester = email || userId || ''
+        await assertLogWritable()
         const dispatch = await dispatchToGitHub(message, requester)
 
         let response: string
@@ -183,15 +155,13 @@ const conductorHandlers = protectRouteMulti(
           response = `Logged, but creating the GitHub issue failed (${dispatch.reason}). Nothing was dispatched.`
         }
 
-        const logs = await loadLogs(requestId)
-        logs.push({
+        await appendLog({
           timestamp: new Date().toISOString(),
           userMessage: message,
           conductorResponse: response,
           dispatchedAgents: dispatchedAgents.length > 0 ? dispatchedAgents : undefined,
           dispatchedSkills: dispatchedSkills.length > 0 ? dispatchedSkills : undefined,
         })
-        await saveLogs(logs)
 
         logger.info('Task dispatched successfully', {
           ...logContext,
@@ -234,19 +204,8 @@ const conductorHandlers = protectRouteMulti(
         requestId,
       })
 
-      // Apply rate limiting
-      const rateLimitError = await applyRateLimit(request, 'conductor')
-      if (rateLimitError) {
-        logger.warn('Rate limit exceeded for conductor logs', {
-          ...logContext,
-          statusCode: 429,
-          responseTimeMs: Date.now() - startTime,
-        })
-        return rateLimitError
-      }
-
       try {
-        const logs = await loadLogs(requestId)
+        const logs = await loadLogs()
         logger.info('Conductor logs loaded successfully', {
           ...logContext,
           userId,

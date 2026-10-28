@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createLogger, createLogContext, getErrorMessage } from './logger'
 import type { LogContext } from './logger'
+import { redactSecrets } from './error-handling'
 
 const logger = createLogger('error-handler')
 
@@ -22,7 +23,8 @@ export function extractRequestContext(request: NextRequest, options?: ErrorHandl
   const correlationId = request.headers.get('x-correlation-id') || options?.correlationId
 
   return createLogContext({
-    correlationId,
+    // Only override when present, so createLogContext's generated ID is kept otherwise
+    ...(correlationId && { correlationId }),
     method: request.method,
     route: url.pathname,
     path: url.pathname,
@@ -40,7 +42,8 @@ export function createErrorResponse(
   statusCode: number = 500,
   options?: { serviceName?: string; message?: string }
 ): NextResponse {
-  const errorMessage = options?.message || getErrorMessage(error)
+  // Never echo embedded credentials/tokens back to the client or into log lines
+  const errorMessage = redactSecrets(options?.message || getErrorMessage(error))
   const serviceName = options?.serviceName || 'api'
 
   // Create a logger for this service
@@ -71,7 +74,7 @@ export function createErrorResponse(
   // Add validation details for 400 errors
   if (statusCode === 400 && error instanceof Error) {
     if (error.message.includes('validation') || error.message.includes('invalid')) {
-      responseBody.details = getErrorMessage(error)
+      responseBody.details = redactSecrets(getErrorMessage(error))
     }
   }
 
@@ -125,11 +128,12 @@ export function withErrorLogging<T extends (req: NextRequest) => Promise<NextRes
       // Determine status code based on error type
       let statusCode = 500
       if (error instanceof Error) {
-        if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
+        const lowerMessage = error.message.toLowerCase()
+        if (lowerMessage.includes('unauthorized') || lowerMessage.includes('forbidden')) {
           statusCode = 403
-        } else if (error.message.includes('not found')) {
+        } else if (lowerMessage.includes('not found')) {
           statusCode = 404
-        } else if (error.message.includes('invalid') || error.message.includes('validation')) {
+        } else if (lowerMessage.includes('invalid') || lowerMessage.includes('validation')) {
           statusCode = 400
         }
       }
@@ -177,12 +181,12 @@ export async function tryCatchWithLogging<T>(
     const duration = Date.now() - startTime
 
     let statusCode = 500
-    const errorMsg = getErrorMessage(error)
+    const errorMsg = getErrorMessage(error).toLowerCase()
 
     if (
       error instanceof Error &&
-      (error.message.includes('unauthorized') ||
-        error.message.includes('forbidden'))
+      (errorMsg.includes('unauthorized') ||
+        errorMsg.includes('forbidden'))
     ) {
       statusCode = 403
     } else if (errorMsg.includes('not found')) {
@@ -215,8 +219,8 @@ export function logValidationError(
 
   logger.warn(
     `Validation error${field ? ` on field: ${field}` : ''}`,
-    error,
-    { ...context, validationError: true, field }
+    { ...context, validationError: true, field },
+    { error: getErrorMessage(error) }
   )
 
   return {
@@ -224,7 +228,7 @@ export function logValidationError(
     body: {
       success: false,
       error: 'Validation failed',
-      message: getErrorMessage(error),
+      message: redactSecrets(getErrorMessage(error)),
       field,
       correlationId: context.correlationId,
     },

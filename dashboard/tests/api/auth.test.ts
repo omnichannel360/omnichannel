@@ -1,33 +1,52 @@
 import { describe, it, expect, beforeEach } from '@jest/globals'
-import { createToken, verifyToken, verifyAuth, JWTPayload } from '@/lib/auth'
+import jwt from 'jsonwebtoken'
+import {
+  generateToken,
+  verifyToken,
+  verifyAuth,
+  createUnauthorizedResponse,
+  TokenPayload,
+} from '@/lib/auth'
+import { proxy as middleware } from '@/proxy'
 import { NextRequest } from 'next/server'
+
+type TestIdentity = Pick<TokenPayload, 'sub' | 'email' | 'role'>
+
+const testPayload: TestIdentity = {
+  sub: 'user-123',
+  email: 'test@example.com',
+  role: 'user',
+}
+
+const createTestToken = (payload: TestIdentity = testPayload): Promise<string> =>
+  generateToken(payload.sub, payload.email, payload.role)
+
+/** lib/auth verifyToken reads the Bearer token from a request, not a raw string */
+const verifyRawToken = (token: string): Promise<TokenPayload | null> =>
+  verifyToken(
+    new NextRequest(new URL('http://localhost/api/test'), {
+      headers: { authorization: `Bearer ${token}` },
+    })
+  )
 
 describe('Authentication Middleware', () => {
   let validToken: string
-  let expiredToken: string
-  const testPayload: Omit<JWTPayload, 'iat' | 'exp'> = {
-    sub: 'user-123',
-    email: 'test@example.com',
-    role: 'user',
-  }
 
   beforeEach(async () => {
-    validToken = await createToken(testPayload)
-    // Create expired token by manipulating date (this is a simplified test)
-    // In production, you'd create a token with setExpirationTime('0s') or similar
+    validToken = await createTestToken()
   })
 
   describe('Token Creation', () => {
     it('should create a valid JWT token', async () => {
-      const token = await createToken(testPayload)
+      const token = await createTestToken()
       expect(token).toBeTruthy()
       expect(typeof token).toBe('string')
       expect(token.split('.').length).toBe(3) // JWT format: header.payload.signature
     })
 
     it('should create tokens with correct payload', async () => {
-      const token = await createToken(testPayload)
-      const verified = await verifyToken(token)
+      const token = await createTestToken()
+      const verified = await verifyRawToken(token)
 
       expect(verified).toBeTruthy()
       expect(verified?.sub).toBe(testPayload.sub)
@@ -36,8 +55,8 @@ describe('Authentication Middleware', () => {
     })
 
     it('should include iat and exp claims', async () => {
-      const token = await createToken(testPayload)
-      const verified = await verifyToken(token)
+      const token = await createTestToken()
+      const verified = await verifyRawToken(token)
 
       expect(verified?.iat).toBeTruthy()
       expect(verified?.exp).toBeTruthy()
@@ -48,26 +67,24 @@ describe('Authentication Middleware', () => {
 
   describe('Token Verification', () => {
     it('should verify valid tokens', async () => {
-      const verified = await verifyToken(validToken)
+      const verified = await verifyRawToken(validToken)
       expect(verified).toBeTruthy()
       expect(verified?.email).toBe(testPayload.email)
     })
 
     it('should reject invalid tokens', async () => {
-      const invalid = 'invalid.token.format'
-      const verified = await verifyToken(invalid)
+      const verified = await verifyRawToken('invalid.token.format')
       expect(verified).toBeNull()
     })
 
     it('should reject tampered tokens', async () => {
       const tampered = validToken.slice(0, -5) + 'xxxxx'
-      const verified = await verifyToken(tampered)
+      const verified = await verifyRawToken(tampered)
       expect(verified).toBeNull()
     })
 
     it('should reject malformed tokens', async () => {
-      const malformed = 'not-a-jwt'
-      const verified = await verifyToken(malformed)
+      const verified = await verifyRawToken('not-a-jwt')
       expect(verified).toBeNull()
     })
   })
@@ -83,7 +100,7 @@ describe('Authentication Middleware', () => {
       const result = await verifyAuth(mockRequest)
       expect(result.authenticated).toBe(true)
       expect(result.payload?.email).toBe(testPayload.email)
-      expect(result.error).toBeNull()
+      expect(result.error).toBeUndefined()
     })
 
     it('should reject requests without authorization header', async () => {
@@ -91,8 +108,9 @@ describe('Authentication Middleware', () => {
       const result = await verifyAuth(mockRequest)
 
       expect(result.authenticated).toBe(false)
+      expect(result.payload).toBeUndefined()
       expect(result.error).toContain('Missing or invalid')
-      expect(result.status).toBe(401)
+      expect(createUnauthorizedResponse(result.error as string).status).toBe(401)
     })
 
     it('should reject requests with malformed auth header', async () => {
@@ -104,7 +122,8 @@ describe('Authentication Middleware', () => {
 
       const result = await verifyAuth(mockRequest)
       expect(result.authenticated).toBe(false)
-      expect(result.status).toBe(401)
+      expect(result.payload).toBeUndefined()
+      expect(createUnauthorizedResponse(result.error as string).status).toBe(401)
     })
 
     it('should reject requests with invalid token', async () => {
@@ -116,8 +135,10 @@ describe('Authentication Middleware', () => {
 
       const result = await verifyAuth(mockRequest)
       expect(result.authenticated).toBe(false)
-      expect(result.error).toContain('Invalid or expired')
-      expect(result.status).toBe(401)
+      expect(result.payload).toBeUndefined()
+      // lib/auth now returns one generic message for missing and invalid tokens
+      expect(result.error).toContain('invalid')
+      expect(createUnauthorizedResponse(result.error as string).status).toBe(401)
     })
   })
 
@@ -141,30 +162,39 @@ describe('Authentication Middleware', () => {
       })
 
       const result = await verifyAuth(mockRequest)
-      // Note: Current implementation is case-sensitive, adjust test if needed
-      expect(result.authenticated).toBe(false)
+      // RFC 7235 §2.1: auth-scheme is case-insensitive
+      expect(result.authenticated).toBe(true)
     })
   })
 
   describe('Token Expiration', () => {
     it('should set token to expire in 24 hours', async () => {
-      const token = await createToken(testPayload)
-      const verified = await verifyToken(token)
+      const token = await createTestToken()
+      const verified = await verifyRawToken(token)
 
-      if (verified?.iat && verified?.exp) {
-        const expirationTime = (verified.exp - verified.iat) * 1000 // Convert to ms
-        const expectedTime = 24 * 60 * 60 * 1000 // 24 hours in ms
-        // Allow 1 second tolerance
-        expect(Math.abs(expirationTime - expectedTime)).toBeLessThan(1000)
-      }
+      expect(verified).not.toBeNull()
+      const expirationTime = ((verified as TokenPayload).exp - (verified as TokenPayload).iat) * 1000
+      const expectedTime = 24 * 60 * 60 * 1000 // 24 hours in ms
+      // Allow 1 second tolerance
+      expect(Math.abs(expirationTime - expectedTime)).toBeLessThan(1000)
+    })
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
+    it('should reject expired tokens', async () => {
+      const now = Math.floor(Date.now() / 1000)
+      const expired = jwt.sign(
+        { ...testPayload, iat: now - 7200, exp: now - 3600 },
+        process.env.JWT_SECRET as string
+      )
+
+      expect(await verifyRawToken(expired)).toBeNull()
     })
   })
 })
 
+/**
+ * Previously these hit a live server on localhost:3000 via fetch. They now drive the
+ * Edge middleware (middleware.ts) directly, which is where the 401 gate lives.
+ */
 describe('API Endpoint Authentication', () => {
   describe('Protected Endpoints', () => {
     const endpoints = [
@@ -186,9 +216,8 @@ describe('API Endpoint Authentication', () => {
 
     endpoints.forEach(({ method, path }) => {
       it(`${method} ${path} should return 401 without token`, async () => {
-        const response = await fetch(`http://localhost:3000${path}`, {
-          method,
-        })
+        const request = new NextRequest(new URL(`http://localhost:3000${path}`), { method })
+        const response = await middleware(request)
 
         expect(response.status).toBe(401)
         const body = await response.json()
@@ -196,32 +225,30 @@ describe('API Endpoint Authentication', () => {
       })
 
       it(`${method} ${path} should accept valid token`, async () => {
-        const testPayload: Omit<JWTPayload, 'iat' | 'exp'> = {
-          sub: 'user-123',
-          email: 'test@example.com',
-          role: 'user',
-        }
-        const token = await createToken(testPayload)
+        const token = await createTestToken()
 
-        const response = await fetch(`http://localhost:3000${path}`, {
+        const request = new NextRequest(new URL(`http://localhost:3000${path}`), {
           method,
           headers: {
             authorization: `Bearer ${token}`,
             'content-type': 'application/json',
           },
         })
+        const response = await middleware(request)
 
-        // Should not be 401
+        // Should not be 401 (or 403: role 'user' is allowed on all of these routes)
         expect(response.status).not.toBe(401)
+        expect(response.status).not.toBe(403)
       })
     })
   })
 
   describe('Public Endpoints', () => {
     it('GET /api/health should work without authentication', async () => {
-      const response = await fetch('http://localhost:3000/api/health', {
+      const request = new NextRequest(new URL('http://localhost:3000/api/health'), {
         method: 'GET',
       })
+      const response = await middleware(request)
 
       expect(response.status).not.toBe(401)
     })

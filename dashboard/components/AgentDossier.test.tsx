@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+/** @jest-environment jsdom */
+import { render, screen, within } from '@testing-library/react'
 import { AgentDossier } from './AgentDossier'
 
 describe('AgentDossier', () => {
@@ -34,8 +35,10 @@ describe('AgentDossier', () => {
     it('renders performance details section', () => {
       render(<AgentDossier agentId={testAgentId} />)
       expect(screen.getByText('Performance Details')).toBeInTheDocument()
-      expect(screen.getByText('Active')).toBeInTheDocument()
-      expect(screen.getByText('0 pending')).toBeInTheDocument()
+      // 'Active' appears in both the header badge and the details list; scope to the details section
+      const details = screen.getByRole('heading', { name: 'Performance Details' }).closest('section') as HTMLElement
+      expect(within(details).getByText('Active')).toBeInTheDocument()
+      expect(within(details).getByText('0 pending')).toBeInTheDocument()
     })
   })
 
@@ -44,14 +47,16 @@ describe('AgentDossier', () => {
       const { container } = render(<AgentDossier agentId={testAgentId} />)
       // Since our test data has 94.2%, it won't be green
       // To properly test this, we'd need to mock the metrics
+      // The status color class is applied to the value element itself, not its parent card
       const successRateElement = screen.getByText('94.2%')
-      expect(successRateElement.parentElement?.className).toContain('text-yellow-600')
+      expect(successRateElement).toHaveClass('text-yellow-600')
+      expect(successRateElement).not.toHaveClass('text-green-600')
     })
 
     it('applies yellow color for success rate 85-94%', () => {
       render(<AgentDossier agentId={testAgentId} />)
       const successRateElement = screen.getByText('94.2%')
-      expect(successRateElement.parentElement?.className).toContain('text-yellow-600')
+      expect(successRateElement).toHaveClass('text-yellow-600')
     })
   })
 
@@ -135,8 +140,10 @@ describe('AgentDossier', () => {
   describe('Content Structure', () => {
     it('displays header with agent info and status', () => {
       render(<AgentDossier agentId={testAgentId} />)
-      expect(screen.getByText('Last active:')).toBeInTheDocument()
-      expect(screen.getByText('2 minutes ago')).toBeInTheDocument()
+      const header = screen.getByRole('banner')
+      // Label and value render in a single text node: "Last active: 2 minutes ago"
+      expect(within(header).getByText('Last active: 2 minutes ago')).toBeInTheDocument()
+      expect(within(header).getByText('Active')).toBeInTheDocument()
     })
 
     it('displays description list for performance details', () => {

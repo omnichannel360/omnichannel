@@ -89,12 +89,12 @@ export function createRateLimitMiddleware(config: RateLimitMiddlewareConfig) {
 /**
  * Add rate limit headers to response
  */
-export function addRateLimitHeaders(
-  response: NextResponse,
+export function addRateLimitHeaders<T>(
+  response: NextResponse<T>,
   remaining: number,
   resetTime: number,
   limit: number
-): NextResponse {
+): NextResponse<T> {
   const resetTimeSeconds = Math.ceil(resetTime / 1000)
   response.headers.set('X-RateLimit-Limit', String(limit))
   response.headers.set('X-RateLimit-Remaining', String(remaining))

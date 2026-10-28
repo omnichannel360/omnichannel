@@ -283,11 +283,11 @@ export function buildUnauthorizedContext(error: string = 'Missing token') {
  */
 export function createMockAuthService() {
   return {
-    verifyToken: vi.fn().mockResolvedValue({ sub: 'user-123', email: 'test@example.com' }),
-    generateToken: vi.fn().mockReturnValue(createUserToken()),
-    refreshToken: vi.fn().mockResolvedValue(createUserToken()),
-    revokeToken: vi.fn().mockResolvedValue(true),
-    validateCredentials: vi.fn().mockResolvedValue(true),
+    verifyToken: jest.fn().mockResolvedValue({ sub: 'user-123', email: 'test@example.com' }),
+    generateToken: jest.fn().mockReturnValue(createUserToken()),
+    refreshToken: jest.fn().mockResolvedValue(createUserToken()),
+    revokeToken: jest.fn().mockResolvedValue(true),
+    validateCredentials: jest.fn().mockResolvedValue(true),
   }
 }
 
@@ -296,11 +296,11 @@ export function createMockAuthService() {
  */
 export function createMockSupabaseAuth() {
   return {
-    getUserById: vi.fn().mockResolvedValue({ id: 'user-123', email: 'test@example.com' }),
-    getUserByEmail: vi.fn().mockResolvedValue({ id: 'user-123', email: 'test@example.com' }),
-    createUser: vi.fn().mockResolvedValue({ id: 'user-456' }),
-    updateUser: vi.fn().mockResolvedValue({ id: 'user-123' }),
-    deleteUser: vi.fn().mockResolvedValue(true),
+    getUserById: jest.fn().mockResolvedValue({ id: 'user-123', email: 'test@example.com' }),
+    getUserByEmail: jest.fn().mockResolvedValue({ id: 'user-123', email: 'test@example.com' }),
+    createUser: jest.fn().mockResolvedValue({ id: 'user-456' }),
+    updateUser: jest.fn().mockResolvedValue({ id: 'user-123' }),
+    deleteUser: jest.fn().mockResolvedValue(true),
   }
 }
 
@@ -353,8 +353,8 @@ export function generateSpecialCharacterCases() {
  * Clear all mocks and restore defaults
  */
 export function resetAuthMocks() {
-  vi.clearAllMocks()
-  vi.resetAllMocks()
+  jest.clearAllMocks()
+  jest.resetAllMocks()
 }
 
 /**
@@ -363,13 +363,13 @@ export function resetAuthMocks() {
 export function setupAuthTestEnvironment() {
   beforeEach(() => {
     // Reset time mocks
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2024-01-15T12:00:00Z'))
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2024-01-15T12:00:00Z'))
   })
 
   afterEach(() => {
     resetAuthMocks()
-    vi.useRealTimers()
+    jest.useRealTimers()
   })
 }
 

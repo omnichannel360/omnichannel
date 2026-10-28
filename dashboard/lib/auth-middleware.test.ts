@@ -3,7 +3,7 @@
  * Comprehensive test coverage for auth protection, role-based access, and error handling
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getAuthContext,

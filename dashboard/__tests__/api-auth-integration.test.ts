@@ -9,7 +9,8 @@
 
 import { generateToken } from '@/lib/auth'
 
-const API_BASE = 'http://localhost:3000/api'
+const API_BASE = `${process.env.E2E_BASE_URL}/api`
+const describeE2E = process.env.E2E_BASE_URL ? describe : describe.skip
 
 const testUser = {
   userId: 'test-user-auth-integration',
@@ -43,7 +44,7 @@ async function makeRequest(
   return fetch(`${API_BASE}${endpoint}`, options)
 }
 
-describe('API Authentication Integration', () => {
+describeE2E('API Authentication Integration', () => {
   let validToken: string
 
   beforeEach(async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 import {
   CircuitBreaker,
   retryWithBackoff,
@@ -28,7 +28,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const operation = jest.fn().mockResolvedValue('success')
       const result = await circuitBreaker.execute(operation)
       expect(result).toBe('success')
-      expect(operation).toHaveBeenCalledOnce()
+      expect(operation).toHaveBeenCalledTimes(1)
     })
 
     it('should open after failure threshold', async () => {
@@ -121,7 +121,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const result = await retryWithBackoff(operation)
 
       expect(result).toBe('success')
-      expect(operation).toHaveBeenCalledOnce()
+      expect(operation).toHaveBeenCalledTimes(1)
     })
 
     it('should retry on transient errors', async () => {
@@ -299,7 +299,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const sanitized = sanitizeErrorDetails(details)
       expect(sanitized?.longField).toBeUndefined()
       expect(sanitized?.shortField).toBe('ok')
-      expect(sanitized?.message).toBeUndefined() // > 500 chars
+      expect(sanitized?.message).toBe('Error occurred') // short, non-sensitive: kept
     })
 
     it('should keep numbers and booleans', () => {
@@ -362,7 +362,7 @@ describe('Error Handling - Comprehensive Suite', () => {
       const message = getSafeErrorMessage(error, 'Default message')
 
       process.env.NODE_ENV = env
-      expect(message).toContain('validation')
+      expect(message).toBe('Invalid email format in field user.email')
     })
 
     it('should return default message for unsafe errors in production', () => {

@@ -244,7 +244,7 @@ describe('Validation Integration & Type Inference', () => {
       })
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.issues[0].message).toContain('at least 6 characters')
+        expect(result.error.issues[0].message).toContain('at least 8 characters')
       }
     })
 
@@ -255,7 +255,7 @@ describe('Validation Integration & Type Inference', () => {
       expect(result.success).toBe(false)
       if (!result.success) {
         const messageError = result.error.issues.find((issue) => issue.path[0] === 'message')
-        expect(messageError?.message).toContain('required')
+        expect(messageError?.message).toBe('Required') // zod's default message for a missing key
       }
     })
 

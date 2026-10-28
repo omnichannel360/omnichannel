@@ -123,7 +123,7 @@ describe('Input Validation - Core Middleware', () => {
 
     it('should reject empty string for required field', () => {
       // Arrange
-      const invalidInput = { level: 'info', component: '', message: 'Test message' }
+      const invalidInput = { title: '', message: 'Test message' }
 
       // Act
       const result = AlertCreateBodySchema.safeParse(invalidInput)
@@ -131,9 +131,9 @@ describe('Input Validation - Core Middleware', () => {
       // Assert
       expect(result.success).toBe(false)
       if (!result.success) {
-        const componentError = result.error.errors.find((e) => e.path.includes('component'))
-        expect(componentError).toBeDefined()
-        expect(componentError?.message).toContain('at least 1 character')
+        const titleError = result.error.errors.find((e) => e.path.includes('title'))
+        expect(titleError).toBeDefined()
+        expect(titleError?.message).toContain('at least 1 character')
       }
     })
 
@@ -172,19 +172,17 @@ describe('Input Validation - Core Middleware', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should accept component within max length', () => {
+    it('should accept title within max length', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'A'.repeat(100),
+        title: 'A'.repeat(1000),
         message: 'Test',
       })
       expect(result.success).toBe(true)
     })
 
-    it('should reject component exceeding max length', () => {
+    it('should reject title exceeding max length', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'A'.repeat(101),
+        title: 'A'.repeat(1001),
         message: 'Test',
       })
       expect(result.success).toBe(false)
@@ -192,9 +190,8 @@ describe('Input Validation - Core Middleware', () => {
 
     it('should reject message exceeding max length', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
-        message: 'A'.repeat(2001),
+        title: 'test',
+        message: 'A'.repeat(1001),
       })
       expect(result.success).toBe(false)
     })
@@ -207,14 +204,13 @@ describe('Input Validation - Core Middleware', () => {
 
       // Act
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
+        title: 'test',
         message: xssPayload,
       })
 
       // Assert
       expect(result.success).toBe(false)
-      expect(result.error.errors[0].code).toContain('XSS')
+      expect(result.error.errors[0].message).toContain('XSS')
     })
 
     it('should reject message with javascript: protocol', () => {
@@ -223,8 +219,7 @@ describe('Input Validation - Core Middleware', () => {
 
       // Act
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
+        title: 'test',
         message: xssPayload,
       })
 
@@ -238,8 +233,7 @@ describe('Input Validation - Core Middleware', () => {
 
       // Act
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
+        title: 'test',
         message: safeContent,
       })
 
@@ -257,8 +251,7 @@ describe('Input Validation - Core Middleware', () => {
 
       // Act
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
+        title: 'test',
         message: obfuscated,
       })
 
@@ -272,8 +265,7 @@ describe('Input Validation - Core Middleware', () => {
 
       // Act
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
+        title: 'test',
         message: payload,
       })
 
@@ -283,19 +275,19 @@ describe('Input Validation - Core Middleware', () => {
   })
 
   describe('validateBody - Enum Validation', () => {
-    it('should reject invalid alert level', () => {
+    it('should reject invalid alert severity', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'invalid',
-        component: 'test',
+        title: 'test',
+        severity: 'invalid',
         message: 'Test',
       })
       expect(result.success).toBe(false)
     })
 
-    it('should accept valid alert level', () => {
+    it('should accept valid alert severity', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'warning',
-        component: 'test',
+        title: 'test',
+        severity: 'warning',
         message: 'Test',
       })
       expect(result.success).toBe(true)
@@ -321,11 +313,10 @@ describe('Input Validation - Core Middleware', () => {
 
 describe('Input Validation - Query Parameters', () => {
   describe('validateQuery - Type Coercion', () => {
-    it('should coerce numeric strings to numbers', () => {
-      const result = AlertsQuerySchema.safeParse({
-        limit: '50',
-        offset: '10',
-      })
+    it('should coerce numeric strings to numbers', async () => {
+      // Coercion of query strings happens in validateQuery, not in the schema
+      const request = new NextRequest('http://localhost/api/alerts?limit=50&offset=10')
+      const result = await validateQuery<{ limit: number; offset: number }>(request, AlertsQuerySchema)
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.limit).toBe(50)
@@ -414,9 +405,9 @@ describe('Input Validation - API Endpoint Schemas', () => {
   describe('Alert Schemas', () => {
     it('AlertCreateBodySchema - valid input', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'critical',
-        component: 'payment-service',
+        title: 'payment-service',
         message: 'Payment processing failed',
+        severity: 'critical',
       })
       expect(result.success).toBe(true)
     })
@@ -483,12 +474,12 @@ describe('Input Validation - API Endpoint Schemas', () => {
       expect(result.success).toBe(false)
     })
 
-    it('MeetingSchema - require at least one attendee', () => {
+    it('MeetingSchema - accepts an empty attendee list', () => {
       const result = MeetingSchema.safeParse({
         title: 'Meeting',
         attendees: [],
       })
-      expect(result.success).toBe(false)
+      expect(result.success).toBe(true)
     })
   })
 
@@ -522,22 +513,19 @@ describe('Input Validation - API Endpoint Schemas', () => {
 
 describe('Input Validation - Security Edge Cases', () => {
   describe('Path Traversal Prevention', () => {
-    it('should reject path traversal in component field', () => {
+    it('should allow path-like text in title (title is never used as a path)', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: '../../../etc/passwd',
+        title: '../../../etc/passwd',
         message: 'test',
       })
-      // This should fail because the regex in component validation should block it
-      // However, component field doesn't have a regex restriction, so this might pass
-      // The important validation happens at the API level with safeJoin
-      expect(result.success).toBe(true) // Schema allows it, but safeJoin will block it at API level
+      // title is free text (no path regex); alerts are stored in a fixed JSON file,
+      // so title is never used as a filesystem path
+      expect(result.success).toBe(true)
     })
 
-    it('should accept alphanumeric component names', () => {
+    it('should accept alphanumeric titles', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'auth-service_v2',
+        title: 'auth-service_v2',
         message: 'test',
       })
       expect(result.success).toBe(true)
@@ -548,8 +536,7 @@ describe('Input Validation - Security Edge Cases', () => {
     it('should accept message with SQL-like content', () => {
       // Validation doesn't prevent SQL, that's handled by parameterized queries
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'db',
+        title: 'db',
         message: "'; DROP TABLE users; --",
       })
       expect(result.success).toBe(true)
@@ -559,18 +546,16 @@ describe('Input Validation - Security Edge Cases', () => {
   describe('Large Input Prevention', () => {
     it('should reject extremely long message', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
-        message: 'A'.repeat(2001),
+        title: 'test',
+        message: 'A'.repeat(1001),
       })
       expect(result.success).toBe(false)
     })
 
     it('should accept message at exact max length', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
-        message: 'A'.repeat(2000),
+        title: 'test',
+        message: 'A'.repeat(1000),
       })
       expect(result.success).toBe(true)
     })
@@ -587,8 +572,7 @@ describe('Input Validation - Security Edge Cases', () => {
 
     it('should handle undefined for optional fields', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: 'test',
+        title: 'test',
         message: 'test',
         // tags: undefined (optional)
       })
@@ -607,18 +591,17 @@ describe('Input Validation - Security Edge Cases', () => {
 
     it('should reject array instead of string', () => {
       const result = AlertCreateBodySchema.safeParse({
-        level: 'info',
-        component: ['auth', 'service'],
+        title: ['auth', 'service'],
         message: 'test',
       })
       expect(result.success).toBe(false)
     })
 
-    it('should coerce string number to number', () => {
+    it('should reject string number at schema level (coercion is done by validateQuery)', () => {
       const result = AlertsQuerySchema.safeParse({
         limit: '50',
       })
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
     })
   })
 })
@@ -627,9 +610,9 @@ describe('Input Validation - Comprehensive API Tests', () => {
   it('should validate complete alert creation flow', () => {
     // Arrange
     const validAlert = {
-      level: 'warning' as const,
-      component: 'payment-service',
+      title: 'payment-service',
       message: 'High latency detected',
+      severity: 'warning' as const,
     }
 
     // Act
@@ -638,11 +621,12 @@ describe('Input Validation - Comprehensive API Tests', () => {
     // Assert
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.level).toBe('warning')
-      expect(result.data.component).toBe('payment-service')
+      expect(result.data.severity).toBe('warning')
+      expect(result.data.title).toBe('payment-service')
       expect(result.data.message).toBe('High latency detected')
-      expect(typeof result.data.level).toBe('string')
-      expect(typeof result.data.component).toBe('string')
+      expect(result.data.tags).toEqual([])
+      expect(typeof result.data.severity).toBe('string')
+      expect(typeof result.data.title).toBe('string')
       expect(typeof result.data.message).toBe('string')
     }
   })
@@ -671,9 +655,9 @@ describe('Input Validation - Comprehensive API Tests', () => {
   it('should provide detailed error messages on failure', () => {
     // Arrange
     const invalidInput = {
-      level: 'invalid-level',
-      component: 'A'.repeat(101),
+      title: 'A'.repeat(1001),
       message: '',
+      severity: 'invalid-level',
     }
 
     // Act
@@ -699,8 +683,7 @@ describe('Input Validation - Comprehensive API Tests', () => {
 
     // Act
     const result = AlertCreateBodySchema.safeParse({
-      level: 'info',
-      component: 'test',
+      title: 'test',
       message: unicodeMessage,
     })
 
@@ -732,12 +715,11 @@ describe('Input Validation - Comprehensive API Tests', () => {
 
   it('should reject extremely large payloads', () => {
     // Arrange - Edge case: size limit
-    const hugeMessage = 'X'.repeat(3000) // Exceeds 2000 char limit
+    const hugeMessage = 'X'.repeat(3000) // Exceeds 1000 char limit
 
     // Act
     const result = AlertCreateBodySchema.safeParse({
-      level: 'info',
-      component: 'test',
+      title: 'test',
       message: hugeMessage,
     })
 

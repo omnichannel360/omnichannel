@@ -68,12 +68,12 @@ describe('Error Handling Utilities', () => {
   })
 
   describe('createErrorResponse', () => {
-    it('creates properly formatted error response', () => {
+    it('creates properly formatted error response', async () => {
       const correlationId = 'test-correlation-id'
       const response = createErrorResponse('Test error', ERROR_CODES.VALIDATION_ERROR, correlationId, 400)
 
       expect(response.status).toBe(400)
-      const body = JSON.parse(response.body as string)
+      const body = await response.json()
 
       expect(body).toEqual({
         success: false,
@@ -84,7 +84,7 @@ describe('Error Handling Utilities', () => {
       })
     })
 
-    it('includes details when provided', () => {
+    it('includes details when provided', async () => {
       const correlationId = 'test-correlation-id'
       const details = { field: 'email', issue: 'invalid format' }
 
@@ -96,13 +96,13 @@ describe('Error Handling Utilities', () => {
         details
       )
 
-      const body = JSON.parse(response.body as string)
+      const body = await response.json()
       expect(body.details).toEqual(details)
     })
 
-    it('timestamp is ISO format', () => {
+    it('timestamp is ISO format', async () => {
       const response = createErrorResponse('Error', ERROR_CODES.INTERNAL_ERROR, 'id', 500)
-      const body = JSON.parse(response.body as string)
+      const body = await response.json()
 
       expect(body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
     })

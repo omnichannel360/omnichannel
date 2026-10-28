@@ -6,7 +6,7 @@ import { logger, createLogContext } from './logger'
 export interface ProtectedRouteConfig {
   requiredRoles?: string[]
   requireAuth?: boolean
-  rateLimitKey?: string
+  rateLimitKey?: Parameters<typeof applyRateLimit>[1]
 }
 
 export interface AuthContext {

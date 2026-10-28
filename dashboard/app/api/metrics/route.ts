@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { createRateLimitMiddleware, addRateLimitHeaders, RATE_LIMIT_CONFIGS } from '@/lib/rateLimit/middleware'
 import { createLogger, createLogContext } from '@/lib/logger'
 import { validateQuery } from '@/lib/validation/middleware'
 import { MetricsQuerySchema, type MetricsQuery } from '@/lib/validation/schemas'
 import { protectRoute } from '@/lib/protected-route'
 import { atomicRead } from '@/lib/atomic-file-ops'
+import { getConfigValue } from '@/lib/config-value'
 
-// Create rate limiter for this endpoint
-const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMIT_CONFIGS.metrics)
 const logger = createLogger('metrics-api')
 
 // Configuration defaults for consistency across all code paths
@@ -38,29 +36,6 @@ export interface Metrics {
     total_meetings_processed: number
     avg_task_completion_time_minutes: number
   }
-}
-
-/**
- * Get configuration value from environment with safe defaults and validation.
- * Handles env var parsing with NaN detection and error logging.
- * Exported for use in tests.
- */
-export const getConfigValue = (envKey: string, defaultValue: number): number => {
-  const value = process.env[envKey]
-  if (!value) return defaultValue
-
-  const parsed = parseInt(value, 10)
-  // Validate that parseInt succeeded (returns NaN on failure)
-  if (isNaN(parsed)) {
-    logger.warn(`Invalid numeric value for ${envKey}: "${value}", using default: ${defaultValue}`, {
-      envKey,
-      invalidValue: value,
-      defaultValue,
-    })
-    return defaultValue
-  }
-
-  return parsed
 }
 
 /**
@@ -180,17 +155,6 @@ export const GET = protectRoute(
       operation: 'get_metrics',
     })
 
-    // Apply rate limiting
-    const rateLimitCheck = await rateLimitMiddleware(request)
-    if (!rateLimitCheck.allowed) {
-      logger.warn('Rate limit exceeded for metrics', {
-        ...logContext,
-        statusCode: 429,
-        responseTimeMs: Date.now() - startTime,
-      })
-      return rateLimitCheck.response!
-    }
-
     try {
       // Validate query parameters with Zod schema
       const queryResult = await validateQuery<MetricsQuery>(request, MetricsQuerySchema)
@@ -213,19 +177,11 @@ export const GET = protectRoute(
         responseTimeMs: Date.now() - startTime,
       })
 
-      let response = NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         data: metrics,
         timestamp: new Date().toISOString(),
       })
-
-      // Add rate limit headers
-      response = addRateLimitHeaders(
-        response,
-        rateLimitCheck.remaining!,
-        rateLimitCheck.resetTime!,
-        rateLimitCheck.limit!
-      )
 
       return response
     } catch (error: unknown) {

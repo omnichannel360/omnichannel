@@ -54,13 +54,15 @@ describe('Core Validation Schemas', () => {
         }
       })
 
-      it('should accept email at minimum length boundary (3 chars)', () => {
-        const result = schema.safeParse('a@b')
+      it('should accept shortest well-formed email (domain requires a TLD)', () => {
+        // 'a@b' (3 chars) is rejected by the format check: a TLD is required
+        expect(schema.safeParse('a@b').success).toBe(false)
+        const result = schema.safeParse('a@b.co')
         expect(result.success).toBe(true)
       })
 
       it('should accept email at maximum length boundary (254 chars)', () => {
-        const longEmail = 'a'.repeat(243) + '@example.com' // 254 total
+        const longEmail = 'a'.repeat(242) + '@example.com' // 254 total
         const result = schema.safeParse(longEmail)
         expect(result.success).toBe(true)
       })
@@ -91,7 +93,10 @@ describe('Core Validation Schemas', () => {
       it('should reject email shorter than 3 chars', () => {
         const result = schema.safeParse('a@')
         expect(result.success).toBe(false)
-        expect(result.error?.issues[0].message).toContain('at least 3 characters')
+        // Format check runs first, so the first issue is the format error
+        expect(result.error?.issues.map((i) => i.message)).toEqual(
+          expect.arrayContaining(['Invalid email format', 'Email must be at least 3 characters'])
+        )
       })
 
       it('should reject email longer than 254 chars', () => {
@@ -158,7 +163,9 @@ describe('Core Validation Schemas', () => {
       })
 
       it('should accept password at maximum length (128 chars)', () => {
-        const longPassword = 'A' + 'b'.repeat(126) + '1!'
+        // Must avoid 3+ identical consecutive chars (rejected by PasswordSchema)
+        const longPassword = 'Aa1!' + 'abcdefghijklmnopqrstuvwxyz'.repeat(5).slice(0, 124)
+        expect(longPassword).toHaveLength(128)
         const result = schema.safeParse(longPassword)
         expect(result.success).toBe(true)
       })
@@ -201,7 +208,7 @@ describe('Core Validation Schemas', () => {
         const longPassword = 'A' + 'b'.repeat(128) + '1!'
         const result = schema.safeParse(longPassword)
         expect(result.success).toBe(false)
-        expect(result.error?.issues[0].message).toContain('not exceed 128')
+        expect(result.error?.issues[0].message).toContain('less than 128')
       })
 
       it('should reject empty password', () => {
@@ -315,7 +322,7 @@ describe('Core Validation Schemas', () => {
       it('should reject <script> tag', () => {
         const result = schema.safeParse('<script>alert(1)</script>')
         expect(result.success).toBe(false)
-        expect(result.error?.issues[0].message).toContain('forbidden patterns')
+        expect(result.error?.issues[0].message).toContain('forbidden XSS patterns')
       })
 
       it('should reject <SCRIPT> uppercase', () => {

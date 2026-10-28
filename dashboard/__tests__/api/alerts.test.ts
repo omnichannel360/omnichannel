@@ -1,6 +1,44 @@
 import { promises as fs } from 'fs'
+import os from 'os'
 import path from 'path'
+import { NextRequest } from 'next/server'
 import { clearAllLocks } from '@/lib/file-lock'
+
+jest.mock('@/lib/auth', () => ({
+  verifyAuth: jest.fn().mockResolvedValue({ authenticated: true }),
+  createUnauthorizedResponse: jest.fn(),
+}))
+
+type AlertsRoute = typeof import('@/app/api/alerts/route')
+type AtomicOps = typeof import('@/lib/atomic-file-ops')
+
+/**
+ * Load the alerts route with process.cwd() pointed at a temp dir, so it reads/writes
+ * <tmp>/data/alerts.json instead of the real dashboard data file.
+ */
+function loadAlertsRoute(cwd: string): { route: AlertsRoute; atomic: AtomicOps } {
+  const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(cwd)
+  let route: AlertsRoute | undefined
+  let atomic: AtomicOps | undefined
+  try {
+    jest.isolateModules(() => {
+      atomic = require('@/lib/atomic-file-ops') as AtomicOps
+      route = require('@/app/api/alerts/route') as AlertsRoute
+    })
+  } finally {
+    cwdSpy.mockRestore()
+  }
+  if (!route || !atomic) throw new Error('Failed to load alerts route')
+  return { route, atomic }
+}
+
+function jsonRequest(method: string, body?: unknown): NextRequest {
+  return new NextRequest('http://localhost/api/alerts', {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
 
 describe('Alerts API - Async File I/O Verification', () => {
   const testDataDir = path.join(process.cwd(), 'test-data')
@@ -25,60 +63,91 @@ describe('Alerts API - Async File I/O Verification', () => {
     }
   })
 
-  test('ensures all file I/O operations are async', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
-    const content = await fs.readFile(sourceFile, 'utf-8')
+  describe('route behavior against an isolated data dir', () => {
+    let tmpCwd: string
+    let alertsFile: string
 
-    // Verify: No synchronous file operations
-    expect(content).not.toMatch(/readFileSync/)
-    expect(content).not.toMatch(/writeFileSync/)
-    expect(content).not.toMatch(/statSync/)
-    expect(content).not.toMatch(/mkdirSync/)
+    beforeEach(async () => {
+      tmpCwd = await fs.mkdtemp(path.join(os.tmpdir(), 'alerts-route-test-'))
+      alertsFile = path.join(tmpCwd, 'data', 'alerts.json')
+    })
 
-    // Verify: Uses fs.promises
-    expect(content).toMatch(/import.*promises.*fs/)
+    afterEach(async () => {
+      jest.restoreAllMocks()
+      await fs.rm(tmpCwd, { recursive: true, force: true })
+    })
 
-    // Verify: Uses withFileLock for concurrent access control
-    expect(content).toMatch(/withFileLock/)
-    expect(content).toMatch(/import.*withFileLock/)
+    test('ensures all file I/O goes through the async, locked atomic helpers', async () => {
+      const { route, atomic } = loadAlertsRoute(tmpCwd)
+      const readSpy = jest.spyOn(atomic, 'atomicRead')
+      const updateSpy = jest.spyOn(atomic, 'atomicUpdate')
 
-    // Verify: Uses await for all I/O
-    expect(content).toMatch(/await fs\.readFile/)
-    expect(content).toMatch(/await fs\.writeFile/)
+      const postRes = await route.POST!(jsonRequest('POST', { title: 'Disk', message: 'Disk almost full' }))
+      expect(postRes.status).toBe(201)
+      const getRes = await route.GET!(jsonRequest('GET'))
+      expect(getRes.status).toBe(200)
+
+      expect(updateSpy).toHaveBeenCalledWith(alertsFile, expect.any(Function), [])
+      expect(readSpy).toHaveBeenCalledWith(alertsFile, [])
+
+      const persisted = JSON.parse(await fs.readFile(alertsFile, 'utf-8'))
+      expect(persisted).toHaveLength(1)
+      expect(persisted[0]).toMatchObject({ title: 'Disk', message: 'Disk almost full', status: 'active' })
+    })
+
+    test('concurrent POSTs do not lose updates', async () => {
+      const { route } = loadAlertsRoute(tmpCwd)
+
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, (_, i) =>
+          route.POST!(jsonRequest('POST', { title: `Alert ${i}`, message: `Message ${i}` }))
+        )
+      )
+      responses.forEach((res) => expect(res.status).toBe(201))
+
+      const persisted: Array<{ id: string; title: string }> = JSON.parse(await fs.readFile(alertsFile, 'utf-8'))
+      expect(persisted).toHaveLength(10)
+      expect(new Set(persisted.map((a) => a.id)).size).toBe(10)
+      expect(persisted.map((a) => a.title).sort()).toEqual(
+        Array.from({ length: 10 }, (_, i) => `Alert ${i}`).sort()
+      )
+    })
+
+    test('verifies error handling with JSON parse errors', async () => {
+      await fs.mkdir(path.dirname(alertsFile), { recursive: true })
+      await fs.writeFile(alertsFile, '{ corrupted json', 'utf-8')
+      const { route } = loadAlertsRoute(tmpCwd)
+
+      // A corrupted data file is handled (no unhandled throw / 500) and reading never rewrites it
+      const res = await route.GET!(jsonRequest('GET'))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(Array.isArray(body.data.alerts)).toBe(true)
+      await expect(fs.readFile(alertsFile, 'utf-8')).resolves.toBe('{ corrupted json')
+    })
   })
 
   test('verifies all API endpoints use async patterns', async () => {
     const endpoints = [
-      'dashboard/app/api/alerts/route.ts',
-      'dashboard/app/api/brain/route.ts',
-      'dashboard/app/api/conductor/route.ts',
-      'dashboard/app/api/kanban/route.ts',
-      'dashboard/app/api/meetings/route.ts',
+      'app/api/alerts/route.ts',
+      'app/api/brain/route.ts',
+      'app/api/conductor/route.ts',
+      'app/api/kanban/route.ts',
+      'app/api/meetings/route.ts',
     ]
 
     for (const endpoint of endpoints) {
       const filePath = path.join(process.cwd(), endpoint)
       const content = await fs.readFile(filePath, 'utf-8')
 
-      // Each endpoint should use fs.promises
-      expect(content).toMatch(/import.*promises.*fs/, `${endpoint} should use fs.promises`)
-
-      // Each endpoint should use withFileLock
-      expect(content).toMatch(/withFileLock/, `${endpoint} should use withFileLock`)
+      // Each endpoint should do file I/O under a lock: directly via withFileLock, or via the
+      // atomic helpers (lib/atomic-file-ops, lib/atomic-dir-ops), which take the lock internally
+      expect(content).toMatch(/withFileLock|@\/lib\/atomic-(file|dir)-ops/)
 
       // Each endpoint should not have synchronous operations
       expect(content).not.toMatch(/readFileSync/, `${endpoint} should not use readFileSync`)
       expect(content).not.toMatch(/writeFileSync/, `${endpoint} should not use writeFileSync`)
     }
-  })
-
-  test('verifies error handling with JSON parse errors', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
-    const content = await fs.readFile(sourceFile, 'utf-8')
-
-    // Verify explicit error handling for JSON parse failures
-    expect(content).toMatch(/JSON\.parse.*catch/)
-    expect(content).toMatch(/corrupted|invalid JSON/i)
   })
 
   test('file-lock utility prevents concurrent write corruption', async () => {
@@ -102,7 +171,7 @@ describe('Alerts API - Async File I/O Verification', () => {
   })
 
   test('verifies async/await chain completeness', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
+    const sourceFile = path.join(process.cwd(), 'app/api/alerts/route.ts')
     const content = await fs.readFile(sourceFile, 'utf-8')
 
     // Check that all async functions properly use await
@@ -117,19 +186,10 @@ describe('Alerts API - Async File I/O Verification', () => {
   })
 
   test('verifies imports are properly resolved', async () => {
-    const sourceFile = path.join(process.cwd(), 'dashboard/app/api/alerts/route.ts')
-    const content = await fs.readFile(sourceFile, 'utf-8')
+    const route = await import('@/app/api/alerts/route')
 
-    // Verify no duplicate imports
-    const imports = content.match(/^import .* from/gm) || []
-    const importLines = imports.join('\n')
-
-    // Count withFileLock imports
-    const withFileLockImports = importLines.match(/withFileLock/g) || []
-    expect(withFileLockImports.length).toBe(1) // Should appear exactly once
-
-    // Count parseRequestJson imports
-    const parseJsonImports = importLines.match(/parseRequestJson/g) || []
-    expect(parseJsonImports.length).toBe(1) // Should appear exactly once
+    expect(typeof route.GET).toBe('function')
+    expect(typeof route.POST).toBe('function')
+    expect(typeof route.PATCH).toBe('function')
   })
 })

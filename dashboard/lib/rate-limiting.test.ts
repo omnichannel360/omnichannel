@@ -117,10 +117,16 @@ describe('Rate Limiting', () => {
         },
       })
 
+      // Limiter contract: null = allowed (no response), NextResponse = 429 with headers
+      for (let i = 0; i < 5; i++) {
+        expect(await limiter(request)).toBeNull()
+      }
+
       const result = await limiter(request)
+      expect(result?.status).toBe(429)
       expect(result?.headers.get('X-RateLimit-Limit')).toBe('5')
-      expect(result?.headers.get('X-RateLimit-Remaining')).toBe('4')
-      expect(result?.headers.get('X-RateLimit-Reset')).toBeDefined()
+      expect(result?.headers.get('X-RateLimit-Remaining')).toBe('0')
+      expect(result?.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/)
     })
 
     it('should reset counter after window expires', async () => {
@@ -220,10 +226,16 @@ describe('Rate Limiting', () => {
         },
       })
 
-      for (let i = 0; i < 3; i++) {
+      // Allowed requests return null, so remaining is observable only once the quota is spent:
+      // exactly maxRequests are allowed, and every later request reports 0 remaining
+      for (let i = 0; i < 5; i++) {
+        expect(await limiter(request)).toBeNull()
+      }
+
+      for (let i = 0; i < 2; i++) {
         const result = await limiter(request)
-        const remaining = parseInt(result?.headers.get('X-RateLimit-Remaining') || '0')
-        expect(remaining).toBe(5 - i - 1)
+        expect(result?.status).toBe(429)
+        expect(result?.headers.get('X-RateLimit-Remaining')).toBe('0')
       }
     })
   })

@@ -6,15 +6,20 @@ import * as rateLimitModule from './api-rate-limit-middleware'
 // Mock dependencies
 jest.mock('./auth')
 jest.mock('./api-rate-limit-middleware')
-jest.mock('./logger', () => ({
-  logger: {
+jest.mock('./logger', () => {
+  const mockLogger = {
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
     info: jest.fn(),
-  },
-  createLogContext: jest.fn(),
-}))
+  }
+  return {
+    logger: mockLogger,
+    // Called at module load by api-rate-limit-middleware (loaded to build its automock)
+    createLogger: jest.fn(() => mockLogger),
+    createLogContext: jest.fn(),
+  }
+})
 
 describe('Auth Middleware Wrapper', () => {
   let mockRequest: Partial<NextRequest>
@@ -29,9 +34,6 @@ describe('Auth Middleware Wrapper', () => {
       headers: new Headers(),
     }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
   })
 
   describe('withAuthProtection', () => {

@@ -1,3 +1,4 @@
+/** @jest-environment jsdom */
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ConductorDock } from '@/components/ConductorDock'
@@ -23,11 +24,7 @@ describe('ConductorDock UUID Integration', () => {
     const input = screen.getByPlaceholderText('Dispatch task...')
     const sendButton = screen.getByText('Send')
 
-    fireEvent.change(input, { target: { value: 'Test message' }
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  }) })
+    fireEvent.change(input, { target: { value: 'Test message' } })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
@@ -92,6 +89,7 @@ describe('ConductorDock UUID Integration', () => {
     await waitFor(() => {
       expect(uuidModule.generatePrefixedId).toHaveBeenCalled()
     })
+    const callsAfterFirstMessage = (uuidModule.generatePrefixedId as jest.Mock).mock.calls.length
 
     // Send second message
     rerender(<ConductorDock />)
@@ -102,9 +100,12 @@ describe('ConductorDock UUID Integration', () => {
     fireEvent.click(sendButton2)
 
     // Verify generatePrefixedId was called multiple times
-    expect(uuidModule.generatePrefixedId).toHaveBeenCalledTimes(
-      expect.any(Number)
-    )
+    // (toHaveBeenCalledTimes does not accept asymmetric matchers; assert the count grew instead)
+    await waitFor(() => {
+      expect(
+        (uuidModule.generatePrefixedId as jest.Mock).mock.calls.length
+      ).toBeGreaterThan(callsAfterFirstMessage)
+    })
   })
 
   it('does not use Date.now() for message IDs', async () => {

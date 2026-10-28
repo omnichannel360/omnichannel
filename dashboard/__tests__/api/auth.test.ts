@@ -26,7 +26,7 @@ describe('JWT Authentication System', () => {
   describe('Token Verification', () => {
     test('should verify valid token successfully', async () => {
       const token = await generateToken(testUserId, testEmail, testRole)
-      const mockRequest = createMockRequest(token)
+      const mockRequest = createMockRequest(`Bearer ${token}`)
       
       const result = await verifyAuth(mockRequest as any)
       
@@ -64,7 +64,7 @@ describe('JWT Authentication System', () => {
 
     test('with valid token should proceed', async () => {
       const token = await generateToken(testUserId, testEmail, testRole)
-      const mockRequest = createMockRequest(token)
+      const mockRequest = createMockRequest(`Bearer ${token}`)
       
       const result = await verifyAuth(mockRequest as any)
       

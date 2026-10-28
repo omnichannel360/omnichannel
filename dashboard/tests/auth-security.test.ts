@@ -4,7 +4,7 @@
  * TDD approach: RED → GREEN → REFACTOR
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import {
@@ -72,6 +72,22 @@ function createRequestWithHeaders(headers: Record<string, string>): NextRequest 
     method: 'GET',
     headers: headerObj,
   })
+}
+
+/**
+ * Request stub whose Authorization header bypasses WHATWG Headers validation.
+ * Headers rejects non-ByteString / control characters at construction time, so this
+ * is the only way to feed such values to the auth layer and assert it rejects them too.
+ */
+function createRawAuthRequest(token: string): NextRequest {
+  const authorization = `Bearer ${token}`
+  return {
+    method: 'GET',
+    nextUrl: new URL('http://localhost:3000/api/test'),
+    headers: {
+      get: (name: string) => (name.toLowerCase() === 'authorization' ? authorization : null),
+    },
+  } as unknown as NextRequest
 }
 
 // ============================================================================
@@ -604,9 +620,12 @@ describe('Security Edge Cases', () => {
 
     it('should handle token with unicode characters', async () => {
       const unicodeToken = '测试token中文字符.payload.signature'
-      const request = createRequestWithToken(unicodeToken)
 
-      const context = await getAuthContext(request)
+      // Transport layer: non-ByteString header values cannot even be constructed
+      expect(() => createRequestWithToken(unicodeToken)).toThrow(/ByteString|invalid header value/)
+
+      // Auth layer: still rejected if such a value reaches it
+      const context = await getAuthContext(createRawAuthRequest(unicodeToken))
 
       expect(context.authenticated).toBe(false)
     })
@@ -683,9 +702,12 @@ describe('Security Edge Cases', () => {
 
     it('should reject null bytes in token', async () => {
       const malformedToken = 'valid.part\x00.signature'
-      const request = createRequestWithToken(malformedToken)
 
-      const context = await getAuthContext(request)
+      // Transport layer: header values containing NUL are invalid and cannot be constructed
+      expect(() => createRequestWithToken(malformedToken)).toThrow(/ByteString|invalid header value/)
+
+      // Auth layer: still rejected if such a value reaches it
+      const context = await getAuthContext(createRawAuthRequest(malformedToken))
 
       expect(context.authenticated).toBe(false)
     })

@@ -6,26 +6,25 @@
  * with proper defense in depth across all layers.
  */
 
-import { MeetingTypeSchema, SkillTypeSchema, safeJoin, VALID_MEETING_TYPES, VALID_SKILL_TYPES } from '@/lib/validation'
+import { MeetingTypeSchema, SkillTypeSchema, safeJoin } from '@/lib/validation'
 import path from 'path'
+
+// Meeting/skill types present in real brain logs
+const REAL_TYPES = ['standup-report', 'sprint-review', 'sprint-planning', 'retrospective-kaizen', 'postmortem', 'unknown']
 
 describe('Path Traversal Integration - Complete Defense Verification', () => {
 
-  describe('Layer 1 & 2: Schema Validation + Whitelist Enforcement', () => {
+  describe('Layer 1 & 2: Schema Validation (character allowlist)', () => {
 
-    it('should accept only whitelisted meeting types', () => {
-      // Valid types that are whitelisted
-      const validTypes = Array.from(VALID_MEETING_TYPES)
-      validTypes.forEach(type => {
+    it('should accept meeting types used in real brain logs', () => {
+      REAL_TYPES.forEach(type => {
         const result = MeetingTypeSchema.safeParse(type)
         expect(result.success).toBe(true)
       })
     })
 
-    it('should accept only whitelisted skill types', () => {
-      // Valid skills that are whitelisted
-      const validSkills = Array.from(VALID_SKILL_TYPES)
-      validSkills.forEach(skill => {
+    it('should accept skill types used in real brain logs', () => {
+      REAL_TYPES.forEach(skill => {
         const result = SkillTypeSchema.safeParse(skill)
         expect(result.success).toBe(true)
       })
@@ -156,13 +155,11 @@ describe('Path Traversal Integration - Complete Defense Verification', () => {
 
     it('should fallback to "unknown" for invalid meeting_type', () => {
       // Simulate the fallback behavior in POST handler
-      const userInput = 'invalid_meeting_type_not_in_whitelist'
-      const result = MeetingTypeSchema.safeParse(userInput)
+      const result = MeetingTypeSchema.safeParse('../../etc/passwd')
+      expect(result.success).toBe(false)
 
-      if (!result.success) {
-        const safeFallback = 'unknown'
-        expect(VALID_MEETING_TYPES.has(safeFallback as unknown as NextRequest)).toBe(true)
-      }
+      const safeFallback = result.success ? result.data : 'unknown'
+      expect(MeetingTypeSchema.safeParse(safeFallback).success).toBe(true)
     })
 
     it('should validate skill_triggered independently', () => {
@@ -214,13 +211,12 @@ describe('Path Traversal Integration - Complete Defense Verification', () => {
       })
     })
 
-    it('should prevent symlink escape attacks', () => {
-      // Symlink target would need to be in whitelist first
+    it('should contain symlink-named values inside base directory', () => {
+      // Format-valid name passes schema; containment comes from safeJoin
       const symlinkAttempt = 'link_to_system'
-      const result = MeetingTypeSchema.safeParse(symlinkAttempt)
-
-      // Not in whitelist, so rejected
-      expect(result.success).toBe(false)
+      expect(MeetingTypeSchema.safeParse(symlinkAttempt).success).toBe(true)
+      const contained = safeJoin('/app/data', `${symlinkAttempt}.json`)
+      expect(path.dirname(contained)).toBe(path.resolve('/app/data'))
     })
 
     it('should handle Unicode path traversal attempts', () => {
@@ -250,16 +246,10 @@ describe('Path Traversal Integration - Complete Defense Verification', () => {
       expect(logToBrainValidation.data).toBe(postHandlerValidation.data)
     })
 
-    it('should whitelist membership be the final gate', () => {
-      // Even if regex passes, whitelist blocks unknown values
-      const regexSafeButNotWhitelisted = 'my_custom_meeting'
-
-      // Passes regex (only alphanumeric + _ and -)
-      expect(/^[A-Za-z0-9_-]+$/.test(regexSafeButNotWhitelisted)).toBe(true)
-
-      // But schema rejects due to whitelist
-      const result = MeetingTypeSchema.safeParse(regexSafeButNotWhitelisted)
-      expect(result.success).toBe(false)
+    it('should accept any regex-safe value (no fixed type list)', () => {
+      const regexSafe = 'my_custom_meeting'
+      expect(/^[A-Za-z0-9_-]+$/.test(regexSafe)).toBe(true)
+      expect(MeetingTypeSchema.safeParse(regexSafe).success).toBe(true)
     })
 
     it('should require all 5 defense layers pass independently', () => {

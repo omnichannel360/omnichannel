@@ -3,7 +3,6 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { withFileLock } from '@/lib/file-lock'
 import { logger, createLogContext } from '@/lib/logger'
-import { applyRateLimit } from '@/lib/api-rate-limit-middleware'
 import { validateBody } from '@/lib/validation/middleware'
 import { ProfileUpdateSchema, type ProfileUpdate } from '@/lib/validation/schemas'
 import { validateQuery } from '@/lib/validation/middleware'
@@ -65,9 +64,6 @@ function inferRoleFromName(name: string): string {
 export const GET = protectRoute(
   async (request: NextRequest, { userId }) => {
     const requestId = extractCorrelationFromRequest(request.headers)
-    // Apply rate limiting
-    const rateLimitError = await applyRateLimit(request, 'profiles')
-    if (rateLimitError) return rateLimitError
 
     const startTime = Date.now()
     const logContext = createLogContext({
@@ -86,8 +82,9 @@ export const GET = protectRoute(
 
     try {
       const profiles = await withFileLock(PROFILES_DIR, async () => {
+        // Profiles are runtime data outside the deploy; keep the build tracer from bundling the whole project
         try {
-          await fs.stat(PROFILES_DIR)
+          await fs.stat(/*turbopackIgnore: true*/ PROFILES_DIR)
         } catch (error) {
           logger.debug('Profiles directory not found, returning empty list', {
             ...logContext,
@@ -96,7 +93,7 @@ export const GET = protectRoute(
           return []
         }
 
-        const entries = await fs.readdir(PROFILES_DIR, { withFileTypes: true })
+        const entries = await fs.readdir(/*turbopackIgnore: true*/ PROFILES_DIR, { withFileTypes: true })
         return entries
           .filter(entry => entry.isDirectory())
           .map(entry => ({

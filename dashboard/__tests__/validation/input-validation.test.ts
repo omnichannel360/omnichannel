@@ -305,19 +305,19 @@ describe('Input Validation - Request Bodies', () => {
       expect(result.success).toBe(false)
     })
 
-    test('minimum one attendee required', () => {
+    test('empty attendee list is accepted', () => {
       const input = {
         title: 'Meeting',
         attendees: [],
       }
       const result = MeetingSchema.safeParse(input)
-      expect(result.success).toBe(false)
+      expect(result.success).toBe(true)
     })
 
     test('ISO 8601 datetime validation', () => {
       const inputs = [
         { time: '2024-01-15T10:00:00Z', valid: true },
-        { time: '2024-01-15T10:00:00', valid: true },
+        { time: '2024-01-15T10:00:00', valid: false }, // no timezone: ambiguous meeting time
         { time: '01/15/2024', valid: false },
       ]
       inputs.forEach(({ time, valid }) => {

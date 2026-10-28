@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+/** @jest-environment jsdom */
+import { render, screen, within } from '@testing-library/react'
 import { AgentDossier } from '@/components/AgentDossier'
 
 describe('AgentDossier Component', () => {
@@ -16,7 +17,7 @@ describe('AgentDossier Component', () => {
 
       const header = screen.getByRole('banner')
       expect(header).toBeInTheDocument()
-      expect(screen.getByText('Active')).toBeInTheDocument()
+      expect(within(header).getByText('Active')).toBeInTheDocument()
     })
 
     it('should display metrics section with correct labels', () => {
@@ -143,8 +144,9 @@ describe('AgentDossier Component', () => {
     it('should display status badges', () => {
       render(<AgentDossier agentId={testAgentId} />)
 
-      const activeStatusElement = screen.getByText('Active')
-      expect(activeStatusElement).toBeInTheDocument()
+      // 'Active' is rendered as a header badge and as the Status value in the details list
+      expect(screen.getAllByText('Active')).toHaveLength(2)
+      expect(within(screen.getByRole('banner')).getByText('Active')).toBeInTheDocument()
     })
 
     it('should display agent ID in monospace font', () => {
@@ -175,8 +177,10 @@ describe('AgentDossier Component', () => {
       render(<AgentDossier agentId={testAgentId} />)
 
       // Green status indicator for active agent
-      const statusIndicator = screen.getByText('Active').parentElement
+      const header = screen.getByRole('banner')
+      const statusIndicator = within(header).getByText('Active').parentElement
       expect(statusIndicator).toBeInTheDocument()
+      expect(within(header).getByRole('img', { name: 'Agent status: Active' })).toHaveClass('bg-green-500')
     })
   })
 

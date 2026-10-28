@@ -1,4 +1,4 @@
-﻿import { describe, it, beforeEach, afterEach, expect, vi } from '@jest/globals'
+﻿import { describe, it, beforeEach, afterEach, expect, jest } from '@jest/globals'
 import { generateToken } from '@/lib/auth'
 
 describe('Protected API Endpoints', () => {
@@ -12,13 +12,13 @@ describe('Protected API Endpoints', () => {
     expiredToken = await generateToken('test-user', 'test@example.com', 'user', -1)
 
     // Mock fetch for API calls
-    mockFetch = vi.fn()
+    mockFetch = jest.fn()
     global.fetch = mockFetch
   })
 
   afterEach(() => {
     // CLEANUP: Reset mocks and restore original fetch
-    vi.resetAllMocks()
+    jest.resetAllMocks()
     delete (global as unknown as any).fetch
   })
 
@@ -35,7 +35,7 @@ describe('Protected API Endpoints', () => {
 
       // Assert
       expect(response.status).toBe(401)
-      expect(mockFetch).toHaveBeenCalledWith('/api/alerts', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith('/api/alerts')
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
@@ -131,7 +131,7 @@ describe('Protected API Endpoints', () => {
 
       // Assert
       expect(response.status).toBe(401)
-      expect(mockFetch).toHaveBeenCalledWith('/api/brain', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith('/api/brain')
     })
 
     it('should return 200 with valid token', async () => {

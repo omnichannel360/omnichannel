@@ -259,7 +259,9 @@ describe('Async File Operations', () => {
       .readFile(path.join(testDir, 'nonexistent.json'), 'utf-8')
       .catch(e => e)
 
-    expect(error).toBeInstanceOf(Error)
+    // Node fs errors come from the host realm, so `instanceof Error` fails inside
+    // Jest's VM context; assert on the error shape instead.
+    expect(Object.prototype.toString.call(error)).toBe('[object Error]')
     expect((error as NodeJS.ErrnoException).code).toBe('ENOENT')
   })
 

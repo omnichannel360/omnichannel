@@ -1,4 +1,5 @@
-﻿import React from 'react'
+/** @jest-environment jsdom */
+import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { GalaxyGraph } from '../../components/GalaxyGraph'
 
@@ -15,25 +16,27 @@ describe('GalaxyGraph - XSS Vulnerability Prevention', () => {
       const xssPayload = '<script>alert("XSS")</script>'
       ;(global.fetch as jest.Mock).mockRejectedValueOnce(new Error(xssPayload))
 
-      render(<GalaxyGraph />)
+      const { container } = render(<GalaxyGraph />)
 
       await waitFor(() => {
-        const errorText = screen.getByText(/Error:/)
-        expect(errorText).toBeInTheDocument()
-        expect(screen.queryByText(/alert/)).not.toBeInTheDocument()
+        expect(screen.getByText(/Error:/)).toBeInTheDocument()
       })
+      // Payload is shown only as escaped text; no script element is created
+      expect(screen.getByText(/Error:/).textContent).toBe(`Error: ${xssPayload}`)
+      expect(container.querySelector('script')).toBeNull()
     })
 
     it('should escape event handlers in error messages', async () => {
       const xssPayload = '<img src=x onerror="alert(1)">'
       ;(global.fetch as jest.Mock).mockRejectedValueOnce(new Error(xssPayload))
 
-      render(<GalaxyGraph />)
+      const { container } = render(<GalaxyGraph />)
 
       await waitFor(() => {
-        expect(screen.queryByRole('img')).not.toBeInTheDocument()
         expect(screen.getByText(/Error:/)).toBeInTheDocument()
       })
+      expect(screen.queryByRole('img')).not.toBeInTheDocument()
+      expect(container.querySelector('[onerror]')).toBeNull()
     })
   })
 
@@ -44,15 +47,16 @@ describe('GalaxyGraph - XSS Vulnerability Prevention', () => {
         error: '<img src=x onerror="alert(\'API XSS\')">'
       }
       ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
         json: async () => apiResponse
       })
 
       render(<GalaxyGraph />)
 
       await waitFor(() => {
-        expect(screen.queryByRole('img')).not.toBeInTheDocument()
         expect(screen.getByText(/Error:/)).toBeInTheDocument()
       })
+      expect(screen.queryByRole('img')).not.toBeInTheDocument()
     })
   })
 
@@ -69,12 +73,10 @@ describe('GalaxyGraph - XSS Vulnerability Prevention', () => {
     })
 
     it('should display success state with node counts', async () => {
+      const profiles = Array.from({ length: 42 }, (_, i) => ({ name: `agent-${i}` }))
       ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-        json: async () => ({ success: true, meta: { total: 42 }
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  }) })
+        ok: true,
+        json: async () => ({ success: true, data: profiles })
       })
 
       render(<GalaxyGraph />)
@@ -86,14 +88,18 @@ describe('GalaxyGraph - XSS Vulnerability Prevention', () => {
   })
 
   describe('Component Rendering', () => {
-    it('should render the component with initial state', () => {
+    it('should render the component with initial state', async () => {
       ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-        json: async () => ({ success: true, meta: { total: 4 } })
+        ok: true,
+        json: async () => ({ success: true, data: [] })
       })
 
       render(<GalaxyGraph />)
 
-      expect(screen.getByText('Galaxy Graph Visualization')).toBeInTheDocument()
+      // Page heading lives in app/page.tsx; the component renders the stats bar and legend
+      expect(screen.getByText(/Agents: 0 \| Base Nodes: 4 \| Links: 3/)).toBeInTheDocument()
+      expect(screen.getByText('agent')).toBeInTheDocument()
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/profiles', expect.anything()))
     })
   })
 })

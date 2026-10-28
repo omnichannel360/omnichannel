@@ -25,8 +25,8 @@ interface HealthStatus {
   components: {
     meetings_api: { status: string; response_time_ms: number }
     conductor_api: { status: string; response_time_ms: number }
-    company_brain: { status: string; log_count: number; latest_timestamp: string | null }
-    skill_registry: { status: string; skill_count: number }
+    company_brain: { status: string; response_time_ms: number; log_count: number; latest_timestamp: string | null }
+    skill_registry: { status: string; response_time_ms: number; skill_count: number }
   }
   metrics: {
     total_meetings_processed: number
@@ -257,7 +257,7 @@ export async function GET(request: NextRequest) {
       requestId: correlationId,
       method: request.method,
       path: request.nextUrl.pathname,
-      error: queryResult.error?.toString() || 'Unknown validation error',
+      error: 'Unknown validation error',
     })
     return queryResult.response
   }
@@ -278,7 +278,7 @@ export async function GET(request: NextRequest) {
 
     const successRate = meetingsStats.count > 0 ? meetingsStats.success_count / meetingsStats.count : 0
     const alerts = generateAlerts(meetingsStats.count, successRate, brainStats.count, skillCount)
-    const hasErrorAlert = alerts.some(a => a.startsWith(ALERT_PREFIXES.ERROR))
+    const hasErrorAlert = alerts.some(a => a.startsWith(ALERT_PREFIXES.error))
 
     const status: HealthStatus = {
       status:

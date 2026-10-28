@@ -31,7 +31,7 @@ const withFileLock = withLock
  * @returns Array of filenames in directory
  */
 export async function atomicReaddir(dirPath: string): Promise<string[]> {
-  return withLock(dirPath, async (_lock) => {
+  return withLock(dirPath, async () => {
     try {
       // Ensure directory exists (idempotent)
       await fs.mkdir(dirPath, { recursive: true })
@@ -58,7 +58,7 @@ export async function atomicReaddir(dirPath: string): Promise<string[]> {
  * @param dirPath - Directory path
  */
 export async function atomicMkdir(dirPath: string): Promise<void> {
-  return withLock(dirPath, async (_lock) => {
+  return withLock(dirPath, async () => {
     try {
       await fs.mkdir(dirPath, { recursive: true })
     } catch (error) {
@@ -89,7 +89,7 @@ export async function atomicProcessDirectory<T>(
   dirPath: string,
   processor: (filename: string) => Promise<T>
 ): Promise<T[]> {
-  return withLock(dirPath, async (_lock) => {
+  return withLock(dirPath, async () => {
     // Ensure directory exists
     try {
       await fs.mkdir(dirPath, { recursive: true })
@@ -128,7 +128,7 @@ export async function atomicProcessDirectory<T>(
  * @returns Number of files in directory
  */
 export async function atomicFileCount(dirPath: string): Promise<number> {
-  return withLock(dirPath, async (_lock) => {
+  return withLock(dirPath, async () => {
     try {
       await fs.mkdir(dirPath, { recursive: true })
       const files = await fs.readdir(dirPath)

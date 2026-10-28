@@ -59,7 +59,8 @@ function defaultErrorFormatter(
   statusCode: number
   details?: Record<string, unknown>
 } {
-  if (error instanceof SyntaxError && 'body' in error) {
+  // request.json() in Next.js throws a plain SyntaxError (no Express-style 'body' prop)
+  if (error instanceof SyntaxError) {
     return {
       message: 'Invalid JSON in request body',
       statusCode: 400,

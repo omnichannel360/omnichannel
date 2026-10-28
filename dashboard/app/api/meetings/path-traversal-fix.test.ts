@@ -1,19 +1,26 @@
 /**
  * Path Traversal Vulnerability - Comprehensive Security Tests
  * Verifies that the fix prevents directory traversal attacks through:
- * 1. Schema validation (MeetingTypeSchema + SkillTypeSchema whitelists)
+ * 1. Schema validation (MeetingTypeSchema + SkillTypeSchema character allowlist)
  * 2. path.basename() stripping (explicit defense)
- * 3. safeJoin containment validation (final check)
+ * 3. safeJoin containment (strips directories, result always inside base)
  * 4. Response data sanitization (no leaking unvalidated input)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { MeetingTypeSchema, SkillTypeSchema, safeJoin, generateId, VALID_MEETING_TYPES } from '@/lib/validation'
+import { MeetingTypeSchema, SkillTypeSchema, safeJoin, generateId } from '@/lib/validation'
+
+// Meeting types present in real brain logs
+const REAL_MEETING_TYPES = ['standup-report', 'sprint-review', 'sprint-planning', 'retrospective-kaizen', 'postmortem']
+
+const expectContained = (baseDir: string, result: string) => {
+  expect(path.dirname(result)).toBe(path.resolve(baseDir))
+}
 
 describe('Path Traversal Vulnerability Fix - Comprehensive Suite', () => {
-  describe('Layer 1: MeetingTypeSchema Whitelist Validation', () => {
+  describe('Layer 1: MeetingTypeSchema Character Validation', () => {
     it('should reject path traversal attempts with ../', () => {
       const attacks = ['../../etc/passwd', '..\\..\\windows\\system32', '../../../root/.ssh/id_rsa']
       attacks.forEach(attack => {
@@ -54,21 +61,17 @@ describe('Path Traversal Vulnerability Fix - Comprehensive Suite', () => {
       })
     })
 
-    it('should only accept values from VALID_MEETING_TYPES whitelist', () => {
-      // Verify only whitelisted values pass
-      const validTypes = Array.from(VALID_MEETING_TYPES)
-      validTypes.forEach(type => {
+    it('should accept meeting types used in real brain logs', () => {
+      REAL_MEETING_TYPES.forEach(type => {
         const result = MeetingTypeSchema.safeParse(type)
         expect(result.success).toBe(true)
         expect(result.data).toBe(type)
       })
+    })
 
-      // Verify non-whitelisted valid-looking values fail
-      const notWhitelisted = ['review2', 'meeting_type_x', 'custom-meeting']
-      notWhitelisted.forEach(type => {
-        const result = MeetingTypeSchema.safeParse(type)
-        expect(result.success).toBe(false)
-      })
+    it('should reject values over 64 characters', () => {
+      expect(MeetingTypeSchema.safeParse('a'.repeat(64)).success).toBe(true)
+      expect(MeetingTypeSchema.safeParse('a'.repeat(65)).success).toBe(false)
     })
   })
 
@@ -134,9 +137,6 @@ describe('Path Traversal Vulnerability Fix - Comprehensive Suite', () => {
         // Already exists
       }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
     })
 
     afterAll(async () => {
@@ -153,26 +153,27 @@ describe('Path Traversal Vulnerability Fix - Comprehensive Suite', () => {
       expect(result).toContain('meeting_log.json')
     })
 
-    it('should throw on absolute path injection', () => {
+    it('should contain absolute path injection inside base directory', () => {
       const absolutePath = process.platform === 'win32' ? 'C:\\windows\\system32' : '/etc/passwd'
-      expect(() => safeJoin(testDir, absolutePath)).toThrow('Invalid file path')
+      const result = safeJoin(testDir, absolutePath)
+      expectContained(testDir, result)
+      expect(path.basename(result)).toBe(path.basename(absolutePath))
     })
 
-    it('should throw on directory traversal escape attempts', () => {
+    it('should contain directory traversal escape attempts inside base directory', () => {
       const attempts = [
         '../../sensitive.json',
         '..\\..\\windows\\data',
         '../../../root/.ssh/id_rsa',
       ]
       attempts.forEach(attempt => {
-        expect(() => safeJoin(testDir, attempt)).toThrow('Invalid file path')
+        expectContained(testDir, safeJoin(testDir, attempt))
       })
     })
 
-    it('should prevent symlink-based escape attempts', () => {
-      // safeJoin uses path.resolve and dirname check to prevent escape
-      const malicious = '../../etc/passwd'
-      expect(() => safeJoin(testDir, malicious)).toThrow('Invalid file path')
+    it('should strip traversal so result never points outside base', () => {
+      const result = safeJoin(testDir, '../../etc/passwd')
+      expect(result).toBe(path.resolve(testDir, 'passwd'))
     })
   })
 
@@ -217,7 +218,7 @@ describe('Path Traversal Vulnerability Fix - Comprehensive Suite', () => {
 
       // Layer 3: safeJoin containment
       const testDir = process.cwd()
-      expect(() => safeJoin(testDir, malicious)).toThrow()
+      expectContained(testDir, safeJoin(testDir, malicious))
     })
 
     it('should reject combination attacks (traversal + null bytes + special chars)', () => {

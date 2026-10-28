@@ -70,9 +70,6 @@ describe('RateLimiter', () => {
       expect(result.allowed).toBe(true)
     }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
   })
 
   test('blocks requests exceeding limit', async () => {
