@@ -278,7 +278,7 @@ export async function GET(request: NextRequest) {
 
     const successRate = meetingsStats.count > 0 ? meetingsStats.success_count / meetingsStats.count : 0
     const alerts = generateAlerts(meetingsStats.count, successRate, brainStats.count, skillCount)
-    const hasErrorAlert = alerts.some(a => a.startsWith(ALERT_PREFIXES.ERROR))
+    const hasErrorAlert = alerts.some(a => a.startsWith(ALERT_PREFIXES.error))
 
     const status: HealthStatus = {
       status:

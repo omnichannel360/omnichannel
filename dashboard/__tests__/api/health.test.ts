@@ -74,9 +74,11 @@ describe('/api/health - Async I/O Conversion Tests', () => {
     const statSpy = jest.fn().mockResolvedValue({ isDirectory: () => true })
     mockFs.stat.mockImplementationOnce(statSpy)
     mockFs.readdir.mockResolvedValueOnce(['meeting-1.json'])
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify({ timestamp: '2026-10-21T12:00:00Z' }))
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify([{ status: 'scheduled' }]))
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify({ meeting_skills: ['skill1', 'skill2'] }))
+    mockReadFileByName({
+      'meeting-1.json': JSON.stringify({ timestamp: '2026-10-21T12:00:00Z' }),
+      'meetings-log.json': JSON.stringify([{ status: 'scheduled' }]),
+      'registry.json': JSON.stringify({ meeting_skills: ['skill1', 'skill2'] }),
+    })
 
     verifyAuth.mockResolvedValueOnce({ authenticated: true })
 
@@ -134,8 +136,11 @@ describe('/api/health - Async I/O Conversion Tests', () => {
     const mockFs = require('fs').promises
     mockFs.stat.mockResolvedValueOnce({ isDirectory: () => true })
     mockFs.readdir.mockResolvedValueOnce(['invalid.json'])
-    // Return invalid JSON string that will fail to parse
-    mockFs.readFile.mockResolvedValueOnce('{ invalid json content }')
+    // Brain record is invalid JSON; skill registry is valid so only warning-level alerts remain
+    mockReadFileByName({
+      'invalid.json': '{ invalid json content }',
+      'registry.json': JSON.stringify({ meeting_skills: ['skill1'] }),
+    })
 
     verifyAuth.mockResolvedValueOnce({ authenticated: true })
 
@@ -180,13 +185,13 @@ describe('/api/health - Async I/O Conversion Tests', () => {
   })
 
   it('should generate appropriate alerts for degraded state', async () => {
+    // Warning/info alerts only (no brain logs, no meetings), skill registry present
     const mockFs = require('fs').promises
-    mockFs.stat.mockResolvedValueOnce({ isDirectory: () => true })
+    mockFs.stat.mockResolvedValue({ isDirectory: () => true })
     mockFs.readdir.mockResolvedValueOnce([])
-    mockFs.readFile.mockRejectedValueOnce(new Error('ENOENT'))
-    mockFs.readFile.mockRejectedValueOnce(new Error('ENOENT'))
-
-    verifyAuth.mockResolvedValueOnce({ authenticated: true })
+    mockReadFileByName({
+      'registry.json': JSON.stringify({ meeting_skills: ['skill1'] }),
+    })
 
     const request = new NextRequest(new URL('http://localhost:3000/api/health'), {
       method: 'GET',
@@ -196,6 +201,31 @@ describe('/api/health - Async I/O Conversion Tests', () => {
     const data = await response.json()
 
     expect(data.alerts.length).toBeGreaterThan(0)
+    expect(data.alerts.some((a: string) => a.startsWith('[ERROR]'))).toBe(false)
     expect(data.status).toBe('degraded')
+    expect(response.status).toBe(200)
+  })
+
+  it('should report unhealthy with 503 when an error-level alert is raised', async () => {
+    // Empty skill registry raises an [ERROR] alert
+    const mockFs = require('fs').promises
+    mockFs.stat.mockResolvedValue({ isDirectory: () => true })
+    mockFs.readdir.mockResolvedValueOnce(['meeting-1.json'])
+    mockReadFileByName({
+      'meeting-1.json': JSON.stringify({ timestamp: '2026-10-21T12:00:00Z' }),
+      'meetings-log.json': JSON.stringify([{ status: 'scheduled' }]),
+      'registry.json': JSON.stringify({ meeting_skills: [] }),
+    })
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/health'), {
+      method: 'GET',
+    })
+
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(data.alerts).toContain('[ERROR] Skill registry not found or empty')
+    expect(data.status).toBe('unhealthy')
+    expect(response.status).toBe(503)
   })
 })
